@@ -231,14 +231,14 @@ export const searchService = {
       // Get category suggestions
       const { data: categories } = await supabase
         .from('categories')
-        .select('name')
+        .select('id, name')
         .ilike('name', `%${query}%`)
         .limit(3);
 
       // Get brand suggestions
       const { data: brands } = await supabase
         .from('brands')
-        .select('name')
+        .select('id, name')
         .ilike('name', `%${query}%`)
         .limit(3);
 
