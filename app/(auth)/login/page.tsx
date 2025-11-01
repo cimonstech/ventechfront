@@ -203,6 +203,7 @@ export default function LoginPage() {
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19] focus:border-transparent text-sm"
                   placeholder="you@example.com"
                   required
+                  suppressHydrationWarning
                 />
               </div>
               {errors.email && (
@@ -226,6 +227,7 @@ export default function LoginPage() {
                   className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19] focus:border-transparent text-sm"
                   placeholder="Enter your password"
                   required
+                  suppressHydrationWarning
                 />
                 <button
                   type="button"

@@ -68,11 +68,12 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
         >
           {/* Background Image */}
           <Image
-            src={banner.image_url}
+            src={banner.image_url || '/placeholders/placeholder-banner.webp'}
             alt={banner.title}
             fill
             className="object-cover"
             priority={index === 0}
+            unoptimized
           />
 
           {/* Overlay */}

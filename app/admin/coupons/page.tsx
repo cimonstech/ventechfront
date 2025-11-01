@@ -216,12 +216,12 @@ export default function AdminCouponsPage() {
       </div>
 
       {/* Coupons Table */}
-      <div className="bg-white rounded-lg shadow-sm border">
+      <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[800px]">
             <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Code
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -248,82 +248,92 @@ export default function AdminCouponsPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {coupons.map((coupon) => (
-                <tr key={coupon.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      <code className="bg-gray-100 px-2 py-1 rounded text-sm font-mono">
-                        {coupon.code}
-                      </code>
-                      <button
-                        onClick={() => copyToClipboard(coupon.code)}
-                        className="text-gray-400 hover:text-gray-600"
-                      >
-                        <Copy className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{coupon.name}</div>
-                      {coupon.description && (
-                        <div className="text-sm text-gray-500">{coupon.description}</div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <Badge className={`${getTypeColor(coupon.type)} flex items-center gap-1 w-fit`}>
-                      {getTypeIcon(coupon.type)}
-                      {coupon.type.replace('_', ' ')}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {coupon.type === 'percentage' ? `${coupon.value}%` : 
-                     coupon.type === 'fixed_amount' ? `GHS ${coupon.value}` : 
-                     'Free Delivery'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div className="flex items-center gap-1">
-                      <Users className="w-4 h-4" />
-                      {coupon.used_count}
-                      {coupon.usage_limit && ` / ${coupon.usage_limit}`}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <Badge 
-                      variant={isActive(coupon) ? 'success' : 'error'}
-                    >
-                      {isActive(coupon) ? 'Active' : 
-                       isExpired(coupon.valid_until) ? 'Expired' : 'Inactive'}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <div className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4" />
-                      {coupon.valid_until ? 
-                        new Date(coupon.valid_until).toLocaleDateString() : 
-                        'No expiry'
-                      }
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleEditCoupon(coupon)}
-                        className="text-[#FF7A19] hover:text-[#FF7A19]/80"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteCoupon(coupon.id)}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+              {coupons.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                    No coupons found. Create your first coupon above.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                coupons.map((coupon) => (
+                  <tr key={coupon.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <code className="bg-gray-100 px-2 py-1 rounded text-sm font-mono">
+                          {coupon.code}
+                        </code>
+                        <button
+                          onClick={() => copyToClipboard(coupon.code)}
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">{coupon.name}</div>
+                        {coupon.description && (
+                          <div className="text-xs text-gray-500 truncate max-w-xs">
+                            {coupon.description}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <Badge className={`${getTypeColor(coupon.type)} flex items-center gap-1 w-fit`}>
+                        {getTypeIcon(coupon.type)}
+                        {coupon.type.replace('_', ' ')}
+                      </Badge>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {coupon.type === 'percentage' ? `${coupon.value}%` : 
+                       coupon.type === 'fixed_amount' ? `GHS ${coupon.value}` : 
+                       'Free Delivery'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <div className="flex items-center gap-1">
+                        <Users className="w-4 h-4" />
+                        {coupon.used_count}
+                        {coupon.usage_limit && ` / ${coupon.usage_limit}`}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <Badge 
+                        variant={isActive(coupon) ? 'success' : 'error'}
+                      >
+                        {isActive(coupon) ? 'Active' : 
+                         isExpired(coupon.valid_until) ? 'Expired' : 'Inactive'}
+                      </Badge>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="w-4 h-4" />
+                        {coupon.valid_until ? 
+                          new Date(coupon.valid_until).toLocaleDateString() : 
+                          'No expiry'
+                        }
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleEditCoupon(coupon)}
+                          className="text-[#FF7A19] hover:text-[#FF7A19]/80"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCoupon(coupon.id)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -331,13 +341,15 @@ export default function AdminCouponsPage() {
 
       {/* Create/Edit Modal */}
       {(showCreateModal || editingCoupon) && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <h2 className="text-xl font-bold text-[#1A1A1A] mb-4">
-              {editingCoupon ? 'Edit Coupon' : 'Create New Coupon'}
-            </h2>
-            
-            <form onSubmit={editingCoupon ? handleUpdateCoupon : handleCreateCoupon}>
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="sticky top-0 bg-white border-b px-6 py-4 z-10">
+              <h2 className="text-xl font-bold text-[#1A1A1A]">
+                {editingCoupon ? 'Edit Coupon' : 'Create New Coupon'}
+              </h2>
+            </div>
+            <div className="p-6">
+              <form onSubmit={editingCoupon ? handleUpdateCoupon : handleCreateCoupon}>
               <div className="space-y-4">
                 {/* Code */}
                 <div>
@@ -534,6 +546,7 @@ export default function AdminCouponsPage() {
                 </Button>
               </div>
             </form>
+            </div>
           </div>
         </div>
       )}

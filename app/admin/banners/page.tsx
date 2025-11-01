@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Upload, Plus, Trash2, Eye, EyeOff, MoveUp, MoveDown } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import toast from 'react-hot-toast';
+import { supabase } from '@/lib/supabase';
 
 interface Banner {
   id: string;
@@ -32,10 +33,66 @@ export default function BannersPage() {
     active: true,
   });
 
+  const fetchBanners = async () => {
+    try {
+      setLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast.error('Please login to manage banners');
+        setLoading(false);
+        return;
+      }
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/banners`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Failed to fetch banners' }));
+        throw new Error(errorData.message || `Failed to fetch banners: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      // Filter for hero type banners and map to expected format
+      const heroBanners = (result.data || [])
+        .filter((b: any) => !b.type || b.type === 'hero') // Include all if no type field exists, or filter by hero
+        .map((b: any) => ({
+          id: b.id,
+          title: b.title || '',
+          subtitle: b.subtitle || '',
+          image_url: b.image_url || '',
+          link_url: b.link_url || b.link || '',
+          button_text: b.button_text || 'Shop Now',
+          display_order: b.position || b.order || b.display_order || 1,
+          active: b.active !== false,
+        }))
+        .sort((a: any, b: any) => a.display_order - b.display_order);
+
+      setBanners(heroBanners);
+    } catch (error: any) {
+      console.error('Error fetching banners:', error);
+      const errorMessage = error.message || 'Failed to load banners';
+      toast.error(errorMessage);
+      setBanners([]);
+      
+      // If it's an auth error, log more details
+      if (errorMessage.includes('Unauthorized') || errorMessage.includes('401')) {
+        console.error('Authentication failed. Please check your session.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    // TODO: Fetch banners from Supabase
-    // This is a placeholder
-    setLoading(false);
+    fetchBanners();
   }, []);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -90,10 +147,45 @@ export default function BannersPage() {
       return;
     }
 
+    if (!formData.title) {
+      toast.error('Please enter a title');
+      return;
+    }
+
     try {
-      // TODO: Save to Supabase
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast.error('Please login to create banners');
+        return;
+      }
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/banners`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          title: formData.title,
+          subtitle: formData.subtitle || null,
+          image_url: formData.image_url,
+          link: formData.link_url || null, // Use 'link' column (matches database schema)
+          button_text: formData.button_text || 'Shop Now',
+          order: formData.display_order || 0, // Use 'order' column (matches database schema)
+          active: formData.active !== false,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to create banner');
+      }
+
       toast.success('Banner added successfully!');
       setShowForm(false);
+      
       // Reset form
       setFormData({
         title: '',
@@ -101,34 +193,88 @@ export default function BannersPage() {
         image_url: '',
         link_url: '',
         button_text: 'Shop Now',
-        display_order: 1,
+        display_order: banners.length + 1,
         active: true,
       });
-    } catch (error) {
+
+      // Refresh banners list
+      fetchBanners();
+    } catch (error: any) {
       console.error('Save error:', error);
-      toast.error('Failed to save banner');
+      toast.error(error.message || 'Failed to save banner');
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this banner?')) return;
+    if (!confirm('Are you sure you want to delete this banner?')) return;
 
     try {
-      // TODO: Delete from Supabase
-      toast.success('Banner deleted!');
-    } catch (error) {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast.error('Please login to delete banners');
+        return;
+      }
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/banners/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to delete banner');
+      }
+
+      toast.success('Banner deleted successfully!');
+      
+      // Refresh banners list
+      fetchBanners();
+    } catch (error: any) {
       console.error('Delete error:', error);
-      toast.error('Failed to delete banner');
+      toast.error(error.message || 'Failed to delete banner');
     }
   };
 
   const toggleActive = async (id: string) => {
     try {
-      // TODO: Update active status in Supabase
-      toast.success('Banner status updated!');
-    } catch (error) {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast.error('Please login to update banners');
+        return;
+      }
+
+      const banner = banners.find(b => b.id === id);
+      if (!banner) return;
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/banners/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          active: !banner.active,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to update banner');
+      }
+
+      toast.success(`Banner ${!banner.active ? 'activated' : 'deactivated'}!`);
+      
+      // Refresh banners list
+      fetchBanners();
+    } catch (error: any) {
       console.error('Update error:', error);
-      toast.error('Failed to update status');
+      toast.error(error.message || 'Failed to update status');
     }
   };
 

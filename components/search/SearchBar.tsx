@@ -118,6 +118,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           onFocus={() => setIsOpen(true)}
           placeholder={placeholder}
           className="w-full px-4 py-2.5 pl-12 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19] focus:border-transparent text-sm"
+          suppressHydrationWarning
         />
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
         {query && (

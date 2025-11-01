@@ -43,33 +43,46 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { user, isAuthenticated, isLoading } = useAppSelector((state) => state.auth);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['products', 'analytics']);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    // Wait for auth state to finish loading before checking
-    if (isLoading) {
-      return; // Still loading, don't redirect yet
+    // Mark as mounted to prevent hydration mismatch
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    // Wait for component to mount and auth state to finish loading before checking
+    if (!mounted || isLoading) {
+      return; // Still mounting or loading auth state, don't redirect yet
     }
 
-    // Only redirect if we're certain the user is not authenticated or not admin
-    if (isAuthenticated === false) {
-      // User is definitely not authenticated
-      router.push('/login');
-      return;
-    }
-    
-    if (isAuthenticated === true && user && user.role !== 'admin') {
-      // User is authenticated but not admin
-      router.push('/');
-      toast.error('Access denied. Admin only.');
-      return;
-    }
-    
-    // If isAuthenticated is undefined/null or user is null after loading, treat as not authenticated
-    if (!isAuthenticated || !user) {
-      router.push('/login');
-      return;
-    }
-  }, [isAuthenticated, user, isLoading, router]);
+    // Small delay to ensure auth state is fully settled
+    const timeoutId = setTimeout(() => {
+      // After loading is complete, check authentication status
+      // Only redirect if we're absolutely certain the user is not authenticated or not admin
+      if (!isAuthenticated || !user) {
+        // User is not authenticated after loading completed
+        // Only redirect if we're not already on login page to avoid loops
+        if (pathname !== '/login' && pathname !== '/register') {
+          router.replace('/login');
+        }
+        return;
+      }
+      
+      if (user.role !== 'admin') {
+        // User is authenticated but not admin
+        if (pathname !== '/') {
+          router.replace('/');
+          toast.error('Access denied. Admin only.');
+        }
+        return;
+      }
+      
+      // User is authenticated and is admin - allow access
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
+  }, [isAuthenticated, user, isLoading, mounted, router, pathname]);
 
   const toggleMenu = (label: string) => {
     setExpandedMenus(prev =>
@@ -171,7 +184,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return pathname === href || pathname.startsWith(href + '/');
   };
 
+  // Prevent hydration mismatch by not rendering until mounted
+  if (!mounted) {
+    // Render a minimal loading state that matches server-side rendering
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50" suppressHydrationWarning>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF7A19] mx-auto mb-4"></div>
+          <p className="text-[#3A3A3A]">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   // Show loading state while auth is being checked
+  // This prevents unnecessary redirects during page refresh
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -183,9 +210,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  // After loading, check if user is authenticated and is admin
+  // After loading is complete, check if user is authenticated and is admin
+  // Only render if authenticated as admin, otherwise useEffect will handle redirect
   if (!isAuthenticated || !user || user.role !== 'admin') {
-    // Redirect is handled in useEffect, just return null here to prevent flash
+    // Don't render anything while redirect is happening
+    // This prevents flash of content
     return null;
   }
 

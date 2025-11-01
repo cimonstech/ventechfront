@@ -139,6 +139,7 @@ export default function RegisterPage() {
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19] focus:border-transparent text-sm"
                     placeholder="John"
                     required
+                    suppressHydrationWarning
                   />
                 </div>
                 {errors.firstName && (
@@ -162,6 +163,7 @@ export default function RegisterPage() {
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19] focus:border-transparent text-sm"
                     placeholder="Doe"
                     required
+                    suppressHydrationWarning
                   />
                 </div>
                 {errors.lastName && (
@@ -186,6 +188,7 @@ export default function RegisterPage() {
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19] focus:border-transparent text-sm"
                   placeholder="you@example.com"
                   required
+                  suppressHydrationWarning
                 />
               </div>
               {errors.email && (
@@ -208,6 +211,7 @@ export default function RegisterPage() {
                   onChange={handleChange}
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19] focus:border-transparent text-sm"
                   placeholder="+233 XX XXX XXXX"
+                  suppressHydrationWarning
                 />
               </div>
             </div>
@@ -228,6 +232,7 @@ export default function RegisterPage() {
                   className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19] focus:border-transparent text-sm"
                   placeholder="Min. 8 characters"
                   required
+                  suppressHydrationWarning
                 />
                 <button
                   type="button"
@@ -258,6 +263,7 @@ export default function RegisterPage() {
                   className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19] focus:border-transparent text-sm"
                   placeholder="Confirm your password"
                   required
+                  suppressHydrationWarning
                 />
                 <button
                   type="button"

@@ -76,14 +76,14 @@ export default function Home() {
   return (
     <div className="bg-white">
       {/* Hero Section */}
-      <section className="container mx-auto px-4 py-6">
+      <section className="container mx-auto px-3 sm:px-4 py-4 sm:py-6">
         <HeroSlider banners={heroBanners} />
       </section>
 
       {/* Features Section */}
-      <section className="bg-gray-50 py-8 border-y border-gray-200">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <section className="bg-gray-50 py-6 sm:py-8 border-y border-gray-200">
+        <div className="container mx-auto px-3 sm:px-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             <div className="flex flex-col items-center text-center p-4">
               <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-3">
                 <Truck className="text-[#FF7A19]" size={24} />
@@ -120,8 +120,8 @@ export default function Home() {
       </section>
 
       {/* Quick Categories */}
-      <section className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <section className="container mx-auto px-3 sm:px-4 py-6 sm:py-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
           <Link href="/categories/smartphones">
             <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-6 text-center hover:shadow-lg transition-shadow cursor-pointer">
               <Smartphone className="text-[#FF7A19] mx-auto mb-2" size={32} />
@@ -158,18 +158,18 @@ export default function Home() {
 
 
       {/* Featured Products Section */}
-      <section className="bg-gray-50 py-10">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between mb-6">
+      <section className="bg-gray-50 py-6 sm:py-10">
+        <div className="container mx-auto px-3 sm:px-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <Star className="text-[#FF7A19] fill-[#FF7A19]" size={20} />
-                <h2 className="text-2xl font-bold text-[#1A1A1A]">Featured Products</h2>
+                <Star className="text-[#FF7A19] fill-[#FF7A19]" size={18} />
+                <h2 className="text-xl sm:text-2xl font-bold text-[#1A1A1A]">Featured Products</h2>
               </div>
-              <p className="text-[#3A3A3A] text-sm">Handpicked for you</p>
+              <p className="text-[#3A3A3A] text-xs sm:text-sm">Handpicked for you</p>
             </div>
-            <Link href="/products">
-              <Button variant="outline" size="sm" icon={<ArrowRight size={14} />}>
+            <Link href="/products" className="w-full sm:w-auto">
+              <Button variant="outline" size="sm" icon={<ArrowRight size={14} />} className="w-full sm:w-auto">
                 View All
               </Button>
             </Link>
@@ -187,7 +187,7 @@ export default function Home() {
               </Link>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-4">
               {featuredProducts.slice(0, 5).map((product) => (
                 <ProductCard 
                   key={product.id} 
@@ -201,21 +201,21 @@ export default function Home() {
       </section>
 
       {/* All Products / Trending */}
-      <section className="container mx-auto px-4 py-10">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <TrendingUp className="text-[#FF7A19]" size={20} />
-              <h2 className="text-2xl font-bold text-[#1A1A1A]">All Products</h2>
+      <section className="container mx-auto px-3 sm:px-4 py-6 sm:py-10">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <TrendingUp className="text-[#FF7A19]" size={18} />
+                <h2 className="text-xl sm:text-2xl font-bold text-[#1A1A1A]">All Products</h2>
+              </div>
+              <p className="text-[#3A3A3A] text-xs sm:text-sm">Explore our complete collection</p>
             </div>
-            <p className="text-[#3A3A3A] text-sm">Explore our complete collection</p>
+            <Link href="/shop" className="w-full sm:w-auto">
+              <Button variant="outline" size="sm" icon={<ArrowRight size={14} />} className="w-full sm:w-auto">
+                View All
+              </Button>
+            </Link>
           </div>
-          <Link href="/shop">
-            <Button variant="outline" size="sm" icon={<ArrowRight size={14} />}>
-              View All
-            </Button>
-          </Link>
-        </div>
 
         {isLoading ? (
           <ProductListSkeleton count={20} />

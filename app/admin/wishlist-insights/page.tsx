@@ -8,6 +8,7 @@ import {
   TrendingUp,
   Package,
   DollarSign,
+  MessageSquare,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
@@ -167,9 +168,26 @@ export default function WishlistInsightsPage() {
               These users have shown interest but haven't purchased yet. Send them a reminder
               email with a special discount code to encourage conversion!
             </p>
-            <Button variant="primary" size="sm" icon={<Mail size={16} />}>
-              Send Bulk Reminder Emails
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                variant="primary" 
+                size="sm" 
+                icon={<Mail size={16} />}
+                disabled
+                className="opacity-50 cursor-not-allowed"
+              >
+                Send Bulk Reminder Emails
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                icon={<MessageSquare size={16} />}
+                disabled
+                className="opacity-50 cursor-not-allowed"
+              >
+                Send Bulk Reminder SMS
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -230,6 +248,8 @@ export default function WishlistInsightsPage() {
                     size="sm"
                     icon={<Mail size={16} />}
                     onClick={() => sendReminderEmail(user.id)}
+                    disabled
+                    className="opacity-50 cursor-not-allowed"
                   >
                     Send Reminder
                   </Button>

@@ -25,15 +25,31 @@ export function ReduxProvider({ children }: { children: React.ReactNode }) {
     // Check initial session first
     const checkInitialSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        store.dispatch(setLoading(true));
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting session:', error);
+          store.dispatch(setLoading(false));
+          return;
+        }
+
         if (session?.user) {
+          // Session exists - fetch user profile
           const profile = await getUserProfile(session.user.id);
           if (profile) {
             store.dispatch(setUser(profile));
+          } else {
+            // Session exists but profile fetch failed - clear state
+            store.dispatch(setUser(null));
           }
+        } else {
+          // No session - user is not authenticated
+          store.dispatch(setUser(null));
         }
       } catch (error) {
         console.error('Error checking initial session:', error);
+        store.dispatch(setUser(null));
       } finally {
         store.dispatch(setLoading(false));
       }

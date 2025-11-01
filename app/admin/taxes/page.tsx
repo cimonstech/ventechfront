@@ -45,11 +45,55 @@ export default function AdminTaxesPage() {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        // Check if table doesn't exist - handle silently
+        const errorStr = String(JSON.stringify(error)).toLowerCase();
+        const errorMessage = String(error.message || '').toLowerCase();
+        const errorCode = String(error.code || '');
+        
+        // PGRST205 = table not found in schema cache
+        if (errorCode === '42P01' || errorCode === 'PGRST116' || errorCode === 'PGRST205' ||
+            errorMessage.includes('does not exist') || 
+            errorMessage.includes('could not find the table') ||
+            errorMessage.includes('relation') || 
+            errorMessage.includes('not found') ||
+            errorStr.includes('does not exist') ||
+            errorStr.includes('could not find the table') ||
+            errorStr.includes('relation') ||
+            errorStr.includes('not found') ||
+            Object.keys(error).length === 0) {
+          // Table doesn't exist or empty error - set empty array silently
+          setTaxes([]);
+          return;
+        }
+        throw error;
+      }
       setTaxes(data || []);
-    } catch (error) {
-      console.error('Error fetching taxes:', error);
-      toast.error('Failed to fetch taxes');
+    } catch (error: any) {
+      // Check if it's a "table doesn't exist" error
+      const errorStr = String(JSON.stringify(error || {})).toLowerCase();
+      const errorMessage = String(error?.message || '').toLowerCase();
+      const errorCode = String(error?.code || '');
+      
+      // PGRST205 = table not found in schema cache
+      if (errorCode === '42P01' || errorCode === 'PGRST116' || errorCode === 'PGRST205' ||
+          errorMessage.includes('does not exist') || 
+          errorMessage.includes('could not find the table') ||
+          errorMessage.includes('relation') || 
+          errorMessage.includes('not found') ||
+          errorStr.includes('does not exist') ||
+          errorStr.includes('could not find the table') ||
+          errorStr.includes('relation') ||
+          errorStr.includes('not found') ||
+          Object.keys(error || {}).length === 0) {
+        // Table doesn't exist or empty error - set empty array silently
+        setTaxes([]);
+      } else {
+        // Real error - log it
+        console.error('Error fetching taxes:', error);
+        toast.error('Failed to fetch taxes');
+        setTaxes([]);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -62,7 +106,27 @@ export default function AdminTaxesPage() {
         .from('taxes')
         .insert([newTax]);
 
-      if (error) throw error;
+      if (error) {
+        // Check if table doesn't exist
+        const errorStr = String(JSON.stringify(error || {})).toLowerCase();
+        const errorMessage = String(error.message || '').toLowerCase();
+        const errorCode = String(error.code || '');
+        
+        if (errorCode === '42P01' || errorCode === 'PGRST116' || errorCode === 'PGRST205' ||
+            errorMessage.includes('does not exist') || 
+            errorMessage.includes('could not find the table') ||
+            errorMessage.includes('relation') || 
+            errorMessage.includes('not found') ||
+            errorStr.includes('does not exist') ||
+            errorStr.includes('could not find the table') ||
+            errorStr.includes('relation') ||
+            errorStr.includes('not found') ||
+            Object.keys(error || {}).length === 0) {
+          toast.error('Taxes table does not exist. Please run the create_taxes_discounts_system.sql migration in Supabase.');
+          return;
+        }
+        throw error;
+      }
       toast.success('Tax created successfully!');
       setShowCreateModal(false);
       setNewTax({
@@ -74,9 +138,27 @@ export default function AdminTaxesPage() {
         applies_to: 'all',
       });
       fetchTaxes();
-    } catch (error) {
-      console.error('Error creating tax:', error);
-      toast.error('Failed to create tax');
+    } catch (error: any) {
+      // Only log if it's not a "table doesn't exist" error
+      const errorStr = String(JSON.stringify(error || {})).toLowerCase();
+      const errorMessage = String(error?.message || '').toLowerCase();
+      const errorCode = String(error?.code || '');
+      
+      if (errorCode === '42P01' || errorCode === 'PGRST116' || errorCode === 'PGRST205' ||
+          errorMessage.includes('does not exist') || 
+          errorMessage.includes('could not find the table') ||
+          errorMessage.includes('relation') || 
+          errorMessage.includes('not found') ||
+          errorStr.includes('does not exist') ||
+          errorStr.includes('could not find the table') ||
+          errorStr.includes('relation') ||
+          errorStr.includes('not found') ||
+          Object.keys(error || {}).length === 0) {
+        toast.error('Taxes table does not exist. Please run the create_taxes_discounts_system.sql migration in Supabase.');
+      } else {
+        console.error('Error creating tax:', error);
+        toast.error('Failed to create tax');
+      }
     }
   };
 
@@ -90,7 +172,27 @@ export default function AdminTaxesPage() {
         .update(newTax)
         .eq('id', editingTax.id);
 
-      if (error) throw error;
+      if (error) {
+        // Check if table doesn't exist
+        const errorStr = String(JSON.stringify(error || {})).toLowerCase();
+        const errorMessage = String(error.message || '').toLowerCase();
+        const errorCode = String(error.code || '');
+        
+        if (errorCode === '42P01' || errorCode === 'PGRST116' || errorCode === 'PGRST205' ||
+            errorMessage.includes('does not exist') || 
+            errorMessage.includes('could not find the table') ||
+            errorMessage.includes('relation') || 
+            errorMessage.includes('not found') ||
+            errorStr.includes('does not exist') ||
+            errorStr.includes('could not find the table') ||
+            errorStr.includes('relation') ||
+            errorStr.includes('not found') ||
+            Object.keys(error || {}).length === 0) {
+          toast.error('Taxes table does not exist. Please run the create_taxes_discounts_system.sql migration in Supabase.');
+          return;
+        }
+        throw error;
+      }
       toast.success('Tax updated successfully!');
       setEditingTax(null);
       setNewTax({
@@ -102,9 +204,27 @@ export default function AdminTaxesPage() {
         applies_to: 'all',
       });
       fetchTaxes();
-    } catch (error) {
-      console.error('Error updating tax:', error);
-      toast.error('Failed to update tax');
+    } catch (error: any) {
+      // Only log if it's not a "table doesn't exist" error
+      const errorStr = String(JSON.stringify(error || {})).toLowerCase();
+      const errorMessage = String(error?.message || '').toLowerCase();
+      const errorCode = String(error?.code || '');
+      
+      if (errorCode === '42P01' || errorCode === 'PGRST116' || errorCode === 'PGRST205' ||
+          errorMessage.includes('does not exist') || 
+          errorMessage.includes('could not find the table') ||
+          errorMessage.includes('relation') || 
+          errorMessage.includes('not found') ||
+          errorStr.includes('does not exist') ||
+          errorStr.includes('could not find the table') ||
+          errorStr.includes('relation') ||
+          errorStr.includes('not found') ||
+          Object.keys(error || {}).length === 0) {
+        toast.error('Taxes table does not exist. Please run the create_taxes_discounts_system.sql migration in Supabase.');
+      } else {
+        console.error('Error updating tax:', error);
+        toast.error('Failed to update tax');
+      }
     }
   };
 
@@ -117,12 +237,48 @@ export default function AdminTaxesPage() {
         .delete()
         .eq('id', taxId);
 
-      if (error) throw error;
+      if (error) {
+        // Check if table doesn't exist - handle silently
+        const errorStr = String(JSON.stringify(error || {})).toLowerCase();
+        const errorMessage = String(error.message || '').toLowerCase();
+        const errorCode = String(error.code || '');
+        
+        if (errorCode === '42P01' || errorCode === 'PGRST116' || errorCode === 'PGRST205' ||
+            errorMessage.includes('does not exist') || 
+            errorMessage.includes('could not find the table') ||
+            errorMessage.includes('relation') || 
+            errorMessage.includes('not found') ||
+            errorStr.includes('does not exist') ||
+            errorStr.includes('could not find the table') ||
+            errorStr.includes('relation') ||
+            errorStr.includes('not found') ||
+            Object.keys(error || {}).length === 0) {
+          // Table doesn't exist - don't show error
+          return;
+        }
+        throw error;
+      }
       toast.success('Tax deleted successfully!');
       fetchTaxes();
-    } catch (error) {
-      console.error('Error deleting tax:', error);
-      toast.error('Failed to delete tax');
+    } catch (error: any) {
+      // Only log if it's not a "table doesn't exist" error
+      const errorStr = String(JSON.stringify(error || {})).toLowerCase();
+      const errorMessage = String(error?.message || '').toLowerCase();
+      const errorCode = String(error?.code || '');
+      
+      if (!(errorCode === '42P01' || errorCode === 'PGRST116' || errorCode === 'PGRST205' ||
+            errorMessage.includes('does not exist') || 
+            errorMessage.includes('could not find the table') ||
+            errorMessage.includes('relation') || 
+            errorMessage.includes('not found') ||
+            errorStr.includes('does not exist') ||
+            errorStr.includes('could not find the table') ||
+            errorStr.includes('relation') ||
+            errorStr.includes('not found') ||
+            Object.keys(error || {}).length === 0)) {
+        console.error('Error deleting tax:', error);
+        toast.error('Failed to delete tax');
+      }
     }
   };
 

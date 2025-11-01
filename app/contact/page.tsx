@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { 
   Mail, 
@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { contactService } from '@/services/contact.service';
+import { settingsService } from '@/lib/settings.service';
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -23,6 +24,41 @@ export default function ContactPage() {
     message: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [settings, setSettings] = useState<Record<string, string | null>>({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchSettings = async () => {
+      try {
+        const storeSettings = await settingsService.getSettingsByCategory('store');
+        if (isMounted) {
+          setSettings(storeSettings);
+        }
+      } catch (error) {
+        if (isMounted) {
+          console.error('Error fetching settings for contact page:', error);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchSettings();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const storePhone = settings.store_phone || '+233 55 134 4310';
+  const storeEmail = settings.store_email || 'ventechgadgets@gmail.com';
+  const addressHo = settings.store_address_ho || '';
+  const addressAccra = settings.store_address_accra || '';
+  const businessHours = settings.store_business_hours || 'Mon-Sat: 9AM-6PM, Sun: Closed';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,7 +120,9 @@ export default function ContactPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-sm text-[#1A1A1A] mb-1">Phone</h3>
-                  <p className="text-[#3A3A3A] text-sm">+233 55 134 4310</p>
+                  <a href={`tel:${storePhone.replace(/\s/g, '')}`} className="text-[#3A3A3A] text-sm hover:text-[#FF7A19] transition-colors">
+                    {storePhone}
+                  </a>
                 </div>
               </div>
 
@@ -96,7 +134,9 @@ export default function ContactPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-sm text-[#1A1A1A] mb-1">Email</h3>
-                  <p className="text-[#3A3A3A] text-sm">ventechgadgets@gmail.com</p>
+                  <a href={`mailto:${storeEmail}`} className="text-[#3A3A3A] text-sm hover:text-[#FF7A19] transition-colors">
+                    {storeEmail}
+                  </a>
                 </div>
               </div>
 
@@ -109,8 +149,9 @@ export default function ContactPage() {
                 <div>
                   <h3 className="font-semibold text-sm text-[#1A1A1A] mb-1">Address</h3>
                   <p className="text-[#3A3A3A] text-sm">
-                    123 Tech Street<br />
-                    Accra, Ghana
+                    {addressHo && <>{addressHo}<br /></>}
+                    {addressAccra && <>{addressAccra}<br /></>}
+                    {!addressHo && !addressAccra && 'Ghana'}
                   </p>
                 </div>
               </div>
@@ -123,9 +164,7 @@ export default function ContactPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-sm text-[#1A1A1A] mb-1">Business Hours</h3>
-                  <p className="text-[#3A3A3A] text-sm">Monday - Friday: 8am - 6pm</p>
-                  <p className="text-[#3A3A3A] text-sm">Saturday: 9am - 4pm</p>
-                  <p className="text-[#3A3A3A] text-sm">Sunday: Closed</p>
+                  <p className="text-[#3A3A3A] text-sm">{businessHours}</p>
                 </div>
               </div>
             </div>

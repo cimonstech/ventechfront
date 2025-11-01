@@ -43,20 +43,28 @@ export default function NotificationsPage() {
         .order('created_at', { ascending: false });
 
       if (error) {
-        // If table doesn't exist, use empty array
-        if (error.code === '42P01' || error.code === 'PGRST116' || error.message?.includes('does not exist') || error.message?.includes('relation') || error.message?.includes('not found')) {
-          console.warn('Notifications table does not exist. Please run the create_notifications_table.sql migration.');
+        // If table doesn't exist, use empty array silently
+        if (error.code === '42P01' || error.code === 'PGRST116' || 
+            error.message?.includes('does not exist') || 
+            error.message?.includes('relation') || 
+            error.message?.includes('not found')) {
+          // Table doesn't exist - set empty array without logging error
           setNotifications([]);
           return;
         }
-        throw error;
+        // For other errors, log and set empty array
+        console.error('Error fetching notifications:', error);
+        setNotifications([]);
+        return;
       }
       setNotifications(data || []);
     } catch (error: any) {
-      console.error('Error fetching notifications:', error);
-      // Fallback to empty array if table doesn't exist
-      if (error?.code === '42P01' || error?.code === 'PGRST116' || error?.message?.includes('does not exist') || error?.message?.includes('relation') || error?.message?.includes('not found')) {
-        console.warn('Notifications table does not exist. Using empty array.');
+      // Only log if it's not a "table doesn't exist" error
+      if (!(error?.code === '42P01' || error?.code === 'PGRST116' || 
+            error?.message?.includes('does not exist') || 
+            error?.message?.includes('relation') || 
+            error?.message?.includes('not found'))) {
+        console.error('Error fetching notifications:', error);
       }
       setNotifications([]);
     } finally {

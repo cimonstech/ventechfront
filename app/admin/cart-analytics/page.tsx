@@ -9,6 +9,7 @@ import {
   TrendingDown,
   DollarSign,
   Clock,
+  MessageSquare,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
@@ -179,9 +180,26 @@ export default function CartAnalyticsPage() {
               small discount (5-10%) to encourage them to complete their purchase within 24
               hours!
             </p>
-            <Button variant="primary" size="sm" icon={<Mail size={16} />}>
-              Send Bulk Recovery Emails
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                variant="primary" 
+                size="sm" 
+                icon={<Mail size={16} />}
+                disabled
+                className="opacity-50 cursor-not-allowed"
+              >
+                Send Bulk Recovery Emails
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                icon={<MessageSquare size={16} />}
+                disabled
+                className="opacity-50 cursor-not-allowed"
+              >
+                Send Bulk Recovery SMS
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -241,13 +259,14 @@ export default function CartAnalyticsPage() {
                     </div>
                   </div>
                   <Button
-                    variant={cart.recovery_sent ? 'outline' : 'primary'}
+                    variant="outline"
                     size="sm"
                     icon={<Mail size={16} />}
                     onClick={() => sendRecoveryEmail(cart.id)}
-                    disabled={cart.recovery_sent}
+                    disabled
+                    className="opacity-50 cursor-not-allowed"
                   >
-                    {cart.recovery_sent ? 'Email Sent' : 'Send Recovery Email'}
+                    Send Recovery Email
                   </Button>
                 </div>
                 <div>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
@@ -31,6 +31,23 @@ export const NavBar = () => {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Prevent body scroll when mobile menu is open
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isMobileMenuOpen]);
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [pathname]);
   
   const { itemCount } = useAppSelector((state) => state.cart);
   const { count: wishlistCount } = useAppSelector((state) => state.wishlist);
@@ -63,9 +80,9 @@ export const NavBar = () => {
 
   return (
     <nav className="bg-white shadow-md sticky top-0 z-50">
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-3 sm:px-4">
         {/* Top Bar */}
-        <div className="flex items-center justify-between h-16 md:h-20">
+        <div className="flex items-center justify-between h-14 sm:h-16 md:h-20">
           {/* Logo */}
           <Link href="/" className="flex items-center flex-shrink-0">
             <Image
@@ -73,7 +90,7 @@ export const NavBar = () => {
               alt="VENTECH"
               width={120}
               height={50}
-              className="object-contain"
+              className="object-contain h-8 sm:h-10 md:h-12 w-auto"
               style={{ width: "auto", height: "auto" }}
               priority
             />
@@ -203,13 +220,27 @@ export const NavBar = () => {
             )}
           </div>
 
-          {/* Mobile Menu Button */}
-          <button
-            className="md:hidden p-2"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          >
-            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
+          {/* Mobile Actions - Cart & Menu */}
+          <div className="md:hidden flex items-center gap-2">
+            {/* Mobile Cart Icon */}
+            <Link href="/cart" className="relative p-2 -mr-1">
+              <ShoppingCart size={22} className="text-[#3A3A3A]" />
+              {itemCount > 0 && (
+                <span className="absolute top-0 right-0 bg-[#FF7A19] text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                  {itemCount > 9 ? '9+' : itemCount}
+                </span>
+              )}
+            </Link>
+
+            {/* Mobile Menu Button */}
+            <button
+              className="p-2 flex items-center justify-center"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              aria-label="Toggle menu"
+            >
+              {isMobileMenuOpen ? <X size={24} className="text-[#3A3A3A]" /> : <Menu size={24} className="text-[#3A3A3A]" />}
+            </button>
+          </div>
         </div>
 
         {/* Desktop Navigation with Mega Menu */}
@@ -240,74 +271,215 @@ export const NavBar = () => {
         </div>
       </div>
 
-      {/* Mobile Menu */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden border-t border-gray-200 bg-white">
+      {/* Mobile Menu Overlay & Sidebar */}
+      <>
+        {/* Overlay */}
+        {isMobileMenuOpen && (
+          <div
+            className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity duration-300"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+        )}
+
+        {/* Sliding Sidebar Menu */}
+        <div
+          className={`
+            fixed top-0 right-0 h-full w-80 max-w-[85vw] bg-white shadow-2xl z-50 md:hidden
+            transform transition-transform duration-300 ease-in-out overflow-y-auto
+            ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}
+          `}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b border-gray-200 sticky top-0 bg-white z-10">
+            <h2 className="text-lg font-bold text-[#1A1A1A]">Menu</h2>
+            <button
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label="Close menu"
+            >
+              <X size={24} className="text-[#3A3A3A]" />
+            </button>
+          </div>
+
           {/* Mobile Search */}
           <div className="p-4 border-b border-gray-200">
             <SearchBar
-              placeholder="Search products, brands, categories..."
+              placeholder="Search products, brands..."
               className="w-full"
             />
           </div>
 
-          {/* Mobile Links */}
-          <div className="p-4">
+          {/* Navigation Links */}
+          <div className="py-2">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={() => setIsMobileMenuOpen(false)}
-                className={`block py-3 text-sm font-medium border-b border-gray-100 transition-colors hover:text-[#FF7A19] ${
-                  pathname === link.href ? 'text-[#FF7A19]' : 'text-[#3A3A3A]'
-                }`}
+                className={`
+                  block px-4 py-3 text-base font-medium transition-colors
+                  ${pathname === link.href 
+                    ? 'text-[#FF7A19] bg-orange-50 border-r-2 border-[#FF7A19]' 
+                    : 'text-[#3A3A3A] hover:text-[#FF7A19] hover:bg-gray-50'
+                  }
+                  ${link.highlight ? 'bg-gradient-to-r from-orange-50 to-orange-100' : ''}
+                `}
               >
                 {link.label}
               </Link>
             ))}
-            
-            {/* Mobile Wishlist & Cart */}
-            {isAuthenticated && (
-              <div className="flex gap-4 py-4 border-b border-gray-100">
-                <Link href="/wishlist" onClick={() => setIsMobileMenuOpen(false)}>
-                  <Button variant="outline" size="sm" className="relative">
-                    <Heart size={16} />
-                    Wishlist
-                    {wishlistCount > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-[#FF7A19] text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                        {wishlistCount}
-                      </span>
-                    )}
-                  </Button>
-                </Link>
-                <Link href="/cart" onClick={() => setIsMobileMenuOpen(false)}>
-                  <Button variant="outline" size="sm" className="relative">
-                    <ShoppingCart size={16} />
-                    Cart
-                    {itemCount > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-[#FF7A19] text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                        {itemCount}
-                      </span>
-                    )}
-                  </Button>
-                </Link>
-              </div>
-            )}
           </div>
 
-          {/* Mobile Contact Info */}
-          <div className="p-4 border-t border-gray-200 space-y-3">
-            <a href="tel:+233XXXXXXXXX" className="flex items-center gap-3 text-sm text-[#3A3A3A]">
+          {/* User Actions */}
+          {isAuthenticated ? (
+            <>
+              {/* Account Section */}
+              <div className="border-t border-gray-200 py-4">
+                <div className="px-4 mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-[#FF7A19] rounded-full flex items-center justify-center">
+                      <User size={20} className="text-white" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm text-[#1A1A1A]">
+                        {user?.name || 'User'}
+                      </p>
+                      <p className="text-xs text-[#3A3A3A]">{user?.email}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <Link
+                  href="/profile"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="block px-4 py-2.5 text-sm text-[#3A3A3A] hover:bg-gray-50 hover:text-[#FF7A19] transition-colors"
+                >
+                  <User size={16} className="inline mr-2" />
+                  My Profile
+                </Link>
+                <Link
+                  href="/orders"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="block px-4 py-2.5 text-sm text-[#3A3A3A] hover:bg-gray-50 hover:text-[#FF7A19] transition-colors"
+                >
+                  <Package size={16} className="inline mr-2" />
+                  My Orders
+                </Link>
+                {user?.role === 'admin' && (
+                  <Link
+                    href="/admin"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="block px-4 py-2.5 text-sm text-[#FF7A19] hover:bg-orange-50 transition-colors font-medium"
+                  >
+                    <Settings size={16} className="inline mr-2" />
+                    Admin Panel
+                  </Link>
+                )}
+              </div>
+
+              {/* Quick Actions */}
+              <div className="border-t border-gray-200 px-4 py-4 space-y-2">
+                <Link
+                  href="/wishlist"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:border-[#FF7A19] transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Heart size={20} className="text-[#FF7A19]" />
+                    <span className="font-medium text-sm">Wishlist</span>
+                  </div>
+                  {wishlistCount > 0 && (
+                    <span className="bg-[#FF7A19] text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+                      {wishlistCount}
+                    </span>
+                  )}
+                </Link>
+                <Link
+                  href="/cart"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:border-[#FF7A19] transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <ShoppingCart size={20} className="text-[#FF7A19]" />
+                    <span className="font-medium text-sm">Cart</span>
+                  </div>
+                  {itemCount > 0 && (
+                    <span className="bg-[#FF7A19] text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+                      {itemCount}
+                    </span>
+                  )}
+                </Link>
+              </div>
+
+              {/* Logout */}
+              <div className="border-t border-gray-200 px-4 py-2">
+                <button
+                  onClick={() => {
+                    handleLogout();
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                >
+                  <LogOut size={16} />
+                  Logout
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="border-t border-gray-200 px-4 py-4 space-y-2">
+              <Link
+                href="/cart"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:border-[#FF7A19] transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <ShoppingCart size={20} className="text-[#FF7A19]" />
+                  <span className="font-medium text-sm">Cart</span>
+                </div>
+                {itemCount > 0 && (
+                  <span className="bg-[#FF7A19] text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+                    {itemCount}
+                  </span>
+                )}
+              </Link>
+              <Link
+                href="/login"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block w-full text-center py-3 border border-gray-200 rounded-lg hover:border-[#FF7A19] hover:text-[#FF7A19] transition-colors font-medium text-sm"
+              >
+                Login
+              </Link>
+              <Link
+                href="/register"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block w-full text-center py-3 bg-[#FF7A19] text-white rounded-lg hover:bg-[#FF8C3A] transition-colors font-medium text-sm"
+              >
+                Sign Up
+              </Link>
+            </div>
+          )}
+
+          {/* Contact Info */}
+          <div className="border-t border-gray-200 px-4 py-4 space-y-3 bg-gray-50">
+            <a
+              href="tel:+233551344310"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="flex items-center gap-3 text-sm text-[#3A3A3A] hover:text-[#FF7A19] transition-colors"
+            >
               <Phone size={18} className="text-[#FF7A19]" />
-              <span>+233 XX XXX XXXX</span>
+              <span>+233 55 134 4310</span>
             </a>
-            <a href="mailto:support@ventech.gh" className="flex items-center gap-3 text-sm text-[#3A3A3A]">
+            <a
+              href="mailto:ventechgadgets@gmail.com"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="flex items-center gap-3 text-sm text-[#3A3A3A] hover:text-[#FF7A19] transition-colors"
+            >
               <Mail size={18} className="text-[#FF7A19]" />
-              <span>support@ventech.gh</span>
+              <span>ventechgadgets@gmail.com</span>
             </a>
           </div>
         </div>
-      )}
+      </>
     </nav>
   );
 };

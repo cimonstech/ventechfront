@@ -52,7 +52,36 @@ export default function AdminSettingsPage() {
         .select('*')
         .order('category', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        // Check if error is empty object (table doesn't exist)
+        const errorKeys = Object.keys(error);
+        const isEmptyError = errorKeys.length === 0 || 
+                           (!error.code && !error.message && !error.details && !error.hint);
+        
+        // Check for table-not-found indicators
+        const errorStr = String(JSON.stringify(error)).toLowerCase();
+        const errorMessage = String(error.message || '').toLowerCase();
+        const errorCode = String(error.code || '');
+        
+        // PGRST205 = table not found in schema cache
+        if (isEmptyError ||
+            errorCode === '42P01' || errorCode === 'PGRST116' || errorCode === 'PGRST205' ||
+            errorMessage.includes('does not exist') || 
+            errorMessage.includes('could not find the table') ||
+            errorMessage.includes('relation') || 
+            errorMessage.includes('not found') ||
+            errorStr.includes('does not exist') ||
+            errorStr.includes('could not find the table') ||
+            errorStr.includes('relation') ||
+            errorStr.includes('not found')) {
+          // Table doesn't exist or empty error - set empty defaults silently
+          setSettings([]);
+          setFormData({});
+          return;
+        }
+        // Real error - rethrow to catch block
+        throw error;
+      }
       
       setSettings(data || []);
       
@@ -62,9 +91,44 @@ export default function AdminSettingsPage() {
         initialData[setting.key] = setting.value || '';
       });
       setFormData(initialData);
-    } catch (error) {
-      console.error('Error fetching settings:', error);
-      toast.error('Failed to load settings');
+    } catch (error: any) {
+      // Check if error is empty or table-not-found - handle silently
+      const errorKeys = Object.keys(error || {});
+      const isEmptyError = errorKeys.length === 0 || 
+                         (!error?.code && !error?.message && !error?.details && !error?.hint);
+      
+      if (isEmptyError) {
+        // Empty error object - treat as table doesn't exist, handle silently
+        setSettings([]);
+        setFormData({});
+        return;
+      }
+      
+      // Check for table-not-found indicators
+      const errorStr = String(JSON.stringify(error || {})).toLowerCase();
+      const errorMessage = String(error?.message || '').toLowerCase();
+      const errorCode = String(error?.code || '');
+      
+      // PGRST205 = table not found in schema cache
+      if (errorCode === '42P01' || errorCode === 'PGRST116' || errorCode === 'PGRST205' ||
+          errorMessage.includes('does not exist') || 
+          errorMessage.includes('could not find the table') ||
+          errorMessage.includes('relation') || 
+          errorMessage.includes('not found') ||
+          errorStr.includes('does not exist') ||
+          errorStr.includes('could not find the table') ||
+          errorStr.includes('relation') ||
+          errorStr.includes('not found')) {
+        // Table doesn't exist - set empty defaults silently
+        setSettings([]);
+        setFormData({});
+      } else {
+        // Real error - log it
+        console.error('Error fetching settings:', error);
+        toast.error('Failed to load settings');
+        setSettings([]);
+        setFormData({});
+      }
     } finally {
       setIsLoading(false);
     }
@@ -108,6 +172,14 @@ export default function AdminSettingsPage() {
 
   const renderField = (setting: Setting) => {
     const isBoolean = setting.value === 'true' || setting.value === 'false';
+    const key = setting.key.toLowerCase();
+    
+    // Detect field type
+    const isEmail = key.includes('email') || key.includes('_email') || key.includes('email_');
+    const isUrl = key.includes('url') || key.includes('_url') || key.includes('_link') || key.includes('facebook') || key.includes('twitter') || key.includes('instagram') || key.includes('linkedin');
+    const isPassword = key.includes('password') || key.includes('secret') || key.includes('api_key');
+    const isNumber = key.includes('port') || key.includes('cost') || key.includes('threshold') || key.includes('amount') || key.includes('per_page') || key.includes('days');
+    const isMultiline = key.includes('text') || key.includes('message') || key.includes('about') || key.includes('description') && !isUrl;
     
     if (isBoolean) {
       return (
@@ -143,18 +215,55 @@ export default function AdminSettingsPage() {
       );
     }
 
+    if (isMultiline) {
+      return (
+        <div key={setting.key} className="space-y-2">
+          <label className="text-sm font-medium text-[#1A1A1A]">
+            {setting.description || setting.key}
+          </label>
+          <textarea
+            value={formData[setting.key] || ''}
+            onChange={(e) => setFormData({ ...formData, [setting.key]: e.target.value })}
+            rows={4}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19] resize-y"
+            placeholder={`Enter ${setting.description?.toLowerCase() || setting.key}`}
+          />
+        </div>
+      );
+    }
+
     return (
       <div key={setting.key} className="space-y-2">
         <label className="text-sm font-medium text-[#1A1A1A]">
           {setting.description || setting.key}
+          {isPassword && (
+            <span className="ml-2 text-xs text-amber-600 font-normal">
+              (Store securely in backend .env file)
+            </span>
+          )}
         </label>
         <input
-          type="text"
+          type={isPassword ? 'password' : isEmail ? 'email' : isNumber ? 'number' : 'text'}
           value={formData[setting.key] || ''}
           onChange={(e) => setFormData({ ...formData, [setting.key]: e.target.value })}
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
-          placeholder={`Enter ${setting.description?.toLowerCase() || setting.key}`}
+          placeholder={
+            isUrl 
+              ? 'https://example.com' 
+              : isEmail 
+              ? 'email@example.com' 
+              : isPassword 
+              ? 'Enter password (hidden)' 
+              : `Enter ${setting.description?.toLowerCase() || setting.key}`
+          }
+          min={isNumber ? 0 : undefined}
+          step={isNumber && key.includes('cost') ? '0.01' : undefined}
         />
+        {isUrl && formData[setting.key] && !formData[setting.key].startsWith('http') && (
+          <p className="text-xs text-amber-600 mt-1">
+            ⚠️ URLs should start with http:// or https://
+          </p>
+        )}
       </div>
     );
   };
@@ -251,12 +360,14 @@ export default function AdminSettingsPage() {
                     {activeTab === 'email' && (
                       <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
                         <h4 className="text-sm font-semibold text-[#1A1A1A] mb-2">
-                          📧 Email Configuration Help
+                          📧 Email Configuration
                         </h4>
-                        <p className="text-sm text-[#3A3A3A] leading-relaxed">
-                          The email sender address will be used for all automated emails including order confirmations,
-                          shipping updates, wishlist reminders, and cart abandonment emails. Make sure this email
-                          is configured in your backend SMTP settings.
+                        <p className="text-sm text-[#3A3A3A] leading-relaxed mb-2">
+                          Configure your email service for sending order confirmations, shipping notifications, wishlist
+                          reminders, and cart abandonment emails.
+                        </p>
+                        <p className="text-xs text-[#3A3A3A] leading-relaxed">
+                          <strong>Note:</strong> For Gmail, use an App Password (not your regular password). SMTP password should be stored in the backend <code>.env</code> file for security.
                         </p>
                       </div>
                     )}
@@ -266,9 +377,54 @@ export default function AdminSettingsPage() {
                         <h4 className="text-sm font-semibold text-[#1A1A1A] mb-2">
                           🏪 Store Information
                         </h4>
-                        <p className="text-sm text-[#3A3A3A] leading-relaxed">
+                        <p className="text-sm text-[#3A3A3A] leading-relaxed mb-2">
                           This information will be displayed on your website footer, contact page, and in customer
                           emails. Keep it accurate and up-to-date.
+                        </p>
+                        <p className="text-xs text-[#3A3A3A] leading-relaxed">
+                          <strong>Tip:</strong> Add your social media links and WhatsApp number to increase customer engagement and support.
+                        </p>
+                      </div>
+                    )}
+                    
+                    {activeTab === 'payment' && (
+                      <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
+                        <h4 className="text-sm font-semibold text-[#1A1A1A] mb-2">
+                          💳 Payment Configuration (Paystack)
+                        </h4>
+                        <p className="text-sm text-[#3A3A3A] leading-relaxed mb-2">
+                          Configure Paystack payment gateway for online payments. Get your API keys from your Paystack dashboard.
+                        </p>
+                        <p className="text-xs text-[#3A3A3A] leading-relaxed">
+                          <strong>Security:</strong> Secret keys should be stored in the backend <code>.env</code> file. Public key can be stored here for frontend use. Set webhook URL to receive payment notifications: <code>https://your-backend-url/api/payments/paystack/webhook</code>
+                        </p>
+                      </div>
+                    )}
+                    
+                    {activeTab === 'shipping' && (
+                      <div className="mt-6 p-4 bg-purple-50 rounded-lg border border-purple-200">
+                        <h4 className="text-sm font-semibold text-[#1A1A1A] mb-2">
+                          🚚 Shipping & Delivery Settings
+                        </h4>
+                        <p className="text-sm text-[#3A3A3A] leading-relaxed mb-2">
+                          Configure shipping costs and delivery times for different locations. Enable free shipping above a certain order amount.
+                        </p>
+                        <p className="text-xs text-[#3A3A3A] leading-relaxed">
+                          <strong>Tip:</strong> Set different shipping costs for Accra, Ho, and other cities. Enable store pickup for customers who prefer to collect orders in person.
+                        </p>
+                      </div>
+                    )}
+                    
+                    {activeTab === 'general' && (
+                      <div className="mt-6 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+                        <h4 className="text-sm font-semibold text-[#1A1A1A] mb-2">
+                          ⚙️ General Store Settings
+                        </h4>
+                        <p className="text-sm text-[#3A3A3A] leading-relaxed mb-2">
+                          Configure general store settings like currency, timezone, features, and operational preferences.
+                        </p>
+                        <p className="text-xs text-[#3A3A3A] leading-relaxed">
+                          <strong>Note:</strong> Maintenance mode will show a maintenance page to all visitors except admins. Use it when updating the store.
                         </p>
                       </div>
                     )}

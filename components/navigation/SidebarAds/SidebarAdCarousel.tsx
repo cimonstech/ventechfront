@@ -49,12 +49,13 @@ export const SidebarAdCarousel: React.FC<SidebarAdCarouselProps> = ({ ads }) => 
               <Link href={ad.link}>
                 <div className="relative aspect-square">
                   <Image
-                    src={ad.image_url}
+                    src={ad.image_url || '/placeholders/placeholder-ad.webp'}
                     alt={ad.title || 'Advertisement'}
                     fill
                     sizes="(max-width: 1200px) 0vw, 13vw"
                     className="object-cover"
                     loading="lazy"
+                    unoptimized
                   />
                 </div>
               </Link>

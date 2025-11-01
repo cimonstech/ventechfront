@@ -56,11 +56,55 @@ export default function AdminDiscountsPage() {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        // Check if table doesn't exist - handle silently
+        const errorStr = String(JSON.stringify(error)).toLowerCase();
+        const errorMessage = String(error.message || '').toLowerCase();
+        const errorCode = String(error.code || '');
+        
+        // PGRST205 = table not found in schema cache
+        if (errorCode === '42P01' || errorCode === 'PGRST116' || errorCode === 'PGRST205' ||
+            errorMessage.includes('does not exist') || 
+            errorMessage.includes('could not find the table') ||
+            errorMessage.includes('relation') || 
+            errorMessage.includes('not found') ||
+            errorStr.includes('does not exist') ||
+            errorStr.includes('could not find the table') ||
+            errorStr.includes('relation') ||
+            errorStr.includes('not found') ||
+            Object.keys(error).length === 0) {
+          // Table doesn't exist or empty error - set empty array silently
+          setDiscounts([]);
+          return;
+        }
+        throw error;
+      }
       setDiscounts(data || []);
-    } catch (error) {
-      console.error('Error fetching discounts:', error);
-      toast.error('Failed to fetch discounts');
+    } catch (error: any) {
+      // Check if it's a "table doesn't exist" error
+      const errorStr = String(JSON.stringify(error || {})).toLowerCase();
+      const errorMessage = String(error?.message || '').toLowerCase();
+      const errorCode = String(error?.code || '');
+      
+      // PGRST205 = table not found in schema cache
+      if (errorCode === '42P01' || errorCode === 'PGRST116' || errorCode === 'PGRST205' ||
+          errorMessage.includes('does not exist') || 
+          errorMessage.includes('could not find the table') ||
+          errorMessage.includes('relation') || 
+          errorMessage.includes('not found') ||
+          errorStr.includes('does not exist') ||
+          errorStr.includes('could not find the table') ||
+          errorStr.includes('relation') ||
+          errorStr.includes('not found') ||
+          Object.keys(error || {}).length === 0) {
+        // Table doesn't exist or empty error - set empty array silently
+        setDiscounts([]);
+      } else {
+        // Real error - log it
+        console.error('Error fetching discounts:', error);
+        toast.error('Failed to fetch discounts');
+        setDiscounts([]);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -77,14 +121,52 @@ export default function AdminDiscountsPage() {
           usage_limit: newDiscount.usage_limit || null,
         }]);
 
-      if (error) throw error;
+      if (error) {
+        // Check if table doesn't exist
+        const errorStr = String(JSON.stringify(error || {})).toLowerCase();
+        const errorMessage = String(error.message || '').toLowerCase();
+        const errorCode = String(error.code || '');
+        
+        if (errorCode === '42P01' || errorCode === 'PGRST116' || errorCode === 'PGRST205' ||
+            errorMessage.includes('does not exist') || 
+            errorMessage.includes('could not find the table') ||
+            errorMessage.includes('relation') || 
+            errorMessage.includes('not found') ||
+            errorStr.includes('does not exist') ||
+            errorStr.includes('could not find the table') ||
+            errorStr.includes('relation') ||
+            errorStr.includes('not found') ||
+            Object.keys(error || {}).length === 0) {
+          toast.error('Discounts table does not exist. Please run the create_taxes_discounts_system.sql migration in Supabase.');
+          return;
+        }
+        throw error;
+      }
       toast.success('Discount created successfully!');
       setShowCreateModal(false);
       resetForm();
       fetchDiscounts();
-    } catch (error) {
-      console.error('Error creating discount:', error);
-      toast.error('Failed to create discount');
+    } catch (error: any) {
+      // Only log if it's not a "table doesn't exist" error
+      const errorStr = String(JSON.stringify(error || {})).toLowerCase();
+      const errorMessage = String(error?.message || '').toLowerCase();
+      const errorCode = String(error?.code || '');
+      
+      if (errorCode === '42P01' || errorCode === 'PGRST116' || errorCode === 'PGRST205' ||
+          errorMessage.includes('does not exist') || 
+          errorMessage.includes('could not find the table') ||
+          errorMessage.includes('relation') || 
+          errorMessage.includes('not found') ||
+          errorStr.includes('does not exist') ||
+          errorStr.includes('could not find the table') ||
+          errorStr.includes('relation') ||
+          errorStr.includes('not found') ||
+          Object.keys(error || {}).length === 0) {
+        toast.error('Discounts table does not exist. Please run the create_taxes_discounts_system.sql migration in Supabase.');
+      } else {
+        console.error('Error creating discount:', error);
+        toast.error('Failed to create discount');
+      }
     }
   };
 
@@ -102,14 +184,52 @@ export default function AdminDiscountsPage() {
         })
         .eq('id', editingDiscount.id);
 
-      if (error) throw error;
+      if (error) {
+        // Check if table doesn't exist
+        const errorStr = String(JSON.stringify(error || {})).toLowerCase();
+        const errorMessage = String(error.message || '').toLowerCase();
+        const errorCode = String(error.code || '');
+        
+        if (errorCode === '42P01' || errorCode === 'PGRST116' || errorCode === 'PGRST205' ||
+            errorMessage.includes('does not exist') || 
+            errorMessage.includes('could not find the table') ||
+            errorMessage.includes('relation') || 
+            errorMessage.includes('not found') ||
+            errorStr.includes('does not exist') ||
+            errorStr.includes('could not find the table') ||
+            errorStr.includes('relation') ||
+            errorStr.includes('not found') ||
+            Object.keys(error || {}).length === 0) {
+          toast.error('Discounts table does not exist. Please run the create_taxes_discounts_system.sql migration in Supabase.');
+          return;
+        }
+        throw error;
+      }
       toast.success('Discount updated successfully!');
       setEditingDiscount(null);
       resetForm();
       fetchDiscounts();
-    } catch (error) {
-      console.error('Error updating discount:', error);
-      toast.error('Failed to update discount');
+    } catch (error: any) {
+      // Only log if it's not a "table doesn't exist" error
+      const errorStr = String(JSON.stringify(error || {})).toLowerCase();
+      const errorMessage = String(error?.message || '').toLowerCase();
+      const errorCode = String(error?.code || '');
+      
+      if (errorCode === '42P01' || errorCode === 'PGRST116' || errorCode === 'PGRST205' ||
+          errorMessage.includes('does not exist') || 
+          errorMessage.includes('could not find the table') ||
+          errorMessage.includes('relation') || 
+          errorMessage.includes('not found') ||
+          errorStr.includes('does not exist') ||
+          errorStr.includes('could not find the table') ||
+          errorStr.includes('relation') ||
+          errorStr.includes('not found') ||
+          Object.keys(error || {}).length === 0) {
+        toast.error('Discounts table does not exist. Please run the create_taxes_discounts_system.sql migration in Supabase.');
+      } else {
+        console.error('Error updating discount:', error);
+        toast.error('Failed to update discount');
+      }
     }
   };
 
@@ -122,12 +242,48 @@ export default function AdminDiscountsPage() {
         .delete()
         .eq('id', discountId);
 
-      if (error) throw error;
+      if (error) {
+        // Check if table doesn't exist - handle silently
+        const errorStr = String(JSON.stringify(error || {})).toLowerCase();
+        const errorMessage = String(error.message || '').toLowerCase();
+        const errorCode = String(error.code || '');
+        
+        if (errorCode === '42P01' || errorCode === 'PGRST116' || errorCode === 'PGRST205' ||
+            errorMessage.includes('does not exist') || 
+            errorMessage.includes('could not find the table') ||
+            errorMessage.includes('relation') || 
+            errorMessage.includes('not found') ||
+            errorStr.includes('does not exist') ||
+            errorStr.includes('could not find the table') ||
+            errorStr.includes('relation') ||
+            errorStr.includes('not found') ||
+            Object.keys(error || {}).length === 0) {
+          // Table doesn't exist - don't show error
+          return;
+        }
+        throw error;
+      }
       toast.success('Discount deleted successfully!');
       fetchDiscounts();
-    } catch (error) {
-      console.error('Error deleting discount:', error);
-      toast.error('Failed to delete discount');
+    } catch (error: any) {
+      // Only log if it's not a "table doesn't exist" error
+      const errorStr = String(JSON.stringify(error || {})).toLowerCase();
+      const errorMessage = String(error?.message || '').toLowerCase();
+      const errorCode = String(error?.code || '');
+      
+      if (!(errorCode === '42P01' || errorCode === 'PGRST116' || errorCode === 'PGRST205' ||
+            errorMessage.includes('does not exist') || 
+            errorMessage.includes('could not find the table') ||
+            errorMessage.includes('relation') || 
+            errorMessage.includes('not found') ||
+            errorStr.includes('does not exist') ||
+            errorStr.includes('could not find the table') ||
+            errorStr.includes('relation') ||
+            errorStr.includes('not found') ||
+            Object.keys(error || {}).length === 0)) {
+        console.error('Error deleting discount:', error);
+        toast.error('Failed to delete discount');
+      }
     }
   };
 

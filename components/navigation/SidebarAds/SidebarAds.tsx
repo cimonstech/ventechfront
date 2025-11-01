@@ -170,12 +170,13 @@ export const SidebarAds: React.FC<SidebarAdsProps> = ({ position, page }) => {
                 <Link href={group.ads[0].link}>
                   <div className="relative aspect-square">
                     <Image
-                      src={group.ads[0].image_url}
+                      src={group.ads[0].image_url || '/placeholders/placeholder-ad.webp'}
                       alt={group.ads[0].title || 'Advertisement'}
                       fill
                       sizes="(max-width: 1200px) 0vw, 13vw"
                       className="object-cover"
                       loading="lazy"
+                      unoptimized
                     />
                   </div>
                 </Link>

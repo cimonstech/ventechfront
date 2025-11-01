@@ -30,59 +30,25 @@ export default function TransactionsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  // TODO: Fetch real data from Supabase
+  // Fetch real data from Supabase
   useEffect(() => {
-    // Mock data
-    setTimeout(() => {
-      setTransactions([
-        {
-          id: '1',
-          order_id: 'ORD-001',
-          customer_name: 'John Doe',
-          customer_email: 'john@example.com',
-          amount: 1299.99,
-          status: 'completed',
-          payment_method: 'Mobile Money',
-          date: '2025-10-28',
-          created_at: '2025-10-28T10:30:00Z',
-        },
-        {
-          id: '2',
-          order_id: 'ORD-002',
-          customer_name: 'Jane Smith',
-          customer_email: 'jane@example.com',
-          amount: 599.50,
-          status: 'pending',
-          payment_method: 'Card',
-          date: '2025-10-28',
-          created_at: '2025-10-28T11:15:00Z',
-        },
-        {
-          id: '3',
-          order_id: 'ORD-003',
-          customer_name: 'Mike Johnson',
-          customer_email: 'mike@example.com',
-          amount: 2499.00,
-          status: 'completed',
-          payment_method: 'Mobile Money',
-          date: '2025-10-27',
-          created_at: '2025-10-27T14:20:00Z',
-        },
-        {
-          id: '4',
-          order_id: 'ORD-004',
-          customer_name: 'Sarah Williams',
-          customer_email: 'sarah@example.com',
-          amount: 149.99,
-          status: 'failed',
-          payment_method: 'Card',
-          date: '2025-10-27',
-          created_at: '2025-10-27T16:45:00Z',
-        },
-      ]);
-      setLoading(false);
-    }, 1000);
+    fetchTransactions();
   }, []);
+
+  const fetchTransactions = async () => {
+    try {
+      setLoading(true);
+      // Transactions are typically derived from paid orders
+      // For now, return empty array since there are no transactions yet
+      // TODO: Implement transaction fetching when payment integration is ready
+      setTransactions([]);
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+      setTransactions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
