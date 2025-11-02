@@ -24,6 +24,7 @@ import {
   CreditCard,
   ChevronLeft,
   Percent,
+  Star,
 } from 'lucide-react';
 import Link from 'next/link';
 import { signOut } from '@/services/auth.service';
@@ -154,6 +155,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       href: '/admin/cart-analytics',
     },
     {
+      icon: Star,
+      label: 'Reviews',
+      href: '/admin/reviews',
+    },
+    {
+      icon: Image,
+      label: 'Media Library',
+      href: '/admin/media',
+    },
+    {
       icon: Image,
       label: 'Marketing',
       children: [
@@ -172,7 +183,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       icon: Settings,
       label: 'Settings',
       children: [
-        { icon: Settings, label: 'General Settings', href: '/admin/settings' },
+        { icon: Settings, label: 'Delivery Options', href: '/admin/settings' },
         { icon: DollarSign, label: 'Taxes', href: '/admin/taxes' },
         { icon: Percent, label: 'Discounts', href: '/admin/discounts' },
       ],

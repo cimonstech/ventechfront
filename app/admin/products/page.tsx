@@ -123,6 +123,63 @@ export default function AdminProductsPage() {
     toast.success(`Exported ${productsToExport.length} product(s)!`);
   };
 
+  const handleExportExample = () => {
+    const exampleData = [
+      {
+        name: 'iPhone 15 Pro',
+        slug: 'iphone-15-pro',
+        description: 'The latest iPhone with A17 Pro chip',
+        category_name: 'Smartphones',
+        brand_name: 'Apple',
+        price: '1299.99',
+        discount_price: '',
+        discount_percentage: '',
+        stock_quantity: '50',
+        sku: 'IPH15P-001',
+        in_stock: 'true',
+        is_featured: 'false',
+        thumbnail: 'https://example.com/image.jpg',
+        images: 'https://example.com/img1.jpg,https://example.com/img2.jpg',
+      },
+      {
+        name: 'Samsung Galaxy S24 Ultra',
+        slug: 'samsung-galaxy-s24-ultra',
+        description: 'Flagship Android smartphone',
+        category_name: 'Smartphones',
+        brand_name: 'Samsung',
+        price: '1199.99',
+        discount_price: '1099.99',
+        discount_percentage: '8',
+        stock_quantity: '30',
+        sku: 'SGS24U-001',
+        in_stock: 'true',
+        is_featured: 'true',
+        thumbnail: 'https://example.com/image.jpg',
+        images: 'https://example.com/img1.jpg,https://example.com/img2.jpg',
+      },
+    ];
+
+    const exampleColumns = [
+      { key: 'name', label: 'Product Name' },
+      { key: 'slug', label: 'Slug (URL-friendly)' },
+      { key: 'description', label: 'Description' },
+      { key: 'category_name', label: 'Category Name' },
+      { key: 'brand_name', label: 'Brand Name' },
+      { key: 'price', label: 'Price (GHS)' },
+      { key: 'discount_price', label: 'Discount Price (optional, GHS)' },
+      { key: 'discount_percentage', label: 'Discount % (optional)' },
+      { key: 'stock_quantity', label: 'Stock Quantity' },
+      { key: 'sku', label: 'SKU (Stock Keeping Unit)' },
+      { key: 'in_stock', label: 'In Stock (true/false)' },
+      { key: 'is_featured', label: 'Featured (true/false)' },
+      { key: 'thumbnail', label: 'Thumbnail URL' },
+      { key: 'images', label: 'Images (comma-separated URLs)' },
+    ];
+
+    CSVExporter.export(exampleData, exampleColumns, 'product-import-template');
+    toast.success('Example spreadsheet exported! Use this template to import products.');
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -154,6 +211,15 @@ export default function AdminProductsPage() {
                 onClick={handleExportProducts}
               >
                 Export {selectedProducts.length > 0 ? `(${selectedProducts.length})` : 'All'}
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                icon={<Download size={16} />}
+                onClick={handleExportExample}
+                title="Export example template for product import"
+              >
+                Export Example
               </Button>
             </div>
           </div>
@@ -252,17 +318,32 @@ export default function AdminProductsPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm text-gray-900">{(product as any).category?.name || product.category_name || 'N/A'}</span>
+                          <span className="text-sm text-gray-900">
+                            {product.category_name || (product as any).category?.name || 'Uncategorized'}
+                          </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div>
-                            <p className="text-sm font-medium text-gray-900">
-                              {formatCurrency(product.discount_price || product.original_price)}
-                            </p>
-                            {product.discount_price && product.discount_price < product.original_price && (
-                              <p className="text-xs text-gray-500 line-through">
-                                {formatCurrency(product.original_price)}
+                            {product.price_range?.hasRange ? (
+                              <p className="text-sm font-medium text-gray-900">
+                                {formatCurrency(product.price_range.min)} - {formatCurrency(product.price_range.max)}
                               </p>
+                            ) : (
+                              <>
+                                <p className="text-sm font-medium text-gray-900">
+                                  {formatCurrency(
+                                    product.discount_price || 
+                                    product.original_price || 
+                                    (product as any).price || 
+                                    0
+                                  )}
+                                </p>
+                                {product.discount_price && product.discount_price < product.original_price && (
+                                  <p className="text-xs text-gray-500 line-through">
+                                    {formatCurrency(product.original_price)}
+                                  </p>
+                                )}
+                              </>
                             )}
                           </div>
                         </td>

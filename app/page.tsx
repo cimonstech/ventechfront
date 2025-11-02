@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { HeroSlider } from '@/components/banners/HeroSlider';
@@ -38,6 +38,45 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
 
+  // Fetch banners separately to allow refresh
+  const fetchBanners = useCallback(async () => {
+    try {
+      const { data: bannersData, error } = await supabase
+        .from('banners')
+        .select('*')
+        .eq('active', true)
+        .order('order', { ascending: true })
+        .limit(10);
+      
+      if (error) {
+        console.error('Error fetching banners:', error);
+        return;
+      }
+      
+      if (bannersData) {
+        // Filter for hero type banners (if type field exists) and map to expected format
+        const heroBanners = bannersData
+          .filter((b: any) => !b.type || b.type === 'hero')
+          .map((b: any) => ({
+            id: b.id,
+            title: b.title || '',
+            subtitle: b.subtitle || '',
+            description: b.description || '',
+            image_url: b.image_url || '',
+            link_url: b.link_url || b.link || '',
+            link_text: b.button_text || b.link_text || 'Shop Now',
+            display_order: b.order || b.sort_order || b.display_order || 0,
+            active: b.active !== false,
+          }))
+          .sort((a: any, b: any) => a.display_order - b.display_order);
+        
+        setHeroBanners(heroBanners);
+      }
+    } catch (error) {
+      console.error('Error fetching banners:', error);
+    }
+  }, []);
+
   // Fetch real data from Supabase
   useEffect(() => {
     const fetchData = async () => {
@@ -53,16 +92,7 @@ export default function Home() {
         setFeaturedProducts(productsData);
         
         // Fetch banners
-        const { data: bannersData } = await supabase
-          .from('banners')
-          .select('*')
-          .eq('type', 'hero')
-          .eq('active', true)
-          .order('sort_order', { ascending: true });
-        
-        if (bannersData) {
-          setHeroBanners(bannersData);
-        }
+        await fetchBanners();
       } catch (error) {
         console.error('Error fetching homepage data:', error);
       } finally {
@@ -71,7 +101,16 @@ export default function Home() {
     };
     
     fetchData();
-  }, []);
+    
+    // Set up interval to refresh banners every 30 seconds (for admin updates)
+    const bannerRefreshInterval = setInterval(() => {
+      fetchBanners();
+    }, 30000);
+    
+    return () => {
+      clearInterval(bannerRefreshInterval);
+    };
+  }, [fetchBanners]);
 
   return (
     <div className="bg-white overflow-x-hidden">
@@ -317,6 +356,7 @@ export default function Home() {
             <input
               type="email"
               placeholder="Enter your email"
+              suppressHydrationWarning
               className="flex-1 px-4 py-2 rounded-lg bg-transparent border border-white text-white placeholder:white/80 text-sm focus:outline-none focus:ring-2 focus:ring-white"
             />
             <Button variant="secondary" size="md">

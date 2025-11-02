@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { ShoppingCart, Heart, Star } from 'lucide-react';
 import { Product } from '@/types/product';
 import { Badge } from '../ui/Badge';
-import { formatCurrency, calculateDiscountPercentage } from '@/lib/helpers';
+import { formatCurrency, calculateDiscountPercentage, formatPriceRange } from '@/lib/helpers';
 import { useAppDispatch, useAppSelector } from '@/store';
 import { addToCart } from '@/store/cartSlice';
 import { useWishlist } from '@/hooks/useWishlist';
@@ -107,8 +107,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
             <span className="text-xs font-medium text-[#1A1A1A]">{product.rating.toFixed(1)}</span>
           </div>
 
-          {/* Cart Icon - Top right (opposite of rating), always visible */}
-          <div className="absolute top-3 right-3 z-10">
+          {/* Cart Icon - Top right (opposite of rating), mobile only */}
+          <div className="absolute top-3 right-3 z-10 md:hidden">
             <button
               onClick={handleAddToCart}
               disabled={!product.in_stock}
@@ -174,24 +174,42 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
             {product.brand}
           </p>
 
-          {/* Product Name - Medium size, clear and readable (like reference image) */}
-          <h3 className="text-xs sm:text-sm font-semibold text-[#1A1A1A] mb-2 line-clamp-2 group-hover:text-[#FF7A19] transition-colors leading-tight">
+          {/* Product Name - 30% smaller than before */}
+          <h3 className="text-[9px] sm:text-[10px] font-semibold text-[#1A1A1A] mb-2 line-clamp-2 group-hover:text-[#FF7A19] transition-colors leading-tight">
             {product.name}
           </h3>
 
 
-          {/* Price - Prominent, bold, larger than product titles */}
-          <div className="flex items-baseline gap-2 mb-3 mt-auto">
-            <span className="text-base sm:text-lg font-bold text-[#FF7A19]">
-              {formatCurrency(product.discount_price || product.original_price)}
-            </span>
-            {hasDiscount && (
-              <span className="text-xs sm:text-sm text-[#3A3A3A] line-through">
-                {formatCurrency(product.original_price)}
+          {/* Price - Show range if variants exist, otherwise single price */}
+          <div className="flex items-baseline gap-2 mb-3 mt-auto flex-wrap">
+            {product.price_range?.hasRange ? (
+              <span className="text-sm sm:text-base font-bold text-[#FF7A19]">
+                {formatCurrency(product.price_range.min)} - {formatCurrency(product.price_range.max)}
               </span>
+            ) : (
+              <>
+                <span className="text-sm sm:text-base font-bold text-[#FF7A19]">
+                  {formatCurrency(product.discount_price || product.original_price)}
+                </span>
+                {hasDiscount && (
+                  <span className="text-[10px] sm:text-xs text-[#3A3A3A] line-through">
+                    {formatCurrency(product.original_price)}
+                  </span>
+                )}
+              </>
             )}
           </div>
 
+          {/* Desktop: Add to Cart Button */}
+          <button
+            onClick={handleAddToCart}
+            disabled={!product.in_stock}
+            className="hidden md:flex w-full items-center justify-center gap-2 px-4 py-2.5 bg-[#FF7A19] hover:bg-orange-600 text-white font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            title={!product.in_stock ? 'Out of Stock' : isInCart ? 'In Cart' : 'Add to Cart'}
+          >
+            <ShoppingCart size={16} />
+            {!product.in_stock ? 'Out of Stock' : isInCart ? 'In Cart' : 'Add to Cart'}
+          </button>
         </div>
       </div>
     </Link>

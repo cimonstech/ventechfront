@@ -12,7 +12,8 @@ interface Category {
   name: string;
   slug: string;
   description?: string;
-  thumbnail_url?: string;
+  image_url?: string;
+  thumbnail_url?: string; // Keep for backward compatibility
   parent_id?: string;
   show_in_mega_menu: boolean;
   product_count: number;
@@ -174,9 +175,9 @@ export default function AdminCategoriesPage() {
               {/* Category Thumbnail - 1:1 Aspect Ratio */}
               <div className="relative w-full pt-[100%] bg-gray-100 overflow-hidden">
                 <div className="absolute inset-0 flex items-center justify-center">
-                  {category.thumbnail_url ? (
+                  {(category.image_url || category.thumbnail_url) ? (
                     <img
-                      src={category.thumbnail_url}
+                      src={category.image_url || category.thumbnail_url}
                       alt={category.name}
                       className="w-full h-full object-cover"
                     />

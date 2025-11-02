@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Upload, Loader2 } from 'lucide-react';
+import { X, Upload, Loader2, ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import toast from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
+import { MediaPicker } from './MediaPicker';
 
 interface BrandModalProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ interface BrandModalProps {
 export function BrandModal({ isOpen, onClose, brand, onSuccess }: BrandModalProps) {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [showMediaPicker, setShowMediaPicker] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
@@ -253,27 +255,37 @@ export function BrandModal({ isOpen, onClose, brand, onSuccess }: BrandModalProp
                 </div>
               )}
               <div className="flex-1">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                  id="logo-upload"
-                  disabled={uploading}
-                />
-                <label
-                  htmlFor="logo-upload"
-                  className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
-                >
-                  {uploading ? (
-                    <Loader2 size={18} className="animate-spin" />
-                  ) : (
-                    <Upload size={18} />
-                  )}
-                  {uploading ? 'Uploading...' : 'Upload Logo'}
-                </label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    icon={<ImageIcon size={18} />}
+                    onClick={() => setShowMediaPicker(true)}
+                  >
+                    Select from Library
+                  </Button>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    id="logo-upload"
+                    disabled={uploading}
+                  />
+                  <label
+                    htmlFor="logo-upload"
+                    className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+                  >
+                    {uploading ? (
+                      <Loader2 size={18} className="animate-spin" />
+                    ) : (
+                      <Upload size={18} />
+                    )}
+                    {uploading ? 'Uploading...' : 'Upload from Local'}
+                  </label>
+                </div>
                 <p className="text-xs text-[#3A3A3A] mt-2">
-                  Recommended: Square image, max 2MB
+                  Choose from media library or upload a new image. Recommended: Square image, max 2MB
                 </p>
               </div>
             </div>
@@ -325,6 +337,17 @@ export function BrandModal({ isOpen, onClose, brand, onSuccess }: BrandModalProp
             </Button>
           </div>
         </form>
+
+        {/* Media Picker */}
+        <MediaPicker
+          isOpen={showMediaPicker}
+          onClose={() => setShowMediaPicker(false)}
+          onSelect={(url) => {
+            setFormData(prev => ({ ...prev, logo_url: url }));
+            setShowMediaPicker(false);
+          }}
+          folder="brands"
+        />
       </div>
     </div>
   );

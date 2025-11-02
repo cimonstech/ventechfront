@@ -32,7 +32,7 @@ export default function CartPage() {
     dispatch(updateQuantity({ id: productId, quantity }));
   };
 
-  const deliveryFee = total > 200 ? 0 : 15;
+  const deliveryFee = total >= 10000 ? 0 : 15;
   const couponDiscount = appliedCoupon?.discount_amount || 0;
   const totalDiscount = discountAmount + couponDiscount;
   // Free delivery is already included in the discount_amount if applicable
@@ -98,9 +98,9 @@ export default function CartPage() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Shopping Cart</h1>
-          <p className="text-gray-600">{itemCount} {itemCount === 1 ? 'item' : 'items'} in your cart</p>
+        <div className="mb-6">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Shopping Cart</h1>
+          <p className="text-xs sm:text-sm text-gray-600">{itemCount} {itemCount === 1 ? 'item' : 'items'} in your cart</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -127,19 +127,19 @@ export default function CartPage() {
                     <div className="flex-1">
                       <Link
                         href={`/product/${item.slug}`}
-                        className="font-semibold text-gray-900 hover:text-blue-600 mb-1 block"
+                        className="text-xs sm:text-sm font-semibold text-gray-900 hover:text-[#FF7A19] mb-1 block"
                       >
                         {item.name}
                       </Link>
-                      <p className="text-sm text-gray-500 mb-2">{item.brand}</p>
+                      <p className="text-[10px] sm:text-xs text-gray-500 mb-2">{item.brand}</p>
 
                       {/* Variants */}
                       {Object.keys(item.selected_variants || {}).length > 0 && (
-                        <div className="flex flex-wrap gap-2 mb-2">
+                        <div className="flex flex-wrap gap-1 mb-2">
                           {Object.values(item.selected_variants || {}).map((variant: any) => (
                             <span
                               key={variant.id}
-                              className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded"
+                              className="text-[9px] sm:text-xs bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded"
                             >
                               {variant.name}: {variant.value}
                             </span>
@@ -147,38 +147,37 @@ export default function CartPage() {
                         </div>
                       )}
 
-                      <div className="flex items-center justify-between mt-4">
-                        {/* Quantity Controls */}
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
-                            className="w-8 h-8 rounded-lg border border-gray-300 flex items-center justify-center hover:bg-gray-50"
-                            disabled={item.quantity <= 1}
-                          >
-                            <Minus size={14} />
-                          </button>
-                          <span className="w-8 text-center font-medium">{item.quantity}</span>
-                          <button
-                            onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
-                            className="w-8 h-8 rounded-lg border border-gray-300 flex items-center justify-center hover:bg-gray-50"
-                            disabled={item.quantity >= item.stock_quantity}
-                          >
-                            <Plus size={14} />
-                          </button>
-                        </div>
+                      {/* Quantity Controls */}
+                      <div className="flex items-center gap-2 mb-2">
+                        <button
+                          onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
+                          className="w-7 h-7 rounded-lg border border-gray-300 flex items-center justify-center hover:bg-gray-50"
+                          disabled={item.quantity <= 1}
+                        >
+                          <Minus size={12} />
+                        </button>
+                        <span className="w-6 text-center text-xs sm:text-sm font-medium">{item.quantity}</span>
+                        <button
+                          onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
+                          className="w-7 h-7 rounded-lg border border-gray-300 flex items-center justify-center hover:bg-gray-50"
+                          disabled={item.quantity >= item.stock_quantity}
+                        >
+                          <Plus size={12} />
+                        </button>
+                      </div>
 
-                        {/* Price & Remove */}
-                        <div className="flex items-center gap-4">
-                          <span className="text-lg font-bold text-gray-900">
-                            {formatCurrency(item.subtotal)}
-                          </span>
-                          <button
-                            onClick={() => handleRemoveItem(item.id)}
-                            className="text-red-600 hover:text-red-700 p-2"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
+                      {/* Price - Under quantity selector */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm sm:text-base font-bold text-[#FF7A19]">
+                          {formatCurrency(item.subtotal)}
+                        </span>
+                        <button
+                          onClick={() => handleRemoveItem(item.id)}
+                          className="text-red-600 hover:text-red-700 p-1.5"
+                          title="Remove item"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </div>
                     </div>
                   </div>

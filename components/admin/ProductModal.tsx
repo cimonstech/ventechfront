@@ -1,10 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Upload, Loader2, Plus, Trash2 } from 'lucide-react';
+import { X, Upload, Loader2, Plus, Trash2, ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import toast from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
+import { MediaPicker } from './MediaPicker';
+import { ProductVariantManager } from './ProductVariantManager';
+import { notificationService } from '@/services/notification.service';
 
 interface ProductModalProps {
   isOpen: boolean;
@@ -16,10 +19,12 @@ interface ProductModalProps {
 export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductModalProps) {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [showMediaPicker, setShowMediaPicker] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
   const [brands, setBrands] = useState<any[]>([]);
   const [attributes, setAttributes] = useState<any[]>([]);
   const [selectedAttributes, setSelectedAttributes] = useState<string[]>([]);
+  const [productVariants, setProductVariants] = useState<any[]>([]);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -299,7 +304,13 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
         toast.success('Product created successfully');
       }
 
-      // Update product attributes
+      // Check for low stock and create notifications (for both create and update)
+      const stockQuantity = parseInt(formData.stock_quantity) || 0;
+      if (productId && stockQuantity >= 0) {
+        await notificationService.checkLowStock(productId, stockQuantity, formData.name);
+      }
+
+      // Save product variants/attributes
       if (productId) {
         // Delete existing mappings
         await supabase
@@ -324,8 +335,13 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
         }
       }
 
-      onSuccess();
+      // Close modal first to prevent any visual glitches
       onClose();
+      
+      // Call onSuccess after a small delay to ensure modal is closed
+      setTimeout(() => {
+        onSuccess();
+      }, 100);
     } catch (error: any) {
       console.error('Error saving product:', error);
       toast.error(error.message || 'Failed to save product');
@@ -558,30 +574,40 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
               Product Images
             </label>
             <div className="space-y-4">
-              {/* Upload Button */}
+              {/* Upload Buttons */}
               <div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleImageUpload}
-                  className="hidden"
-                  id="product-images"
-                  disabled={uploading}
-                />
-                <label
-                  htmlFor="product-images"
-                  className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
-                >
-                  {uploading ? (
-                    <Loader2 size={18} className="animate-spin" />
-                  ) : (
-                    <Upload size={18} />
-                  )}
-                  {uploading ? 'Uploading...' : 'Upload Images'}
-                </label>
+                <div className="flex gap-2 mb-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    icon={<ImageIcon size={18} />}
+                    onClick={() => setShowMediaPicker(true)}
+                  >
+                    Select from Library
+                  </Button>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    id="product-images"
+                    disabled={uploading}
+                  />
+                  <label
+                    htmlFor="product-images"
+                    className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+                  >
+                    {uploading ? (
+                      <Loader2 size={18} className="animate-spin" />
+                    ) : (
+                      <Upload size={18} />
+                    )}
+                    {uploading ? 'Uploading...' : 'Upload from Local'}
+                  </label>
+                </div>
                 <p className="text-xs text-[#3A3A3A] mt-2">
-                  Multiple images allowed. First image will be thumbnail.
+                  Choose from media library or upload new images. Multiple images allowed. First image will be thumbnail.
                 </p>
               </div>
 
@@ -631,34 +657,20 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
               Product Variants/Attributes
             </label>
             <p className="text-xs text-[#3A3A3A] mb-3">
-              Select which attributes apply to this product (e.g., RAM, Storage, Warranty)
+              Select attributes and their values for this product. Price adjustments can be set per value.
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {attributes.map((attr) => (
-                <div
-                  key={attr.id}
-                  className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                    selectedAttributes.includes(attr.id)
-                      ? 'border-[#FF7A19] bg-orange-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                  onClick={() => toggleAttribute(attr.id)}
-                >
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedAttributes.includes(attr.id)}
-                      onChange={() => {}}
-                      className="w-5 h-5 text-[#FF7A19] border-gray-300 rounded focus:ring-[#FF7A19]"
-                    />
-                    <div>
-                      <p className="font-semibold text-[#1A1A1A]">{attr.name}</p>
-                      <p className="text-xs text-[#3A3A3A] capitalize">{attr.type}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <ProductVariantManager
+              key={product?.id || 'new'} // Force re-render when product changes
+              productId={product?.id}
+              onVariantChange={(variants) => {
+                // Use functional update to avoid stale closure issues
+                setProductVariants(prev => {
+                  const newVariants = variants;
+                  setSelectedAttributes(newVariants.map(v => v.attribute_id));
+                  return newVariants;
+                });
+              }}
+            />
           </div>
 
           {/* Actions */}
@@ -691,6 +703,36 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
             </Button>
           </div>
         </form>
+
+        {/* Media Picker */}
+        <MediaPicker
+          isOpen={showMediaPicker}
+          onClose={() => setShowMediaPicker(false)}
+          onSelect={(url) => {
+            setFormData(prev => {
+              const newImages = [...prev.images, url];
+              return {
+                ...prev,
+                images: newImages,
+                thumbnail: prev.thumbnail || url,
+              };
+            });
+            setShowMediaPicker(false);
+          }}
+          folder="products"
+          multiple={true}
+          onSelectMultiple={(urls) => {
+            setFormData(prev => {
+              const newImages = [...prev.images, ...urls];
+              return {
+                ...prev,
+                images: newImages,
+                thumbnail: prev.thumbnail || urls[0],
+              };
+            });
+            setShowMediaPicker(false);
+          }}
+        />
       </div>
     </div>
   );

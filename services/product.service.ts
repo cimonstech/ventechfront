@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { Product } from '@/types/product';
+import { calculatePriceRangesForProducts } from './priceRange.service';
 
 interface GetProductsParams {
   category?: string;
@@ -71,25 +72,69 @@ export const getProducts = async (params: GetProductsParams = {}): Promise<Produ
     if (error) {
       console.error('Error fetching products with relations:', error);
       
-      // Fallback: Try fetching without relations
-      console.log('Attempting to fetch products without relations...');
+      // Fallback: Try fetching without explicit foreign key
+      console.log('Attempting to fetch products with simple relations...');
       const { data: productsOnly, error: fallbackError } = await supabase
         .from('products')
-        .select('*')
+        .select(`
+          *,
+          categories:category_id(id, name, slug),
+          brands:brand_id(id, name, slug)
+        `)
         .order('created_at', { ascending: false })
         .limit(params.limit || 50);
       
       if (fallbackError) {
         console.error('Fallback query also failed:', fallbackError);
-        throw fallbackError;
+        // Last resort: fetch without relations
+        const { data: productsBasic } = await supabase
+          .from('products')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(params.limit || 50);
+        
+        return (productsBasic || []).map((p: any) => ({
+          ...p,
+          original_price: p.price,
+          category_name: null,
+          brand: p.brand_name || '',
+        }));
       }
       
-      console.log('Fetched products without relations:', productsOnly?.length || 0);
+      console.log('Fetched products with simple relations:', productsOnly?.length || 0);
       return productsOnly || [];
     }
     
-    console.log('Successfully fetched products with relations:', data?.length || 0);
-    return data || [];
+    // Transform products to ensure proper structure
+    const transformedProducts = (data || []).map((product: any) => ({
+      ...product,
+      original_price: product.price || product.original_price || 0,
+      category_name: product.categories?.name || product.category_name || null,
+      category_slug: product.categories?.slug || product.category_slug || null,
+      brand: product.brands?.name || product.brand || '',
+      // Remove nested objects that might cause issues
+      categories: undefined,
+      brands: undefined,
+    }));
+    
+    // Calculate price ranges for products with variants
+    const priceRanges = await calculatePriceRangesForProducts(transformedProducts);
+    
+    // Add price ranges to products
+    const productsWithRanges = transformedProducts.map((product: any) => {
+      const range = priceRanges.get(product.id);
+      return {
+        ...product,
+        price_range: range || {
+          min: product.discount_price || product.original_price || 0,
+          max: product.discount_price || product.original_price || 0,
+          hasRange: false,
+        },
+      };
+    });
+    
+    console.log('Successfully fetched products with relations:', productsWithRanges.length);
+    return productsWithRanges;
   } catch (error) {
     console.error('Error fetching products:', error);
     console.error('Error details:', JSON.stringify(error, null, 2));
@@ -120,7 +165,7 @@ export const getProductBySlug = async (slug: string): Promise<Product | null> =>
     }
 
     // Transform the data to match Product interface
-    return {
+    const product = {
       id: data.id,
       name: data.name,
       slug: data.slug,
@@ -145,6 +190,33 @@ export const getProductBySlug = async (slug: string): Promise<Product | null> =>
       brand_name: data.brands?.name || null,
       brand_slug: data.brands?.slug || null
     };
+
+    // Calculate price range for this product (with error handling)
+    try {
+      const basePrice = product.discount_price || product.original_price;
+      const priceRange = await calculatePriceRangesForProducts([{
+        id: product.id,
+        original_price: product.original_price,
+        discount_price: product.discount_price,
+      }]);
+      
+      product.price_range = priceRange.get(product.id) || {
+        min: basePrice,
+        max: basePrice,
+        hasRange: false,
+      };
+    } catch (error) {
+      console.error('Error calculating price range (skipping):', error);
+      // Fallback: use base price
+      const basePrice = product.discount_price || product.original_price;
+      product.price_range = {
+        min: basePrice,
+        max: basePrice,
+        hasRange: false,
+      };
+    }
+    
+    return product;
   } catch (error) {
     console.error('Error fetching product by slug:', error);
     return null;

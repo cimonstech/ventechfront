@@ -24,6 +24,11 @@ export interface Product {
   category_slug?: string | null;
   brand_name?: string | null;
   brand_slug?: string | null;
+  price_range?: {
+    min: number;
+    max: number;
+    hasRange: boolean;
+  };
 }
 
 export interface ProductSpecs {

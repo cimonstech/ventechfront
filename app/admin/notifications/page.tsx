@@ -43,29 +43,85 @@ export default function NotificationsPage() {
         .order('created_at', { ascending: false });
 
       if (error) {
-        // If table doesn't exist, use empty array silently
-        if (error.code === '42P01' || error.code === 'PGRST116' || 
-            error.message?.includes('does not exist') || 
-            error.message?.includes('relation') || 
-            error.message?.includes('not found')) {
-          // Table doesn't exist - set empty array without logging error
+        // Check for table doesn't exist or RLS policy errors
+        const errorMessage = error.message || JSON.stringify(error) || '';
+        const errorCode = error.code || '';
+        const errorDetails = error.details || '';
+        const errorHint = error.hint || '';
+        
+        // Check if it's a "table doesn't exist" error
+        const isTableNotFound = 
+          errorCode === '42P01' || 
+          errorCode === 'PGRST116' || 
+          errorMessage.includes('does not exist') || 
+          errorMessage.includes('relation') || 
+          errorMessage.includes('not found') ||
+          errorMessage.includes('Could not find');
+        
+        // Check if it's an RLS policy error
+        const isRLSError = 
+          errorMessage.includes('policy') ||
+          errorMessage.includes('RLS') ||
+          errorMessage.includes('permission denied') ||
+          errorMessage.includes('new row violates row-level security');
+        
+        if (isTableNotFound) {
+          // Table doesn't exist - set empty array silently
           setNotifications([]);
           return;
         }
-        // For other errors, log and set empty array
-        console.error('Error fetching notifications:', error);
+        
+        if (isRLSError) {
+          // RLS policy blocking - log but don't show error to user
+          console.warn('RLS policy may be blocking notifications access. Run create_notifications_table.sql to set up proper policies.');
+          setNotifications([]);
+          return;
+        }
+        
+        // For other errors, log with details
+        if (Object.keys(error).length > 0) {
+          console.error('Error fetching notifications:', {
+            code: errorCode,
+            message: errorMessage,
+            details: errorDetails,
+            hint: errorHint,
+            fullError: error
+          });
+        }
+        
         setNotifications([]);
         return;
       }
       setNotifications(data || []);
     } catch (error: any) {
-      // Only log if it's not a "table doesn't exist" error
-      if (!(error?.code === '42P01' || error?.code === 'PGRST116' || 
-            error?.message?.includes('does not exist') || 
-            error?.message?.includes('relation') || 
-            error?.message?.includes('not found'))) {
-        console.error('Error fetching notifications:', error);
+      // Handle caught errors
+      const errorMessage = error?.message || JSON.stringify(error) || 'Unknown error';
+      const errorCode = error?.code || '';
+      
+      // Check if it's a "table doesn't exist" or RLS error
+      const isTableNotFound = 
+        errorCode === '42P01' || 
+        errorCode === 'PGRST116' || 
+        errorMessage.includes('does not exist') || 
+        errorMessage.includes('relation') || 
+        errorMessage.includes('not found');
+      
+      const isRLSError = 
+        errorMessage.includes('policy') ||
+        errorMessage.includes('RLS') ||
+        errorMessage.includes('permission denied');
+      
+      if (!isTableNotFound && !isRLSError) {
+        // Only log unexpected errors
+        if (errorMessage !== '{}' && errorMessage !== 'Unknown error') {
+          console.error('Error fetching notifications:', {
+            code: errorCode,
+            message: errorMessage,
+            error: error
+          });
+        }
       }
+      
       setNotifications([]);
     } finally {
       setLoading(false);

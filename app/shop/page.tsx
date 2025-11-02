@@ -193,8 +193,8 @@ export default function ShopPage() {
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h1 className="text-3xl font-bold text-[#1A1A1A]">Shop All Products</h1>
-                <p className="text-sm text-[#3A3A3A] mt-1">Showing {filteredProducts.length} results</p>
+                <h1 className="text-xl sm:text-2xl font-bold text-[#1A1A1A] whitespace-nowrap">Shop All Products</h1>
+                <p className="text-xs text-[#3A3A3A] mt-1">Showing {filteredProducts.length} results</p>
               </div>
               
               <div className="flex items-center gap-3">

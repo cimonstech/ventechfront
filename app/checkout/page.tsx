@@ -11,7 +11,8 @@ import { clearCart } from '@/store/cartSlice';
 import { Check, CreditCard, Smartphone, Banknote, ChevronLeft } from 'lucide-react';
 import { formatCurrency } from '@/lib/helpers';
 import { orderService } from '@/services/order.service';
-import { DELIVERY_OPTIONS } from '@/lib/constants';
+import { deliveryOptionsService } from '@/services/deliveryOptions.service';
+import { DeliveryOption } from '@/types/order';
 import toast from 'react-hot-toast';
 
 export default function CheckoutPage() {
@@ -33,23 +34,63 @@ export default function CheckoutPage() {
     postal_code: '',
   });
 
+  // Delivery Options
+  const [deliveryOptions, setDeliveryOptions] = useState<DeliveryOption[]>([]);
+  
   // Selected Options
-  const [selectedDelivery, setSelectedDelivery] = useState(DELIVERY_OPTIONS[0]);
+  const [selectedDelivery, setSelectedDelivery] = useState<DeliveryOption | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'mobile_money' | 'card' | 'cash_on_delivery'>('mobile_money');
   const [notes, setNotes] = useState('');
+
+  // Fetch delivery options function
+  const fetchDeliveryOptions = async () => {
+    try {
+      const options = await deliveryOptionsService.getActiveDeliveryOptions();
+      setDeliveryOptions(options);
+      if (options.length > 0 && !selectedDelivery) {
+        setSelectedDelivery(options[0]);
+      }
+    } catch (error) {
+      console.error('Error fetching delivery options:', error);
+      // Fallback to default options if fetch fails
+      const defaultOptions: DeliveryOption[] = [
+        {
+          id: 'standard',
+          name: 'Standard Delivery',
+          description: '5-7 business days',
+          price: 0,
+          estimated_days: 6,
+        },
+        {
+          id: 'express',
+          name: 'Express Delivery',
+          description: '2-3 business days',
+          price: 15,
+          estimated_days: 3,
+        },
+        {
+          id: 'overnight',
+          name: 'Overnight Delivery',
+          description: 'Next business day',
+          price: 30,
+          estimated_days: 1,
+        },
+      ];
+      setDeliveryOptions(defaultOptions);
+      setSelectedDelivery(defaultOptions[0]);
+    }
+  };
 
   useEffect(() => {
     // Redirect if cart is empty
     if (items.length === 0) {
       router.push('/cart');
+      return;
     }
-
-    // Redirect if not authenticated
-    if (!isAuthenticated) {
-      toast.error('Please login to continue');
-      router.push('/login');
-    }
-  }, [items, isAuthenticated, router]);
+    // Allow non-logged users to proceed - they'll need to provide address info
+    fetchDeliveryOptions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, router]);
 
   const handleDeliveryInfoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setDeliveryInfo({
@@ -77,9 +118,15 @@ export default function CheckoutPage() {
   };
 
   const handlePlaceOrder = async () => {
-    if (!user) {
-      toast.error('Please login to place order');
-      return;
+    // User can proceed without login - they provide address as billing address
+    // If not logged in, create order as guest (user_id will be null or handled by backend)
+    const userId = user?.id || null;
+    
+    if (!userId) {
+      // For guest checkout, we still need to validate address
+      if (!validateDeliveryInfo()) {
+        return;
+      }
     }
 
     setIsProcessing(true);
@@ -92,12 +139,12 @@ export default function CheckoutPage() {
           country: 'Ghana',
           is_default: false,
         },
-        delivery_option: selectedDelivery,
+        delivery_option: selectedDelivery || deliveryOptions[0],
         payment_method: paymentMethod,
         notes,
       };
 
-      const order = await orderService.createOrder(checkoutData, user.id);
+      const order = await orderService.createOrder(checkoutData, userId);
 
       // Clear cart
       dispatch(clearCart());
@@ -113,12 +160,22 @@ export default function CheckoutPage() {
     }
   };
 
-  const deliveryFee = selectedDelivery.price;
+  // Free shipping for orders over 10,000 cedis
+  const deliveryFee = total >= 10000 ? 0 : (selectedDelivery?.price || deliveryOptions[0]?.price || 0);
   const tax = 0;
   const grandTotal = total + deliveryFee + tax;
 
+  // Early return for empty cart - but render something to avoid hydration mismatch
   if (items.length === 0) {
-    return null;
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="container mx-auto px-4">
+          <div className="text-center py-12">
+            <p className="text-gray-600">Your cart is empty. Redirecting...</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -228,29 +285,35 @@ export default function CheckoutPage() {
                 {/* Delivery Options */}
                 <div className="mt-6">
                   <h3 className="font-semibold text-gray-900 mb-4">Delivery Option</h3>
-                  <div className="space-y-3">
-                    {DELIVERY_OPTIONS.map((option) => (
-                      <button
-                        key={option.id}
-                        onClick={() => setSelectedDelivery(option)}
-                        className={`w-full p-4 rounded-lg border-2 transition-all text-left ${
-                          selectedDelivery.id === option.id
-                            ? 'border-blue-600 bg-blue-50'
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                      >
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <p className="font-semibold text-gray-900">{option.name}</p>
-                            <p className="text-sm text-gray-600">{option.description}</p>
+                  {deliveryOptions.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      Loading delivery options...
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {deliveryOptions.map((option) => (
+                        <button
+                          key={option.id}
+                          onClick={() => setSelectedDelivery(option)}
+                          className={`w-full p-4 rounded-lg border-2 transition-all text-left ${
+                            selectedDelivery?.id === option.id
+                              ? 'border-blue-600 bg-blue-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="font-semibold text-gray-900">{option.name}</p>
+                              <p className="text-sm text-gray-600">{option.description}</p>
+                            </div>
+                            <span className="font-bold text-gray-900">
+                              {option.price === 0 ? 'FREE' : formatCurrency(option.price)}
+                            </span>
                           </div>
-                          <span className="font-bold text-gray-900">
-                            {option.price === 0 ? 'FREE' : formatCurrency(option.price)}
-                          </span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <Button

@@ -11,6 +11,7 @@ import { QuickView } from '@/components/shop/QuickView';
 import { Reviews } from '@/components/product/Reviews';
 import { similarProductsService } from '@/services/similarProducts.service';
 import { getProductBySlug } from '@/services/product.service';
+import { useAppSelector } from '@/store';
 import { 
   Heart, 
   Share2, 
@@ -24,13 +25,15 @@ import {
   ChevronRight,
   Package,
   CreditCard,
-  Headphones
+  Headphones,
+  ShoppingCart
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Product, ProductVariant } from '@/types/product';
 
 export default function ProductDetailPage() {
   const params = useParams();
+  const { items } = useAppSelector((state) => state.cart);
   const [product, setProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(0);
@@ -41,6 +44,9 @@ export default function ProductDetailPage() {
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
   const [similarProducts, setSimilarProducts] = useState<Product[]>([]);
   const [isLoadingSimilar, setIsLoadingSimilar] = useState(true);
+  
+  // Check if product is in cart
+  const isInCart = product ? items.some(item => item.id === product.id) : false;
 
   // Fetch product data
   useEffect(() => {
@@ -241,34 +247,42 @@ export default function ProductDetailPage() {
             <div>
               <div className="bg-white rounded-xl p-6">
                 <div className="mb-4">
-                  <p className="text-sm text-[#FF7A19] font-semibold mb-2">{product.brand}</p>
-                  <h1 className="text-3xl font-bold text-[#1A1A1A] mb-3">{product.name}</h1>
+                  <p className="text-xs sm:text-sm text-[#FF7A19] font-semibold mb-2">{product.brand}</p>
+                  <h1 className="text-xl sm:text-2xl font-bold text-[#1A1A1A] mb-3">{product.name}</h1>
                   
                   {/* Rating */}
-                  <div className="flex items-center gap-3 mb-4">
+                  <div className="flex items-center gap-2 sm:gap-3 mb-4">
                     <div className="flex items-center gap-1">
                       {[...Array(5)].map((_, i) => (
                         <Star
                           key={i}
-                          size={16}
+                          size={14}
                           className={i < Math.floor(product.rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
                         />
                       ))}
                     </div>
-                    <span className="text-sm text-[#3A3A3A]">
-                      {product.rating} ({product.review_count} reviews)
+                    <span className="text-xs sm:text-sm text-[#3A3A3A]">
+                      {product.rating.toFixed(1)} ({product.review_count || 0} reviews)
                     </span>
                   </div>
 
-                  {/* Price */}
-                  <div className="flex items-baseline gap-3 mb-6">
-                    <span className="text-3xl font-bold text-[#FF7A19]">
-                      GHS {calculateTotalPrice().toLocaleString()}
-                    </span>
-                    {product.discount_price && (
-                      <span className="text-lg text-gray-400 line-through">
-                        GHS {(product.original_price * quantity).toLocaleString()}
+                  {/* Price - Show range if variants exist, otherwise calculated price */}
+                  <div className="flex items-baseline gap-2 sm:gap-3 mb-6 flex-wrap">
+                    {product.price_range?.hasRange ? (
+                      <span className="text-lg sm:text-xl font-bold text-[#FF7A19]">
+                        GHS {product.price_range.min.toLocaleString()} - GHS {product.price_range.max.toLocaleString()}
                       </span>
+                    ) : (
+                      <>
+                        <span className="text-lg sm:text-xl font-bold text-[#FF7A19]">
+                          GHS {calculateTotalPrice().toLocaleString()}
+                        </span>
+                        {product.discount_price && product.discount_price < product.original_price && (
+                          <span className="text-sm sm:text-base text-gray-400 line-through">
+                            GHS {(product.original_price * quantity).toLocaleString()}
+                          </span>
+                        )}
+                      </>
                     )}
                   </div>
 
@@ -336,27 +350,53 @@ export default function ProductDetailPage() {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex gap-3 mb-6">
+                <div className="flex gap-2 sm:gap-3 mb-6 items-center">
+                  {/* Mobile: Cart Icon Only */}
+                  <button
+                    onClick={handleAddToCart}
+                    disabled={!product.in_stock}
+                    className={`md:hidden p-2.5 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-md ${
+                      isInCart 
+                        ? 'bg-orange-600 hover:bg-orange-700' 
+                        : 'bg-[#FF7A19] hover:bg-orange-600'
+                    }`}
+                    title={isInCart ? 'In Cart' : 'Add to Cart'}
+                  >
+                    <ShoppingCart size={18} className="text-white" />
+                  </button>
+                  
+                  {/* Desktop: Full Add to Cart Button */}
                   <Button
                     variant="primary"
                     size="lg"
-                    className="flex-1"
+                    className="hidden md:flex flex-1"
                     onClick={handleAddToCart}
                     disabled={!product.in_stock}
                   >
                     Add to Cart
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="lg"
+                  
+                  {/* Wishlist Icon - Reduced padding */}
+                  <button
                     onClick={handleWishlistToggle}
-                    className={isWishlisted ? 'border-red-500 text-red-500' : ''}
+                    className={`p-1.5 sm:p-2 border-2 rounded-lg transition-colors ${
+                      isWishlisted 
+                        ? 'border-red-500 text-red-500 bg-red-50' 
+                        : 'border-gray-200 text-gray-600 hover:border-[#FF7A19] hover:text-[#FF7A19]'
+                    }`}
+                    title={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
                   >
-                    <Heart size={20} className={isWishlisted ? 'fill-red-500' : ''} />
-                  </Button>
-                  <Button variant="outline" size="lg" onClick={handleShare}>
-                    <Share2 size={20} />
-                  </Button>
+                    <Heart size={16} className={isWishlisted ? 'fill-red-500' : ''} />
+                  </button>
+                  
+                  {/* Share Icon - Reduced padding */}
+                  <button
+                    onClick={handleShare}
+                    className="p-1.5 sm:p-2 border-2 border-gray-200 rounded-lg text-gray-600 hover:border-[#FF7A19] hover:text-[#FF7A19] transition-colors"
+                    title="Share product"
+                  >
+                    <Share2 size={16} />
+                  </button>
                 </div>
 
                 {/* Features */}

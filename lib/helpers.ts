@@ -104,3 +104,93 @@ export const getOrderStatusColor = (status: string): string => {
   return statusColors[status.toLowerCase()] || 'text-gray-600 bg-gray-50';
 };
 
+// Calculate price range for products with variants
+export interface PriceRange {
+  min: number;
+  max: number;
+  hasRange: boolean;
+}
+
+export const calculatePriceRange = async (
+  productId: string,
+  basePrice: number
+): Promise<PriceRange> => {
+  try {
+    const { supabase } = await import('@/lib/supabase');
+    
+    // Get product attribute mappings
+    const { data: mappings, error: mappingsError } = await supabase
+      .from('product_attribute_mappings')
+      .select('attribute_id')
+      .eq('product_id', productId);
+
+    if (mappingsError || !mappings || mappings.length === 0) {
+      return { min: basePrice, max: basePrice, hasRange: false };
+    }
+
+    // Get all attributes and their options
+    const attributeIds = mappings.map((m: any) => m.attribute_id);
+    const { data: attributes } = await supabase
+      .from('product_attributes')
+      .select('id')
+      .in('id', attributeIds);
+
+    if (!attributes || attributes.length === 0) {
+      return { min: basePrice, max: basePrice, hasRange: false };
+    }
+
+    // Get all options for these attributes
+    const { data: allOptions } = await supabase
+      .from('product_attribute_options')
+      .select('attribute_id, price_modifier')
+      .in('attribute_id', attributeIds)
+      .eq('is_available', true);
+
+    if (!allOptions || allOptions.length === 0) {
+      return { min: basePrice, max: basePrice, hasRange: false };
+    }
+
+    // Group options by attribute_id
+    const optionsByAttribute: { [key: string]: number[] } = {};
+    allOptions.forEach((option: any) => {
+      if (!optionsByAttribute[option.attribute_id]) {
+        optionsByAttribute[option.attribute_id] = [];
+      }
+      optionsByAttribute[option.attribute_id].push(option.price_modifier || 0);
+    });
+
+    // Calculate min and max price adjustments
+    let minAdjustment = 0;
+    let maxAdjustment = 0;
+
+    Object.values(optionsByAttribute).forEach((priceModifiers) => {
+      if (priceModifiers.length > 0) {
+        const min = Math.min(...priceModifiers);
+        const max = Math.max(...priceModifiers);
+        minAdjustment += min;
+        maxAdjustment += max;
+      }
+    });
+
+    const minPrice = basePrice + minAdjustment;
+    const maxPrice = basePrice + maxAdjustment;
+
+    return {
+      min: minPrice,
+      max: maxPrice,
+      hasRange: minPrice !== maxPrice,
+    };
+  } catch (error) {
+    console.error('Error calculating price range:', error);
+    return { min: basePrice, max: basePrice, hasRange: false };
+  }
+};
+
+// Format price range display
+export const formatPriceRange = (range: PriceRange): string => {
+  if (!range.hasRange) {
+    return formatCurrency(range.min);
+  }
+  return `${formatCurrency(range.min)} - ${formatCurrency(range.max)}`;
+};
+

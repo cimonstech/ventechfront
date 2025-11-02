@@ -2,8 +2,8 @@ import { supabase } from '@/lib/supabase';
 import { CheckoutData, Order } from '@/types/order';
 
 export const orderService = {
-  // Create new order
-  async createOrder(checkoutData: CheckoutData, userId: string) {
+  // Create new order (supports guest checkout with null userId)
+  async createOrder(checkoutData: CheckoutData, userId: string | null) {
     // Generate order number in format: ORD-XXXDDMM
     // First 3 digits: order number for the day (001, 002, etc.)
     // Last 4 digits: day and month (DDMM format, e.g., 0111 = 1st November)

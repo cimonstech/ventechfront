@@ -224,6 +224,74 @@ export const getReviewStats = async (productId: string) => {
   }
 };
 
+// Admin: Get all reviews (including unapproved)
+export const getAllReviews = async (): Promise<Review[]> => {
+  try {
+    // Try with generic foreign key reference (without specific constraint name)
+    let { data, error } = await supabase
+      .from('reviews')
+      .select(`
+        *,
+        user:user_id(
+          id,
+          first_name,
+          last_name,
+          full_name,
+          avatar_url,
+          email
+        ),
+        product:product_id(
+          id,
+          name,
+          slug
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    // If that fails, try without joins
+    if (error) {
+      console.warn('Error with joins, trying simple query:', error);
+      const simpleResult = await supabase
+        .from('reviews')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (simpleResult.error) {
+        console.error('Error fetching all reviews:', simpleResult.error);
+        throw simpleResult.error;
+      }
+      
+      return simpleResult.data || [];
+    }
+    
+    return data || [];
+  } catch (error: any) {
+    console.error('Failed to fetch all reviews:', error);
+    // Return empty array on error to prevent UI breakage
+    return [];
+  }
+};
+
+// Admin: Delete any review
+export const adminDeleteReview = async (reviewId: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('reviews')
+      .delete()
+      .eq('id', reviewId);
+
+    if (error) {
+      console.error('Error deleting review:', error);
+      throw error;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Failed to delete review:', error);
+    throw error;
+  }
+};
+
 // Export as object for convenience
 export const reviewsService = {
   getProductReviews,
@@ -232,5 +300,7 @@ export const reviewsService = {
   updateReview,
   deleteReview,
   getReviewStats,
+  getAllReviews, // Admin only
+  adminDeleteReview, // Admin only
 };
 

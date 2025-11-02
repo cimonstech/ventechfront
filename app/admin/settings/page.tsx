@@ -1,438 +1,428 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { 
-  Settings as SettingsIcon, 
-  ChevronLeft,
-  Store,
-  Mail,
-  Globe,
-  CreditCard,
-  Truck,
-  Save,
-  AlertCircle
-} from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
+import { Input } from '@/components/ui/Input';
+import { 
+  Plus, 
+  Edit, 
+  Trash2, 
+  Eye,
+  EyeOff,
+  ArrowUp,
+  ArrowDown,
+  Save,
+  X
+} from 'lucide-react';
+import { deliveryOptionsService } from '@/services/deliveryOptions.service';
+import { formatCurrency } from '@/lib/helpers';
 import { useAppSelector } from '@/store';
-import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 
-interface Setting {
+interface DeliveryOption {
   id: string;
-  key: string;
-  value: string | null;
-  category: string;
-  description: string | null;
+  name: string;
+  description: string;
+  price: number;
+  estimated_days?: number;
+  is_active: boolean;
+  display_order: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export default function AdminSettingsPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
-  const [activeTab, setActiveTab] = useState('email');
-  const [settings, setSettings] = useState<Setting[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [formData, setFormData] = useState<Record<string, string>>({});
+
+  const [deliveryOptions, setDeliveryOptions] = useState<DeliveryOption[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingOption, setEditingOption] = useState<DeliveryOption | null>(null);
+
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    price: '',
+    estimated_days: '',
+    is_active: true,
+    display_order: 0,
+  });
 
   useEffect(() => {
     if (isAuthenticated && user?.role !== 'admin') {
       router.push('/');
+      return;
     }
-    fetchSettings();
+    fetchDeliveryOptions();
   }, [isAuthenticated, user, router]);
 
-  const fetchSettings = async () => {
+  const fetchDeliveryOptions = async () => {
     try {
-      setIsLoading(true);
-      const { data, error } = await supabase
-        .from('settings')
-        .select('*')
-        .order('category', { ascending: true });
-
-      if (error) {
-        // Check if error is empty object (table doesn't exist)
-        const errorKeys = Object.keys(error);
-        const isEmptyError = errorKeys.length === 0 || 
-                           (!error.code && !error.message && !error.details && !error.hint);
-        
-        // Check for table-not-found indicators
-        const errorStr = String(JSON.stringify(error)).toLowerCase();
-        const errorMessage = String(error.message || '').toLowerCase();
-        const errorCode = String(error.code || '');
-        
-        // PGRST205 = table not found in schema cache
-        if (isEmptyError ||
-            errorCode === '42P01' || errorCode === 'PGRST116' || errorCode === 'PGRST205' ||
-            errorMessage.includes('does not exist') || 
-            errorMessage.includes('could not find the table') ||
-            errorMessage.includes('relation') || 
-            errorMessage.includes('not found') ||
-            errorStr.includes('does not exist') ||
-            errorStr.includes('could not find the table') ||
-            errorStr.includes('relation') ||
-            errorStr.includes('not found')) {
-          // Table doesn't exist or empty error - set empty defaults silently
-          setSettings([]);
-          setFormData({});
-          return;
-        }
-        // Real error - rethrow to catch block
-        throw error;
-      }
-      
-      setSettings(data || []);
-      
-      // Initialize form data
-      const initialData: Record<string, string> = {};
-      data?.forEach((setting) => {
-        initialData[setting.key] = setting.value || '';
-      });
-      setFormData(initialData);
+      setLoading(true);
+      const options = await deliveryOptionsService.getAllDeliveryOptions();
+      setDeliveryOptions(options);
     } catch (error: any) {
-      // Check if error is empty or table-not-found - handle silently
-      const errorKeys = Object.keys(error || {});
-      const isEmptyError = errorKeys.length === 0 || 
-                         (!error?.code && !error?.message && !error?.details && !error?.hint);
-      
-      if (isEmptyError) {
-        // Empty error object - treat as table doesn't exist, handle silently
-        setSettings([]);
-        setFormData({});
-        return;
-      }
-      
-      // Check for table-not-found indicators
-      const errorStr = String(JSON.stringify(error || {})).toLowerCase();
-      const errorMessage = String(error?.message || '').toLowerCase();
-      const errorCode = String(error?.code || '');
-      
-      // PGRST205 = table not found in schema cache
-      if (errorCode === '42P01' || errorCode === 'PGRST116' || errorCode === 'PGRST205' ||
-          errorMessage.includes('does not exist') || 
-          errorMessage.includes('could not find the table') ||
-          errorMessage.includes('relation') || 
-          errorMessage.includes('not found') ||
-          errorStr.includes('does not exist') ||
-          errorStr.includes('could not find the table') ||
-          errorStr.includes('relation') ||
-          errorStr.includes('not found')) {
-        // Table doesn't exist - set empty defaults silently
-        setSettings([]);
-        setFormData({});
-      } else {
-        // Real error - log it
-        console.error('Error fetching settings:', error);
-        toast.error('Failed to load settings');
-        setSettings([]);
-        setFormData({});
-      }
+      console.error('Error fetching delivery options:', error);
+      toast.error('Failed to load delivery options');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const handleSave = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.name || !formData.price) {
+      toast.error('Please fill in name and price');
+      return;
+    }
+
     try {
-      setIsSaving(true);
-      
-      // Update each changed setting
-      const updates = Object.entries(formData).map(([key, value]) => {
-        return supabase
-          .from('settings')
-          .update({ value, updated_by: user?.id })
-          .eq('key', key);
+      if (editingOption) {
+        await deliveryOptionsService.updateDeliveryOption(editingOption.id, {
+          name: formData.name,
+          description: formData.description || undefined,
+          price: parseFloat(formData.price),
+          estimated_days: formData.estimated_days ? parseInt(formData.estimated_days) : undefined,
+          is_active: formData.is_active,
+          display_order: formData.display_order,
+        });
+        toast.success('Delivery option updated successfully');
+      } else {
+        await deliveryOptionsService.createDeliveryOption({
+          name: formData.name,
+          description: formData.description || undefined,
+          price: parseFloat(formData.price),
+          estimated_days: formData.estimated_days ? parseInt(formData.estimated_days) : undefined,
+          is_active: formData.is_active,
+          display_order: formData.display_order,
+        });
+        toast.success('Delivery option created successfully');
+      }
+
+      setShowForm(false);
+      resetForm();
+      fetchDeliveryOptions();
+    } catch (error: any) {
+      console.error('Save error:', error);
+      toast.error(error.message || 'Failed to save delivery option');
+    }
+  };
+
+  const handleEdit = (option: DeliveryOption) => {
+    setEditingOption(option);
+    setFormData({
+      name: option.name,
+      description: option.description || '',
+      price: option.price.toString(),
+      estimated_days: option.estimated_days?.toString() || '',
+      is_active: option.is_active,
+      display_order: option.display_order,
+    });
+    setShowForm(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this delivery option?')) return;
+
+    try {
+      await deliveryOptionsService.deleteDeliveryOption(id);
+      toast.success('Delivery option deleted successfully');
+      fetchDeliveryOptions();
+    } catch (error: any) {
+      console.error('Delete error:', error);
+      toast.error(error.message || 'Failed to delete delivery option');
+    }
+  };
+
+  const toggleActive = async (option: DeliveryOption) => {
+    try {
+      await deliveryOptionsService.updateDeliveryOption(option.id, {
+        is_active: !option.is_active,
       });
+      toast.success(`Delivery option ${!option.is_active ? 'activated' : 'deactivated'}`);
+      fetchDeliveryOptions();
+    } catch (error: any) {
+      console.error('Toggle error:', error);
+      toast.error(error.message || 'Failed to toggle delivery option');
+    }
+  };
 
-      await Promise.all(updates);
+  const moveOrder = async (option: DeliveryOption, direction: 'up' | 'down') => {
+    const currentIndex = deliveryOptions.findIndex(o => o.id === option.id);
+    if (currentIndex === -1) return;
+
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= deliveryOptions.length) return;
+
+    const targetOption = deliveryOptions[targetIndex];
+    
+    try {
+      // Swap display orders
+      await deliveryOptionsService.updateDeliveryOption(option.id, {
+        display_order: targetOption.display_order,
+      });
+      await deliveryOptionsService.updateDeliveryOption(targetOption.id, {
+        display_order: option.display_order,
+      });
       
-      toast.success('Settings saved successfully!');
-      fetchSettings();
-    } catch (error) {
-      console.error('Error saving settings:', error);
-      toast.error('Failed to save settings');
-    } finally {
-      setIsSaving(false);
+      fetchDeliveryOptions();
+    } catch (error: any) {
+      console.error('Move error:', error);
+      toast.error(error.message || 'Failed to move delivery option');
     }
   };
 
-  const tabs = [
-    { id: 'email', label: 'Email Settings', icon: Mail, color: 'text-blue-600' },
-    { id: 'store', label: 'Store Info', icon: Store, color: 'text-orange-600' },
-    { id: 'payment', label: 'Payment', icon: CreditCard, color: 'text-green-600' },
-    { id: 'shipping', label: 'Shipping', icon: Truck, color: 'text-purple-600' },
-    { id: 'general', label: 'General', icon: Globe, color: 'text-indigo-600' },
-  ];
-
-  const getSettingsByCategory = (category: string) => {
-    return settings.filter((s) => s.category === category);
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      description: '',
+      price: '',
+      estimated_days: '',
+      is_active: true,
+      display_order: deliveryOptions.length,
+    });
+    setEditingOption(null);
   };
 
-  const renderField = (setting: Setting) => {
-    const isBoolean = setting.value === 'true' || setting.value === 'false';
-    const key = setting.key.toLowerCase();
-    
-    // Detect field type
-    const isEmail = key.includes('email') || key.includes('_email') || key.includes('email_');
-    const isUrl = key.includes('url') || key.includes('_url') || key.includes('_link') || key.includes('facebook') || key.includes('twitter') || key.includes('instagram') || key.includes('linkedin');
-    const isPassword = key.includes('password') || key.includes('secret') || key.includes('api_key');
-    const isNumber = key.includes('port') || key.includes('cost') || key.includes('threshold') || key.includes('amount') || key.includes('per_page') || key.includes('days');
-    const isMultiline = key.includes('text') || key.includes('message') || key.includes('about') || key.includes('description') && !isUrl;
-    
-    if (isBoolean) {
-      return (
-        <div key={setting.key} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-          <div className="flex-1">
-            <label className="text-sm font-medium text-[#1A1A1A]">
-              {setting.description || setting.key}
-            </label>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setFormData({ ...formData, [setting.key]: 'false' })}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                formData[setting.key] === 'false'
-                  ? 'bg-red-100 text-red-700'
-                  : 'bg-gray-200 text-gray-600'
-              }`}
-            >
-              Disabled
-            </button>
-            <button
-              onClick={() => setFormData({ ...formData, [setting.key]: 'true' })}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                formData[setting.key] === 'true'
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-gray-200 text-gray-600'
-              }`}
-            >
-              Enabled
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    if (isMultiline) {
-      return (
-        <div key={setting.key} className="space-y-2">
-          <label className="text-sm font-medium text-[#1A1A1A]">
-            {setting.description || setting.key}
-          </label>
-          <textarea
-            value={formData[setting.key] || ''}
-            onChange={(e) => setFormData({ ...formData, [setting.key]: e.target.value })}
-            rows={4}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19] resize-y"
-            placeholder={`Enter ${setting.description?.toLowerCase() || setting.key}`}
-          />
-        </div>
-      );
-    }
-
+  if (loading) {
     return (
-      <div key={setting.key} className="space-y-2">
-        <label className="text-sm font-medium text-[#1A1A1A]">
-          {setting.description || setting.key}
-          {isPassword && (
-            <span className="ml-2 text-xs text-amber-600 font-normal">
-              (Store securely in backend .env file)
-            </span>
-          )}
-        </label>
-        <input
-          type={isPassword ? 'password' : isEmail ? 'email' : isNumber ? 'number' : 'text'}
-          value={formData[setting.key] || ''}
-          onChange={(e) => setFormData({ ...formData, [setting.key]: e.target.value })}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
-          placeholder={
-            isUrl 
-              ? 'https://example.com' 
-              : isEmail 
-              ? 'email@example.com' 
-              : isPassword 
-              ? 'Enter password (hidden)' 
-              : `Enter ${setting.description?.toLowerCase() || setting.key}`
-          }
-          min={isNumber ? 0 : undefined}
-          step={isNumber && key.includes('cost') ? '0.01' : undefined}
-        />
-        {isUrl && formData[setting.key] && !formData[setting.key].startsWith('http') && (
-          <p className="text-xs text-amber-600 mt-1">
-            ⚠️ URLs should start with http:// or https://
-          </p>
-        )}
+      <div className="p-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+          <div className="h-64 bg-gray-200 rounded"></div>
+        </div>
       </div>
     );
-  };
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link href="/admin">
-                <Button variant="ghost" size="sm">
-                  <ChevronLeft size={20} />
-                  Back
-                </Button>
-              </Link>
-              <div>
-                <h1 className="text-3xl font-bold text-[#1A1A1A]">Settings</h1>
-                <p className="text-sm text-[#3A3A3A] mt-1">Configure your VENTECH store</p>
-              </div>
-            </div>
-            <Button
-              variant="primary"
-              size="md"
-              onClick={handleSave}
-              disabled={isSaving}
-              icon={<Save size={16} />}
-            >
-              {isSaving ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </div>
+    <div className="p-6">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Delivery Options Settings</h1>
+          <p className="text-sm text-gray-600 mt-1">Manage delivery options for checkout</p>
         </div>
+        <Button
+          variant="primary"
+          onClick={() => {
+            resetForm();
+            setShowForm(true);
+          }}
+        >
+          <Plus size={18} className="mr-2" />
+          Add Delivery Option
+        </Button>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
-        {/* Email Not Configured Warning */}
-        {formData['email_sender_address'] === 'ventechgadgets@gmail.com' && (
-          <div className="mb-6 bg-amber-50 border-l-4 border-amber-500 p-4 rounded-lg flex items-start gap-3">
-            <AlertCircle className="text-amber-600 flex-shrink-0 mt-0.5" size={20} />
-            <div>
-              <h3 className="text-sm font-semibold text-[#1A1A1A] mb-1">
-                Email Configuration Required
-              </h3>
-              <p className="text-sm text-[#3A3A3A]">
-                Please configure your email settings in the <strong>Email Settings</strong> tab to enable automatic
-                email notifications for orders, wishlist reminders, and cart abandonment.
-              </p>
+      {showForm && (
+        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-gray-900">
+              {editingOption ? 'Edit Delivery Option' : 'Add New Delivery Option'}
+            </h2>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setShowForm(false);
+                resetForm();
+              }}
+            >
+              <X size={18} />
+            </Button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="Name"
+                name="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g., Standard Delivery"
+                required
+              />
+              <Input
+                label="Price (GHS)"
+                name="price"
+                type="number"
+                step="0.01"
+                value={formData.price}
+                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                placeholder="0.00"
+                required
+              />
+              <div className="md:col-span-2">
+                <Input
+                  label="Description"
+                  name="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="e.g., 5-7 business days"
+                />
+              </div>
+              <Input
+                label="Estimated Days"
+                name="estimated_days"
+                type="number"
+                value={formData.estimated_days}
+                onChange={(e) => setFormData({ ...formData, estimated_days: e.target.value })}
+                placeholder="e.g., 5"
+              />
+              <Input
+                label="Display Order"
+                name="display_order"
+                type="number"
+                value={formData.display_order}
+                onChange={(e) => setFormData({ ...formData, display_order: parseInt(e.target.value) || 0 })}
+                placeholder="0"
+              />
             </div>
-          </div>
-        )}
 
-        {/* Tabs */}
-        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-          <div className="flex border-b overflow-x-auto">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-6 py-4 font-medium text-sm transition-colors whitespace-nowrap ${
-                    activeTab === tab.id
-                      ? 'border-b-2 border-[#FF7A19] text-[#FF7A19] bg-orange-50'
-                      : 'text-[#3A3A3A] hover:bg-gray-50'
-                  }`}
-                >
-                  <Icon size={18} className={activeTab === tab.id ? tab.color : ''} />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.is_active}
+                  onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                />
+                <span className="text-sm font-medium text-gray-700">Active</span>
+              </label>
+            </div>
 
-          {/* Tab Content */}
-          <div className="p-6">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-20">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF7A19]"></div>
-              </div>
-            ) : (
-              <div className="space-y-6 max-w-3xl">
-                {getSettingsByCategory(activeTab).length === 0 ? (
-                  <div className="text-center py-12">
-                    <p className="text-[#3A3A3A]">No settings available for this category.</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="space-y-4">
-                      {getSettingsByCategory(activeTab).map((setting) => renderField(setting))}
-                    </div>
-                    
-                    {/* Category-specific help text */}
-                    {activeTab === 'email' && (
-                      <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <h4 className="text-sm font-semibold text-[#1A1A1A] mb-2">
-                          📧 Email Configuration
-                        </h4>
-                        <p className="text-sm text-[#3A3A3A] leading-relaxed mb-2">
-                          Configure your email service for sending order confirmations, shipping notifications, wishlist
-                          reminders, and cart abandonment emails.
-                        </p>
-                        <p className="text-xs text-[#3A3A3A] leading-relaxed">
-                          <strong>Note:</strong> For Gmail, use an App Password (not your regular password). SMTP password should be stored in the backend <code>.env</code> file for security.
-                        </p>
+            <div className="flex gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowForm(false);
+                  resetForm();
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary">
+                <Save size={18} className="mr-2" />
+                {editingOption ? 'Update' : 'Create'} Delivery Option
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Delivery Options List */}
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Order
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Name
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Description
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Price
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Days
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {deliveryOptions.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                    No delivery options yet. Click "Add Delivery Option" to create one.
+                  </td>
+                </tr>
+              ) : (
+                deliveryOptions.map((option) => (
+                  <tr key={option.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => moveOrder(option, 'up')}
+                          className="text-gray-400 hover:text-gray-600"
+                          disabled={deliveryOptions.findIndex(o => o.id === option.id) === 0}
+                        >
+                          <ArrowUp size={16} />
+                        </button>
+                        <span className="text-sm font-medium text-gray-900">
+                          {option.display_order}
+                        </span>
+                        <button
+                          onClick={() => moveOrder(option, 'down')}
+                          className="text-gray-400 hover:text-gray-600"
+                          disabled={deliveryOptions.findIndex(o => o.id === option.id) === deliveryOptions.length - 1}
+                        >
+                          <ArrowDown size={16} />
+                        </button>
                       </div>
-                    )}
-                    
-                    {activeTab === 'store' && (
-                      <div className="mt-6 p-4 bg-orange-50 rounded-lg border border-orange-200">
-                        <h4 className="text-sm font-semibold text-[#1A1A1A] mb-2">
-                          🏪 Store Information
-                        </h4>
-                        <p className="text-sm text-[#3A3A3A] leading-relaxed mb-2">
-                          This information will be displayed on your website footer, contact page, and in customer
-                          emails. Keep it accurate and up-to-date.
-                        </p>
-                        <p className="text-xs text-[#3A3A3A] leading-relaxed">
-                          <strong>Tip:</strong> Add your social media links and WhatsApp number to increase customer engagement and support.
-                        </p>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">{option.name}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-500">{option.description || '-'}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">
+                        {option.price === 0 ? 'FREE' : formatCurrency(option.price)}
                       </div>
-                    )}
-                    
-                    {activeTab === 'payment' && (
-                      <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
-                        <h4 className="text-sm font-semibold text-[#1A1A1A] mb-2">
-                          💳 Payment Configuration (Paystack)
-                        </h4>
-                        <p className="text-sm text-[#3A3A3A] leading-relaxed mb-2">
-                          Configure Paystack payment gateway for online payments. Get your API keys from your Paystack dashboard.
-                        </p>
-                        <p className="text-xs text-[#3A3A3A] leading-relaxed">
-                          <strong>Security:</strong> Secret keys should be stored in the backend <code>.env</code> file. Public key can be stored here for frontend use. Set webhook URL to receive payment notifications: <code>https://your-backend-url/api/payments/paystack/webhook</code>
-                        </p>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500">
+                        {option.estimated_days ? `${option.estimated_days} days` : '-'}
                       </div>
-                    )}
-                    
-                    {activeTab === 'shipping' && (
-                      <div className="mt-6 p-4 bg-purple-50 rounded-lg border border-purple-200">
-                        <h4 className="text-sm font-semibold text-[#1A1A1A] mb-2">
-                          🚚 Shipping & Delivery Settings
-                        </h4>
-                        <p className="text-sm text-[#3A3A3A] leading-relaxed mb-2">
-                          Configure shipping costs and delivery times for different locations. Enable free shipping above a certain order amount.
-                        </p>
-                        <p className="text-xs text-[#3A3A3A] leading-relaxed">
-                          <strong>Tip:</strong> Set different shipping costs for Accra, Ho, and other cities. Enable store pickup for customers who prefer to collect orders in person.
-                        </p>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <button
+                        onClick={() => toggleActive(option)}
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          option.is_active
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {option.is_active ? 'Active' : 'Inactive'}
+                      </button>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleEdit(option)}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          <Edit size={18} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(option.id)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          <Trash2 size={18} />
+                        </button>
                       </div>
-                    )}
-                    
-                    {activeTab === 'general' && (
-                      <div className="mt-6 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
-                        <h4 className="text-sm font-semibold text-[#1A1A1A] mb-2">
-                          ⚙️ General Store Settings
-                        </h4>
-                        <p className="text-sm text-[#3A3A3A] leading-relaxed mb-2">
-                          Configure general store settings like currency, timezone, features, and operational preferences.
-                        </p>
-                        <p className="text-xs text-[#3A3A3A] leading-relaxed">
-                          <strong>Note:</strong> Maintenance mode will show a maintenance page to all visitors except admins. Use it when updating the store.
-                        </p>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-          </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
