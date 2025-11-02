@@ -32,7 +32,7 @@ export default function CartPage() {
     dispatch(updateQuantity({ id: productId, quantity }));
   };
 
-  const deliveryFee = total >= 10000 ? 0 : 15;
+  const deliveryFee = total >= 20000 ? 0 : 15;
   const couponDiscount = appliedCoupon?.discount_amount || 0;
   const totalDiscount = discountAmount + couponDiscount;
   // Free delivery is already included in the discount_amount if applicable
@@ -238,7 +238,7 @@ export default function CartPage() {
                   </div>
                 )}
                 
-                {total > 200 && !appliedCoupon && (
+                {total >= 20000 && !appliedCoupon && (
                   <div className="text-sm text-green-600 flex items-center gap-1">
                     <span>✓</span>
                     <span>You qualify for FREE delivery!</span>

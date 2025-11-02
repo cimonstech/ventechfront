@@ -36,6 +36,7 @@ export function ProductVariantSelector({
 }: ProductVariantSelectorProps) {
   const [attributes, setAttributes] = useState<ProductAttribute[]>([]);
   const [selectedVariants, setSelectedVariants] = useState<{ [key: string]: VariantOption }>({});
+  const [expandedAttributes, setExpandedAttributes] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -131,6 +132,18 @@ export function ProductVariantSelector({
     }));
   };
 
+  const toggleAttribute = (attributeId: string) => {
+    setExpandedAttributes((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(attributeId)) {
+        newSet.delete(attributeId);
+      } else {
+        newSet.add(attributeId);
+      }
+      return newSet;
+    });
+  };
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -145,127 +158,106 @@ export function ProductVariantSelector({
   }
 
   return (
-    <div className="space-y-6">
-      {attributes.map((attribute) => (
-        <div key={attribute.id}>
-          <label className="block text-sm font-semibold text-[#1A1A1A] mb-3">
-            {attribute.name}
-            {attribute.is_required && <span className="text-red-500 ml-1">*</span>}
-          </label>
+    <div className="space-y-3">
+      {attributes.map((attribute) => {
+        const isExpanded = expandedAttributes.has(attribute.id);
+        const selectedOption = selectedVariants[attribute.id];
 
-          {/* Radio/Select Type */}
-          {(attribute.type === 'select' || attribute.type === 'radio') && (
-            <div className="space-y-2">
-              {attribute.options.map((option) => {
-                const isSelected = selectedVariants[attribute.id]?.id === option.id;
-                const isOutOfStock = option.stock_quantity === 0;
+        return (
+          <div key={attribute.id} className="border border-gray-200 rounded-lg overflow-hidden">
+            {/* Dropdown Header */}
+            <button
+              onClick={() => toggleAttribute(attribute.id)}
+              className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-[#1A1A1A]">
+                  {attribute.name}
+                  {attribute.is_required && <span className="text-red-500 ml-1">*</span>}
+                </span>
+                {selectedOption && (
+                  <span className="text-xs text-[#FF7A19] font-medium">
+                    ({selectedOption.label})
+                  </span>
+                )}
+              </div>
+              <svg
+                className={`w-5 h-5 text-gray-600 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
 
-                return (
-                  <button
-                    key={option.id}
-                    onClick={() => !isOutOfStock && handleVariantSelect(attribute.id, option)}
-                    disabled={isOutOfStock}
-                    className={`
-                      w-full px-4 py-3 border-2 rounded-lg text-left transition-all
-                      ${isSelected
-                        ? 'border-[#FF7A19] bg-orange-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                      }
-                      ${isOutOfStock
-                        ? 'opacity-50 cursor-not-allowed'
-                        : 'cursor-pointer'
-                      }
-                    `}
-                  >
-                    <div className="flex items-center justify-between">
+            {/* Radio Options - Shown when expanded */}
+            {isExpanded && (
+              <div className="p-3 space-y-2 bg-white border-t border-gray-200">
+                {attribute.options.map((option) => {
+                  const isSelected = selectedVariants[attribute.id]?.id === option.id;
+                  const isOutOfStock = option.stock_quantity === 0;
+
+                  return (
+                    <button
+                      key={option.id}
+                      onClick={() => !isOutOfStock && handleVariantSelect(attribute.id, option)}
+                      disabled={isOutOfStock}
+                      className={`
+                        w-full px-3 py-2 flex items-center justify-between rounded-lg text-left transition-all
+                        ${isSelected
+                          ? 'bg-orange-50 border-2 border-[#FF7A19]'
+                          : 'bg-gray-50 border-2 border-transparent hover:border-gray-300'
+                        }
+                        ${isOutOfStock
+                          ? 'opacity-50 cursor-not-allowed'
+                          : 'cursor-pointer'
+                        }
+                      `}
+                    >
                       <div className="flex items-center gap-3">
                         <div
                           className={`
-                            w-5 h-5 rounded-full border-2 flex items-center justify-center
+                            w-4 h-4 rounded-full border-2 flex items-center justify-center
                             ${isSelected ? 'border-[#FF7A19]' : 'border-gray-300'}
                           `}
                         >
                           {isSelected && (
-                            <div className="w-3 h-3 rounded-full bg-[#FF7A19]"></div>
+                            <div className="w-2 h-2 rounded-full bg-[#FF7A19]"></div>
                           )}
                         </div>
                         <div>
-                          <p className="font-medium text-[#1A1A1A]">{option.label}</p>
+                          <p className="text-sm font-medium text-[#1A1A1A]">{option.label}</p>
                           {isOutOfStock && (
                             <p className="text-xs text-red-500">Out of Stock</p>
                           )}
                         </div>
                       </div>
                       {option.price_modifier !== 0 && (
-                        <span className="text-sm font-semibold text-[#FF7A19]">
+                        <span className="text-xs font-semibold text-[#FF7A19]">
                           {option.price_modifier > 0 ? '+' : ''}GHS {option.price_modifier.toFixed(2)}
                         </span>
                       )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Color Type */}
-          {attribute.type === 'color' && (
-            <div className="flex flex-wrap gap-3">
-              {attribute.options.map((option) => {
-                const isSelected = selectedVariants[attribute.id]?.id === option.id;
-                const isOutOfStock = option.stock_quantity === 0;
-
-                return (
-                  <button
-                    key={option.id}
-                    onClick={() => !isOutOfStock && handleVariantSelect(attribute.id, option)}
-                    disabled={isOutOfStock}
-                    className={`
-                      relative px-4 py-2 border-2 rounded-lg transition-all
-                      ${isSelected ? 'border-[#FF7A19]' : 'border-gray-200 hover:border-gray-300'}
-                      ${isOutOfStock ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-                    `}
-                  >
-                    <span className="text-sm font-medium text-[#1A1A1A]">{option.label}</span>
-                    {isOutOfStock && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-full h-0.5 bg-red-500 rotate-45"></div>
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      ))}
-
-      {/* Price Summary */}
-      <div className="pt-4 border-t border-gray-200">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-[#3A3A3A]">Total Price:</span>
-          <span className="text-2xl font-bold text-[#FF7A19]">
-            GHS {calculateTotalPrice().toFixed(2)}
-          </span>
-        </div>
-        {Object.keys(selectedVariants).length > 0 && (
-          <div className="mt-2 text-xs text-[#3A3A3A]">
-            <p>Selected Configuration:</p>
-            <ul className="mt-1 space-y-0.5">
-              {Object.values(selectedVariants).map((variant, index) => (
-                <li key={index}>
-                  • {variant.label}
-                  {variant.price_modifier !== 0 && (
-                    <span className="text-[#FF7A19] ml-1">
-                      ({variant.price_modifier > 0 ? '+' : ''}GHS {variant.price_modifier.toFixed(2)})
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        );
+      })}
+
+      {/* Price Summary - Compact */}
+      {Object.keys(selectedVariants).length > 0 && (
+        <div className="pt-3 border-t border-gray-200">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-[#3A3A3A]">Total Price:</span>
+            <span className="text-lg font-bold text-[#FF7A19]">
+              GHS {calculateTotalPrice().toLocaleString()}
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

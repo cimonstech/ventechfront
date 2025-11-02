@@ -198,21 +198,33 @@ export function SidebarAdModal({ isOpen, onClose, ad, onSuccess }: SidebarAdModa
             />
           </div>
 
-          {/* Ad Link */}
+          {/* Ad Link - Can be product or URL */}
           <div>
             <label className="block text-sm font-semibold text-[#1A1A1A] mb-2">
-              Link URL <span className="text-red-500">*</span>
+              Link <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              value={formData.link}
-              onChange={(e) => setFormData({ ...formData, link: e.target.value })}
-              placeholder="e.g., /product/iphone-15-pro or https://..."
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
-              required
-            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  // TODO: Open product picker
+                  toast.info('Product picker coming soon');
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+              >
+                Select Product
+              </button>
+              <input
+                type="text"
+                value={formData.link}
+                onChange={(e) => setFormData({ ...formData, link: e.target.value })}
+                placeholder="Or enter URL: /product/iphone-15-pro or https://..."
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
+                required
+              />
+            </div>
             <p className="text-xs text-[#3A3A3A] mt-1">
-              Internal link (e.g., /deals) or external URL
+              Select a product or enter a URL (e.g., /deals, /product/slug, or external URL)
             </p>
           </div>
 

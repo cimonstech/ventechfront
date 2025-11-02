@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { Plus, Search, Edit, Trash2, Eye, EyeOff, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { SidebarAdModal } from '@/components/admin/SidebarAdModal';
+import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 
 interface SidebarAd {
@@ -23,63 +25,79 @@ export default function SidebarAdsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
 
-  // TODO: Fetch real data from Supabase
+  const [editingAd, setEditingAd] = useState<SidebarAd | null>(null);
+
   useEffect(() => {
-    setTimeout(() => {
-      setAds([
-        {
-          id: '1',
-          title: 'iPhone 15 Pro Launch',
-          image_url: '/placeholders/imageplaceholder.webp',
-          link: '/product/iphone-15-pro',
-          position: 'right',
-          show_on: ['homepage', 'shop'],
-          active: true,
-          sort_order: 1,
-          created_at: '2025-10-20',
-        },
-        {
-          id: '2',
-          title: 'Laptop Banking Promo',
-          image_url: '/placeholders/imageplaceholder.webp',
-          link: '/laptop-banking',
-          position: 'right',
-          show_on: ['homepage'],
-          active: true,
-          sort_order: 2,
-          created_at: '2025-10-22',
-        },
-        {
-          id: '3',
-          title: 'Black Friday Deal',
-          image_url: '/placeholders/imageplaceholder.webp',
-          link: '/deals',
-          position: 'right',
-          show_on: ['homepage', 'shop', 'product'],
-          active: false,
-          sort_order: 3,
-          created_at: '2025-10-15',
-        },
-      ]);
-      setLoading(false);
-    }, 1000);
+    fetchAds();
   }, []);
+
+  const fetchAds = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('sidebar_ads')
+        .select('*')
+        .order('sort_order', { ascending: true });
+
+      if (error) throw error;
+      
+      setAds((data || []).map((ad: any) => ({
+        id: ad.id,
+        title: ad.title || '',
+        image_url: ad.image_url || '',
+        link: ad.link || '',
+        position: ad.position || 'right',
+        show_on: Array.isArray(ad.show_on) ? ad.show_on : (ad.show_on ? [ad.show_on] : []),
+        active: ad.active !== false,
+        sort_order: ad.sort_order || 0,
+        created_at: ad.created_at || new Date().toISOString(),
+      })));
+    } catch (error: any) {
+      console.error('Error fetching ads:', error);
+      toast.error('Failed to load ads');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredAds = ads.filter((ad) =>
     ad.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const toggleActive = (adId: string) => {
-    setAds(
-      ads.map((ad) => (ad.id === adId ? { ...ad, active: !ad.active } : ad))
-    );
-    toast.success('Ad status updated');
+  const toggleActive = async (adId: string) => {
+    try {
+      const ad = ads.find((a) => a.id === adId);
+      if (!ad) return;
+
+      const { error } = await supabase
+        .from('sidebar_ads')
+        .update({ active: !ad.active })
+        .eq('id', adId);
+
+      if (error) throw error;
+      await fetchAds();
+      toast.success('Ad status updated');
+    } catch (error: any) {
+      console.error('Error updating ad:', error);
+      toast.error('Failed to update ad');
+    }
   };
 
-  const deleteAd = (adId: string) => {
-    if (confirm('Are you sure you want to delete this ad?')) {
-      setAds(ads.filter((ad) => ad.id !== adId));
+  const deleteAd = async (adId: string) => {
+    if (!confirm('Are you sure you want to delete this ad?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('sidebar_ads')
+        .delete()
+        .eq('id', adId);
+
+      if (error) throw error;
+      await fetchAds();
       toast.success('Ad deleted successfully');
+    } catch (error: any) {
+      console.error('Error deleting ad:', error);
+      toast.error('Failed to delete ad');
     }
   };
 
@@ -236,7 +254,10 @@ export default function SidebarAdsPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex gap-2">
-                        <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                        <button 
+                          onClick={() => setEditingAd(ad)}
+                          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
                           <Edit size={18} className="text-[#3A3A3A]" />
                         </button>
                         <button
@@ -255,30 +276,20 @@ export default function SidebarAdsPage() {
         </div>
       </div>
 
-      {/* Add Modal Placeholder */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-md w-full p-6">
-            <h2 className="text-xl font-bold text-[#1A1A1A] mb-4">Add New Sidebar Ad</h2>
-            <p className="text-sm text-[#3A3A3A] mb-6">
-              Ad form coming soon. Will include image upload (R2), title, link, pages to show
-              on, and sort order.
-            </p>
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => setShowAddModal(false)}
-              >
-                Cancel
-              </Button>
-              <Button variant="primary" className="flex-1">
-                Save Ad
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Sidebar Ad Modal */}
+      <SidebarAdModal
+        isOpen={showAddModal || !!editingAd}
+        onClose={() => {
+          setShowAddModal(false);
+          setEditingAd(null);
+        }}
+        ad={editingAd}
+        onSuccess={() => {
+          fetchAds();
+          setShowAddModal(false);
+          setEditingAd(null);
+        }}
+      />
     </div>
   );
 }

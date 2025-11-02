@@ -169,26 +169,26 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
 
         {/* Content */}
         <div className="p-4 flex-1 flex flex-col">
-          {/* Brand/Category */}
-          <p className="text-[10px] sm:text-xs text-[#FF7A19] font-medium uppercase tracking-wide mb-1">
+          {/* Brand/Category - Using p tag, smaller than product name */}
+          <p className="text-[7px] sm:text-[9px] text-[#FF7A19] font-medium uppercase tracking-wide mb-1">
             {product.brand}
           </p>
 
-          {/* Product Name - 30% smaller than before */}
-          <h3 className="text-[9px] sm:text-[10px] font-semibold text-[#1A1A1A] mb-2 line-clamp-2 group-hover:text-[#FF7A19] transition-colors leading-tight">
+          {/* Product Name - Using p tag for easier font-size control */}
+          <p className="text-[10px] sm:text-xs md:text-sm font-semibold text-[#1A1A1A] mb-2 line-clamp-2 group-hover:text-[#FF7A19] transition-colors leading-tight">
             {product.name}
-          </h3>
+          </p>
 
 
-          {/* Price - Show range if variants exist, otherwise single price */}
+          {/* Price - Using p tag, smaller size */}
           <div className="flex items-baseline gap-2 mb-3 mt-auto flex-wrap">
             {product.price_range?.hasRange ? (
-              <span className="text-sm sm:text-base font-bold text-[#FF7A19]">
+              <span className="text-xs sm:text-sm text-[#FF7A19]">
                 {formatCurrency(product.price_range.min)} - {formatCurrency(product.price_range.max)}
               </span>
             ) : (
               <>
-                <span className="text-sm sm:text-base font-bold text-[#FF7A19]">
+                <span className="text-xs sm:text-sm text-[#FF7A19]">
                   {formatCurrency(product.discount_price || product.original_price)}
                 </span>
                 {hasDiscount && (

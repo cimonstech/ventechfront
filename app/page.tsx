@@ -13,23 +13,19 @@ import { Button } from '@/components/ui/Button';
 import { 
   ArrowRight, 
   ShoppingBag, 
-  Truck, 
   Shield, 
   Headphones,
   Zap,
   Award,
   Tag,
   TrendingUp,
-  Smartphone,
-  Laptop,
-  Watch,
   Star
 } from 'lucide-react';
 import { Product, Category } from '@/types/product';
 import { Banner } from '@/types/banner';
 import { productService } from '@/services/product.service';
 import { getCategories } from '@/services/category.service';
-import { supabase } from '@/lib/supabase';
+import { supabasePublic } from '@/lib/supabase';
 
 export default function Home() {
   const [heroBanners, setHeroBanners] = useState<Banner[]>([]);
@@ -41,7 +37,8 @@ export default function Home() {
   // Fetch banners separately to allow refresh
   const fetchBanners = useCallback(async () => {
     try {
-      const { data: bannersData, error } = await supabase
+      // Use anonymous/public client for banner fetching (no auth required)
+      const { data: bannersData, error } = await supabasePublic
         .from('banners')
         .select('*')
         .eq('active', true)
@@ -49,7 +46,10 @@ export default function Home() {
         .limit(10);
       
       if (error) {
-        console.error('Error fetching banners:', error);
+        // Only log error if it's not a 401 (authentication) - which might be expected for public access
+        if (error.code !== '401' && error.code !== 'PGRST301') {
+          console.error('Error fetching banners:', error);
+        }
         return;
       }
       
@@ -126,75 +126,34 @@ export default function Home() {
       {/* Features Section */}
       <section className="bg-gray-50 py-6 sm:py-8 border-y border-gray-200">
         <div className="container mx-auto px-3 sm:px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-3 md:grid-cols-3 gap-3 sm:gap-4">
+            {/* Momo & Cards - First on mobile */}
             <div className="flex flex-col items-center text-center p-4">
-              <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-3">
-                <Truck className="text-[#FF7A19]" size={24} />
+              <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center mb-3">
+                <Shield className="text-[#FF7A19]" size={18} />
               </div>
-              <h3 className="font-semibold text-sm text-[#1A1A1A] mb-1">Fast Delivery</h3>
-              <p className="text-[#3A3A3A] text-xs">Quick & safe shipping</p>
+              <p className="font-semibold text-xs sm:text-sm text-[#1A1A1A]">Momo & Cards</p>
             </div>
 
+            {/* Quality Guarantee */}
             <div className="flex flex-col items-center text-center p-4">
-              <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-3">
-                <Shield className="text-[#FF7A19]" size={24} />
+              <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center mb-3">
+                <Award className="text-[#FF7A19]" size={18} />
               </div>
-              <h3 className="font-semibold text-sm text-[#1A1A1A] mb-1">Secure Payment</h3>
-              <p className="text-[#3A3A3A] text-xs">100% secure checkout</p>
+              <p className="font-semibold text-xs sm:text-sm text-[#1A1A1A]">Quality Guarantee</p>
             </div>
 
+            {/* 24/7 Support */}
             <div className="flex flex-col items-center text-center p-4">
-              <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-3">
-                <Award className="text-[#FF7A19]" size={24} />
+              <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center mb-3">
+                <Headphones className="text-[#FF7A19]" size={18} />
               </div>
-              <h3 className="font-semibold text-sm text-[#1A1A1A] mb-1">Quality Guarantee</h3>
-              <p className="text-[#3A3A3A] text-xs">100% original products</p>
-            </div>
-
-            <div className="flex flex-col items-center text-center p-4">
-              <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-3">
-                <Headphones className="text-[#FF7A19]" size={24} />
-              </div>
-              <h3 className="font-semibold text-sm text-[#1A1A1A] mb-1">24/7 Support</h3>
-              <p className="text-[#3A3A3A] text-xs">Always here to help</p>
+              <p className="font-semibold text-xs sm:text-sm text-[#1A1A1A]">24/7 Support</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Quick Categories */}
-      <section className="container mx-auto px-3 sm:px-4 py-6 sm:py-8">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
-          <Link href="/categories/smartphones">
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-6 text-center hover:shadow-lg transition-shadow cursor-pointer">
-              <Smartphone className="text-[#FF7A19] mx-auto mb-2" size={32} />
-              <h3 className="font-semibold text-sm text-[#1A1A1A]">Smartphones</h3>
-              <p className="text-xs text-[#3A3A3A] mt-1">Latest models</p>
-            </div>
-          </Link>
-          <Link href="/categories/laptops">
-            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 text-center hover:shadow-lg transition-shadow cursor-pointer">
-              <Laptop className="text-[#1A1A1A] mx-auto mb-2" size={32} />
-              <h3 className="font-semibold text-sm text-[#1A1A1A]">Laptops</h3>
-              <p className="text-xs text-[#3A3A3A] mt-1">Work & Gaming</p>
-            </div>
-          </Link>
-          <Link href="/categories/smartwatches">
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-6 text-center hover:shadow-lg transition-shadow cursor-pointer">
-              <Watch className="text-[#FF7A19] mx-auto mb-2" size={32} />
-              <h3 className="font-semibold text-sm text-[#1A1A1A]">Smartwatches</h3>
-              <p className="text-xs text-[#3A3A3A] mt-1">Fitness trackers</p>
-            </div>
-          </Link>
-          <Link href="/categories">
-            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 text-center hover:shadow-lg transition-shadow cursor-pointer">
-              <ShoppingBag className="text-[#1A1A1A] mx-auto mb-2" size={32} />
-              <h3 className="font-semibold text-sm text-[#1A1A1A]">All Categories</h3>
-              <p className="text-xs text-[#3A3A3A] mt-1">Browse all</p>
-            </div>
-          </Link>
-        </div>
-      </section>
 
       {/* Flash Deals Section */}
       <FlashDeals limit={8} />

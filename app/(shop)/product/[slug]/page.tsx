@@ -11,7 +11,9 @@ import { QuickView } from '@/components/shop/QuickView';
 import { Reviews } from '@/components/product/Reviews';
 import { similarProductsService } from '@/services/similarProducts.service';
 import { getProductBySlug } from '@/services/product.service';
-import { useAppSelector } from '@/store';
+import { supabase } from '@/lib/supabase';
+import { useAppSelector, useAppDispatch } from '@/store';
+import { addToCart } from '@/store/cartSlice';
 import { 
   Heart, 
   Share2, 
@@ -30,14 +32,18 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Product, ProductVariant } from '@/types/product';
+import { ProductVariantSelector } from '@/components/product/ProductVariantSelector';
 
 export default function ProductDetailPage() {
   const params = useParams();
+  const dispatch = useAppDispatch();
   const { items } = useAppSelector((state) => state.cart);
   const [product, setProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(0);
-  const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
+  const [selectedVariants, setSelectedVariants] = useState<Record<string, any>>({});
+  const [variantPrice, setVariantPrice] = useState<number>(0);
+  const [actualReviewCount, setActualReviewCount] = useState<number>(0);
   const [quantity, setQuantity] = useState(1);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [activeTab, setActiveTab] = useState<'description' | 'specs' | 'reviews'>('description');
@@ -73,6 +79,30 @@ export default function ProductDetailPage() {
   }, [params.slug]);
 
 
+  // Fetch actual review count
+  useEffect(() => {
+    if (!product) return;
+    
+    const fetchReviewCount = async () => {
+      try {
+        const { count, error } = await supabase
+          .from('reviews')
+          .select('*', { count: 'exact', head: true })
+          .eq('product_id', product.id)
+          .eq('is_approved', true);
+        
+        if (!error && count !== null && count !== undefined) {
+          setActualReviewCount(count);
+        }
+      } catch (error) {
+        // Silently fail - use product.review_count as fallback
+        console.error('Error fetching review count:', error);
+      }
+    };
+
+    fetchReviewCount();
+  }, [product?.id]);
+
   // Fetch similar products
   useEffect(() => {
     if (!product) return;
@@ -100,17 +130,32 @@ export default function ProductDetailPage() {
   const handleAddToCart = () => {
     if (!product) return;
     
-    // Validate variant selection
-    if (product.variants) {
-      const missingVariant = product.variants.find(
-        (v) => !selectedVariants[v.name]
-      );
-      if (missingVariant) {
-        toast.error(`Please select ${missingVariant.name}`);
-        return;
-      }
+    // If product has variants but none selected, show error
+    if (product.price_range?.hasRange && Object.keys(selectedVariants).length === 0) {
+      toast.error('Please select product options');
+      return;
     }
-    toast.success('Added to cart!');
+    
+    // Calculate final price
+    const finalPrice = variantPrice > 0 
+      ? variantPrice 
+      : (product.discount_price || product.original_price);
+    
+    const cartItem = {
+      ...product,
+      quantity: quantity,
+      selected_variants: selectedVariants,
+      subtotal: finalPrice,
+    };
+
+    dispatch(
+      addToCart({
+        product: cartItem,
+        quantity: quantity,
+      })
+    );
+
+    toast.success(`${product.name} added to cart!`);
   };
 
   const handleWishlistToggle = () => {
@@ -136,17 +181,14 @@ export default function ProductDetailPage() {
   const calculateTotalPrice = () => {
     if (!product) return 0;
     
-    let total = product.discount_price || product.original_price;
-    if (product.variants) {
-      product.variants.forEach((variant) => {
-        const selected = selectedVariants[variant.name];
-        if (selected) {
-          // Handle price adjustment from variant
-          total += variant.price_adjustment || 0;
-        }
-      });
+    // If variant price is calculated, use it
+    if (variantPrice > 0) {
+      return variantPrice * quantity;
     }
-    return total * quantity;
+    
+    // Otherwise use base price
+    const basePrice = product.discount_price || product.original_price;
+    return basePrice * quantity;
   };
 
   // Loading state
@@ -191,7 +233,9 @@ export default function ProductDetailPage() {
                 {product.category_name || 'Category'}
               </Link>
               <ChevronRight size={16} />
-              <span className="text-[#1A1A1A] font-medium">{product.name}</span>
+              <span className="text-[#1A1A1A] font-medium">
+                {product.name.length > 12 ? `${product.name.substring(0, 12)}...` : product.name}
+              </span>
             </div>
           </div>
         </div>
@@ -248,7 +292,7 @@ export default function ProductDetailPage() {
               <div className="bg-white rounded-xl p-6">
                 <div className="mb-4">
                   <p className="text-xs sm:text-sm text-[#FF7A19] font-semibold mb-2">{product.brand}</p>
-                  <h1 className="text-xl sm:text-2xl font-bold text-[#1A1A1A] mb-3">{product.name}</h1>
+                  <h1 className="text-base sm:text-xl md:text-2xl font-bold text-[#1A1A1A] mb-3">{product.name}</h1>
                   
                   {/* Rating */}
                   <div className="flex items-center gap-2 sm:gap-3 mb-4">
@@ -262,16 +306,27 @@ export default function ProductDetailPage() {
                       ))}
                     </div>
                     <span className="text-xs sm:text-sm text-[#3A3A3A]">
-                      {product.rating.toFixed(1)} ({product.review_count || 0} reviews)
+                      {product.rating.toFixed(1)} ({actualReviewCount > 0 ? actualReviewCount : (product.review_count || 0)} reviews)
                     </span>
                   </div>
 
                   {/* Price - Show range if variants exist, otherwise calculated price */}
                   <div className="flex items-baseline gap-2 sm:gap-3 mb-6 flex-wrap">
                     {product.price_range?.hasRange ? (
-                      <span className="text-lg sm:text-xl font-bold text-[#FF7A19]">
-                        GHS {product.price_range.min.toLocaleString()} - GHS {product.price_range.max.toLocaleString()}
-                      </span>
+                      variantPrice > 0 ? (
+                        <>
+                          <span className="text-lg sm:text-xl font-bold text-[#FF7A19]">
+                            GHS {(variantPrice * quantity).toLocaleString()}
+                          </span>
+                          <span className="text-sm sm:text-base text-gray-500">
+                            (Range: GHS {product.price_range.min.toLocaleString()} - GHS {product.price_range.max.toLocaleString()})
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-lg sm:text-xl font-bold text-[#FF7A19]">
+                          GHS {product.price_range.min.toLocaleString()} - GHS {product.price_range.max.toLocaleString()}
+                        </span>
+                      )
                     ) : (
                       <>
                         <span className="text-lg sm:text-xl font-bold text-[#FF7A19]">
@@ -301,22 +356,17 @@ export default function ProductDetailPage() {
                   </div>
                 </div>
 
-                {/* Variants - Simplified display for now */}
-                {product.variants && product.variants.length > 0 && (
-                  <div className="space-y-3 mb-6">
-                    {product.variants.map((variant) => (
-                      <div key={variant.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div>
-                          <span className="text-sm font-semibold text-[#1A1A1A]">{variant.name}:</span>
-                          <span className="ml-2 text-sm text-[#3A3A3A]">{variant.value}</span>
-                        </div>
-                        {variant.price_adjustment > 0 && (
-                          <span className="text-sm text-[#FF7A19] font-semibold">
-                            +GHS {variant.price_adjustment.toLocaleString()}
-                          </span>
-                        )}
-                      </div>
-                    ))}
+                {/* Variant Selector */}
+                {product.price_range?.hasRange && (
+                  <div className="mb-6">
+                    <ProductVariantSelector
+                      productId={product.id}
+                      basePrice={product.discount_price || product.original_price}
+                      onVariantChange={(variants, totalPrice) => {
+                        setSelectedVariants(variants);
+                        setVariantPrice(totalPrice);
+                      }}
+                    />
                   </div>
                 )}
 
@@ -351,29 +401,15 @@ export default function ProductDetailPage() {
 
                 {/* Action Buttons */}
                 <div className="flex gap-2 sm:gap-3 mb-6 items-center">
-                  {/* Mobile: Cart Icon Only */}
-                  <button
-                    onClick={handleAddToCart}
-                    disabled={!product.in_stock}
-                    className={`md:hidden p-2.5 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-md ${
-                      isInCart 
-                        ? 'bg-orange-600 hover:bg-orange-700' 
-                        : 'bg-[#FF7A19] hover:bg-orange-600'
-                    }`}
-                    title={isInCart ? 'In Cart' : 'Add to Cart'}
-                  >
-                    <ShoppingCart size={18} className="text-white" />
-                  </button>
-                  
-                  {/* Desktop: Full Add to Cart Button */}
+                  {/* Add to Cart Button - Full width on all devices */}
                   <Button
                     variant="primary"
                     size="lg"
-                    className="hidden md:flex flex-1"
+                    className="flex flex-1"
                     onClick={handleAddToCart}
                     disabled={!product.in_stock}
                   >
-                    Add to Cart
+                    {isInCart ? 'In Cart' : 'Add to Cart'}
                   </Button>
                   
                   {/* Wishlist Icon - Reduced padding */}
@@ -459,7 +495,7 @@ export default function ProductDetailPage() {
                   }
                 `}
               >
-                Specifications
+                Specs
               </button>
               <button
                 onClick={() => setActiveTab('reviews')}
@@ -471,7 +507,7 @@ export default function ProductDetailPage() {
                   }
                 `}
               >
-                Reviews ({product.review_count || 0})
+                Reviews ({actualReviewCount > 0 ? actualReviewCount : (product.review_count || 0)})
               </button>
             </div>
 
@@ -481,7 +517,7 @@ export default function ProductDetailPage() {
                   <p className="text-[#3A3A3A] leading-relaxed">{product.description}</p>
                   {product.specs && typeof product.specs === 'object' && Object.keys(product.specs).length > 0 && (
                     <div className="mt-6">
-                      <h4 className="text-lg font-bold text-[#1A1A1A] mb-4">Product Specifications</h4>
+                      <h4 className="text-lg font-bold text-[#1A1A1A] mb-4">Product Specs</h4>
                       <ul className="grid md:grid-cols-2 gap-3">
                         {Object.entries(product.specs).map(([key, value], index) => (
                           <li key={index} className="flex items-start gap-2">

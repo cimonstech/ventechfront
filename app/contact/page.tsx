@@ -88,11 +88,9 @@ export default function ContactPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
-      <section className="relative py-16">
-        <div className="absolute inset-0 bg-[url('/placeholder/bg-gadgets1.webp')] bg-cover bg-center" />
-        <div className="absolute inset-0 bg-black/50" />
-        <div className="relative container mx-auto px-4 text-center text-white">
-          <h1 className="text-3xl md:text-4xl font-bold mb-4">Get in Touch</h1>
+      <section className="bg-gradient-to-r from-[#FF7A19] to-[#FF9A19] py-16">
+        <div className="container mx-auto px-4 text-center">
+          <h1 className="text-3xl md:text-4xl font-bold mb-4 text-white">Get in Touch</h1>
           <p className="text-lg text-white/90 max-w-2xl mx-auto">
             Have questions? We're here to help. Reach out to us anytime!
           </p>

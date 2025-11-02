@@ -28,34 +28,12 @@ export default function AboutPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
-      <section className="bg-gradient-to-r from-[#1A1A1A] to-[#3A3A3A] py-16">
-        <div className="container mx-auto px-4 text-center text-white">
+      <section className="bg-gradient-to-r from-[#FF7A19] to-[#FF9A19] py-16">
+        <div className="container mx-auto px-4 text-center">
           <h1 className="text-3xl md:text-4xl font-bold mb-4 text-white">About VENTECH</h1>
-          <p className="text-lg text-white/90 max-w-3xl mx-auto text-white">
+          <p className="text-lg text-white/90 max-w-3xl mx-auto">
             Your trusted partner for quality electronics and gadgets in Ghana
           </p>
-        </div>
-      </section>
-
-      {/* Categories teaser */}
-      <section className="bg-white py-12">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold text-[#1A1A1A]">Shop by Category</h3>
-            <Link href="/categories"><Button variant="ghost" size="sm">View all</Button></Link>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {categories.map((cat) => (
-              <Link key={cat.id} href={`/categories/${cat.slug}`} className="group">
-                <div className="bg-gray-50 rounded-xl p-4 hover:shadow-sm transition">
-                  <div className="aspect-square w-full bg-gray-100 rounded-lg mb-3 overflow-hidden"/>
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-[#1A1A1A] group-hover:text-[#FF7A19]">{cat.name}</p>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
         </div>
       </section>
 

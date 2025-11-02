@@ -160,8 +160,8 @@ export default function CheckoutPage() {
     }
   };
 
-  // Free shipping for orders over 10,000 cedis
-  const deliveryFee = total >= 10000 ? 0 : (selectedDelivery?.price || deliveryOptions[0]?.price || 0);
+  // Free shipping for orders over 20,000 cedis
+  const deliveryFee = total >= 20000 ? 0 : (selectedDelivery?.price || deliveryOptions[0]?.price || 0);
   const tax = 0;
   const grandTotal = total + deliveryFee + tax;
 

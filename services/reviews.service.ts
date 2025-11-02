@@ -55,20 +55,19 @@ export const getUserReview = async (productId: string): Promise<Review | null> =
       .select('*')
       .eq('product_id', productId)
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
     if (error) {
-      if (error.code === 'PGRST116') {
-        // No review found
-        return null;
+      // If error is not "not found", log it but don't throw
+      if (error.code !== 'PGRST116' && error.code !== '42P01') {
+        console.error('Error fetching user review:', error);
       }
-      console.error('Error fetching user review:', error);
-      throw error;
+      return null;
     }
 
     return data;
   } catch (error) {
-    console.error('Failed to fetch user review:', error);
+    // Silently return null for any errors (RLS, network, etc.)
     return null;
   }
 };

@@ -180,7 +180,7 @@ export const getProductBySlug = async (slug: string): Promise<Product | null> =>
       thumbnail: data.thumbnail || '',
       featured: data.is_featured || false,
       rating: data.rating || 0,
-      review_count: data.review_count || 0,
+      review_count: data.review_count ?? 0,
       specs: data.specs || {},
       variants: [], // TODO: Add variants if needed
       created_at: data.created_at,
