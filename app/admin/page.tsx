@@ -480,28 +480,28 @@ export default function AdminDashboard() {
           <div className="divide-y divide-gray-200">
             {recentTransactions.length > 0 ? (
               recentTransactions.map((transaction) => (
-                <div key={transaction.id} className="p-6 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="font-semibold text-[#1A1A1A]">{transaction.customer}</p>
-                    <p className="font-bold text-[#1A1A1A]">
-                      GHS {transaction.amount.toFixed(2)}
-                    </p>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={`text-xs px-2 py-1 rounded-full ${
-                        transaction.status === 'completed'
-                          ? 'bg-green-100 text-green-700'
-                          : transaction.status === 'pending'
-                          ? 'bg-yellow-100 text-yellow-700'
-                          : 'bg-red-100 text-red-700'
-                      }`}
-                    >
-                      {transaction.status}
-                    </span>
-                    <span className="text-xs text-[#3A3A3A]">{transaction.date}</span>
-                  </div>
+              <div key={transaction.id} className="p-6 hover:bg-gray-50 transition-colors">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="font-semibold text-[#1A1A1A]">{transaction.customer}</p>
+                  <p className="font-bold text-[#1A1A1A]">
+                    GHS {transaction.amount.toFixed(2)}
+                  </p>
                 </div>
+                <div className="flex items-center justify-between">
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full ${
+                      transaction.status === 'completed'
+                        ? 'bg-green-100 text-green-700'
+                        : transaction.status === 'pending'
+                        ? 'bg-yellow-100 text-yellow-700'
+                        : 'bg-red-100 text-red-700'
+                    }`}
+                  >
+                    {transaction.status}
+                  </span>
+                  <span className="text-xs text-[#3A3A3A]">{transaction.date}</span>
+                </div>
+              </div>
               ))
             ) : (
               <div className="p-6 text-center text-[#3A3A3A]">
@@ -527,22 +527,22 @@ export default function AdminDashboard() {
               topProducts.map((product, index) => {
                 const maxSales = Math.max(...topProducts.map(p => p.sales), 1);
                 return (
-                  <div key={index} className="p-6 hover:bg-gray-50 transition-colors">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1">
-                        <p className="font-semibold text-[#1A1A1A] mb-1">{product.name}</p>
-                        <p className="text-sm text-[#3A3A3A]">{product.sales} units sold</p>
-                      </div>
-                      <p className="font-bold text-[#FF7A19]">
-                        GHS {product.revenue.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
-                      <div
-                        className="bg-[#FF7A19] h-2 rounded-full"
+              <div key={index} className="p-6 hover:bg-gray-50 transition-colors">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex-1">
+                    <p className="font-semibold text-[#1A1A1A] mb-1">{product.name}</p>
+                    <p className="text-sm text-[#3A3A3A]">{product.sales} units sold</p>
+                  </div>
+                  <p className="font-bold text-[#FF7A19]">
+                    GHS {product.revenue.toLocaleString()}
+                  </p>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
+                  <div
+                    className="bg-[#FF7A19] h-2 rounded-full"
                         style={{ width: `${(product.sales / maxSales) * 100}%` }}
-                      ></div>
-                    </div>
+                  ></div>
+                </div>
                   </div>
                 );
               })

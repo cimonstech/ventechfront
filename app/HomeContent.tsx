@@ -48,11 +48,19 @@ export function HomeContent() {
         .limit(10);
       
       if (error) {
-        // Only log error if it's not a 401 (authentication) - which might be expected for public access
-        if (error.code !== '401' && error.code !== 'PGRST301') {
-          console.error('Error fetching banners:', error);
+        // Only log error if it's not a 401 (authentication) or PGRST301 (not found) - which might be expected for public access
+        const errorCode = (error as any)?.code || (error as any)?.status;
+        if (errorCode !== '401' && errorCode !== 'PGRST301' && errorCode !== 401 && errorCode !== 404) {
+          // Only log in development mode
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Error fetching banners:', {
+              message: (error as any)?.message || 'Unknown error',
+              code: errorCode,
+              details: (error as any)?.details,
+            });
+          }
         }
-        return;
+        return [];
       }
       
       if (bannersData) {
@@ -79,7 +87,10 @@ export function HomeContent() {
         return heroBanners as Banner[];
       }
     } catch (error) {
-      console.error('Error fetching banners:', error);
+      // Only log in development mode
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error fetching banners:', error);
+      }
     }
     return [];
   }, []);
