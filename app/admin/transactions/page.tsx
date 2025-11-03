@@ -11,10 +11,11 @@ import {
   Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { supabase } from '@/lib/supabase';
 
 interface Transaction {
   id: string;
-  order_id: string;
+  order_number: string;
   customer_name: string;
   customer_email: string;
   amount: number;
@@ -38,10 +39,42 @@ export default function TransactionsPage() {
   const fetchTransactions = async () => {
     try {
       setLoading(true);
-      // Transactions are typically derived from paid orders
-      // For now, return empty array since there are no transactions yet
-      // TODO: Implement transaction fetching when payment integration is ready
-      setTransactions([]);
+      
+      // Fetch transactions from database
+      let query = supabase
+        .from('transactions')
+        .select(`
+          *,
+          order:orders!transactions_order_id_fkey(id, order_number),
+          user:users!transactions_user_id_fkey(id, first_name, last_name, email)
+        `)
+        .order('created_at', { ascending: false });
+
+      // Apply status filter
+      if (statusFilter !== 'all') {
+        query = query.eq('payment_status', statusFilter);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      // Format transactions for display
+      const formattedTransactions: Transaction[] = (data || []).map((tx: any) => ({
+        id: tx.id,
+        order_number: tx.order?.order_number || 'N/A',
+        customer_name: tx.user 
+          ? `${tx.user.first_name || ''} ${tx.user.last_name || ''}`.trim() || tx.customer_email || 'Unknown'
+          : tx.customer_email || 'Guest',
+        customer_email: tx.customer_email || tx.user?.email || 'No email',
+        amount: typeof tx.amount === 'string' ? parseFloat(tx.amount) || 0 : (tx.amount || 0),
+        status: tx.payment_status === 'paid' ? 'completed' : tx.payment_status === 'pending' ? 'pending' : tx.payment_status === 'failed' ? 'failed' : 'refunded',
+        payment_method: tx.payment_method || 'paystack',
+        date: new Date(tx.paid_at || tx.created_at).toLocaleDateString(),
+        created_at: tx.created_at,
+      }));
+
+      setTransactions(formattedTransactions);
     } catch (error) {
       console.error('Error fetching transactions:', error);
       setTransactions([]);

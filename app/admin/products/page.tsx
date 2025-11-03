@@ -110,13 +110,39 @@ export default function AdminProductsPage() {
     const exportData = productsToExport.map(product => ({
       name: product.name,
       sku: (product as any).sku || 'N/A',
+      description: product.description || '',
+      key_features: product.key_features 
+        ? (Array.isArray(product.key_features) 
+            ? product.key_features.join('; ') 
+            : typeof product.key_features === 'string'
+              ? (product.key_features.startsWith('[') 
+                  ? JSON.parse(product.key_features).join('; ')
+                  : product.key_features)
+              : '')
+        : '',
+      specifications: product.specifications
+        ? (typeof product.specifications === 'string'
+            ? product.specifications
+            : JSON.stringify(product.specifications))
+        : '',
       price: product.original_price,
       discount_price: product.discount_price || null,
+      price_range: (product as any).price_range 
+        ? ((product as any).price_range.min === (product as any).price_range.max
+            ? (product as any).price_range.min
+            : `${(product as any).price_range.min} - ${(product as any).price_range.max}`)
+        : null,
       stock_quantity: product.stock_quantity || 0,
+      in_stock: product.in_stock || false,
       category_name: (product as any).category?.name || product.category_name || 'Uncategorized',
       brand_name: (product as any).brand?.name || product.brand || 'No Brand',
       is_featured: product.featured || false,
+      rating: product.rating || 0,
+      review_count: product.review_count || 0,
+      images: Array.isArray(product.images) ? product.images.join(' | ') : (product.images || ''),
+      thumbnail: product.thumbnail || '',
       created_at: product.created_at,
+      updated_at: product.updated_at || product.created_at,
     }));
 
     CSVExporter.export(exportData, ProductColumns, 'products');

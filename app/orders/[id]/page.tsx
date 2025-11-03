@@ -9,23 +9,45 @@ import { Spinner } from '@/components/loaders/Spinner';
 import { ChevronLeft, Package, MapPin, CreditCard, FileText } from 'lucide-react';
 import { Order } from '@/types/order';
 import { orderService } from '@/services/order.service';
-import { useAppSelector } from '@/store';
+import { useAppSelector, useAppDispatch } from '@/store';
+import { clearCart } from '@/store/cartSlice';
 import { formatCurrency, formatDate, getOrderStatusColor } from '@/lib/helpers';
 import toast from 'react-hot-toast';
 
 export default function OrderDetailPage() {
   const params = useParams();
   const orderId = params.id as string;
+  const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
 
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Check for payment success callback
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentSuccess = urlParams.get('payment');
+    const paymentReference = urlParams.get('reference');
+    
+    if (paymentSuccess === 'success' && paymentReference) {
+      // Clear cart if payment was successful
+      const shouldClearCart = sessionStorage.getItem('clear_cart_after_payment');
+      if (shouldClearCart === 'true') {
+        dispatch(clearCart());
+        sessionStorage.removeItem('clear_cart_after_payment');
+      }
+      
+      // Clear checkout session data
+      sessionStorage.removeItem('pending_checkout_data');
+      sessionStorage.removeItem('pending_payment_reference');
+      
+      toast.success('Payment successful! Order created.');
+    }
+    
     if (user) {
       fetchOrder();
     }
-  }, [user, orderId]);
+  }, [user, orderId, dispatch]);
 
   const fetchOrder = async () => {
     try {

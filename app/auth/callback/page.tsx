@@ -43,7 +43,77 @@ export default function AuthCallbackPage() {
           return;
         }
 
-        if (data.session) {
+        if (data.session && data.user) {
+          // Ensure user profile exists in public.users
+          try {
+            const { data: profile, error: profileError } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', data.user.id)
+              .maybeSingle();
+
+            if (profileError && profileError.code !== 'PGRST116') {
+              console.error('Error checking user profile:', profileError);
+            }
+
+            // Create profile if it doesn't exist
+            if (!profile) {
+              // Build profile data - handle both name and first_name/last_name schemas
+              const firstName = data.user.user_metadata?.first_name || data.user.user_metadata?.firstName || '';
+              const lastName = data.user.user_metadata?.last_name || data.user.user_metadata?.lastName || '';
+              const fullName = `${firstName} ${lastName}`.trim() || data.user.email?.split('@')[0] || 'User';
+              
+              const profileData: any = {
+                id: data.user.id,
+                email: data.user.email || '',
+                phone: data.user.user_metadata?.phone || data.user.phone || null,
+                role: 'customer',
+              };
+
+              // Try to use first_name/last_name if columns exist, otherwise use name
+              // We'll try with first_name/last_name first
+              try {
+                const { data: newProfile, error: createError } = await supabase
+                  .from('users')
+                  .insert({
+                    ...profileData,
+                    first_name: firstName,
+                    last_name: lastName,
+                  })
+                  .select()
+                  .single();
+
+                if (createError) {
+                  // If error, try with 'name' field instead (might be the actual schema)
+                  if (createError.message?.includes('column') || createError.code === '42703') {
+                    const { data: newProfile2, error: createError2 } = await supabase
+                      .from('users')
+                      .insert({
+                        ...profileData,
+                        name: fullName,
+                      })
+                      .select()
+                      .single();
+
+                    if (createError2) {
+                      console.error('Error creating user profile (with name field):', createError2);
+                    } else {
+                      console.log('User profile created successfully (with name field):', newProfile2);
+                    }
+                  } else {
+                    console.error('Error creating user profile:', createError);
+                  }
+                } else {
+                  console.log('User profile created successfully:', newProfile);
+                }
+              } catch (insertError: any) {
+                console.error('Error inserting user profile:', insertError);
+              }
+            }
+          } catch (error) {
+            console.error('Error ensuring user profile exists:', error);
+          }
+
           setStatus('success');
           setMessage('Email verified successfully!');
           

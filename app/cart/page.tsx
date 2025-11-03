@@ -83,7 +83,7 @@ export default function CartPage() {
           </div>
           <h2 className="text-3xl font-bold text-gray-900 mb-2">Your cart is empty</h2>
           <p className="text-gray-600 mb-8">Add some products to get started</p>
-          <Link href="/categories">
+          <Link href="/shop">
             <Button variant="primary" size="lg" icon={<ShoppingBag size={20} />}>
               Start Shopping
             </Button>
@@ -118,6 +118,7 @@ export default function CartPage() {
                         src={item.thumbnail || '/placeholder-product.webp'}
                         alt={item.name}
                         fill
+                        sizes="96px"
                         className="object-cover"
                       />
                     </div>
@@ -185,11 +186,11 @@ export default function CartPage() {
             </div>
 
             {/* Continue Shopping */}
-            <Link href="/categories">
-              <Button variant="outline" size="lg" className="w-full mt-4">
-                Continue Shopping
-              </Button>
-            </Link>
+          <Link href="/shop">
+            <Button variant="outline" size="lg" className="w-full mt-4">
+              Continue Shopping
+            </Button>
+          </Link>
           </div>
 
           {/* Order Summary */}

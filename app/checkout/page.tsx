@@ -25,10 +25,12 @@ export default function CheckoutPage() {
 
   const [step, setStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
   // Delivery Information - Auto-fill from user if logged in
   const [deliveryInfo, setDeliveryInfo] = useState({
     full_name: user?.full_name || '',
+    email: user?.email || '', // Add email field for guest checkout
     phone: user?.phone || '',
     street_address: '',
     city: '',
@@ -42,6 +44,7 @@ export default function CheckoutPage() {
       setDeliveryInfo(prev => ({
         ...prev,
         full_name: user.full_name || prev.full_name,
+        email: user.email || prev.email,
         phone: user.phone || prev.phone,
       }));
       
@@ -60,6 +63,7 @@ export default function CheckoutPage() {
             if (addresses) {
               setDeliveryInfo({
                 full_name: addresses.full_name || user.full_name || '',
+                email: user.email || '', // Add email from user
                 phone: addresses.phone || user.phone || '',
                 street_address: addresses.street_address || '',
                 city: addresses.city || '',
@@ -83,7 +87,7 @@ export default function CheckoutPage() {
   
   // Selected Options
   const [selectedDelivery, setSelectedDelivery] = useState<DeliveryOption | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'mobile_money' | 'card' | 'cash_on_delivery'>('mobile_money');
+  const [paymentMethod, setPaymentMethod] = useState<'paystack' | 'cash_on_delivery'>('paystack');
   const [notes, setNotes] = useState('');
 
   // Fetch delivery options function
@@ -125,7 +129,15 @@ export default function CheckoutPage() {
     }
   };
 
+  // Handle client-side mounting
   useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    // Only redirect on client-side after mount
+    if (!isMounted) return;
+    
     // Redirect if cart is empty
     if (items.length === 0) {
       router.push('/cart');
@@ -134,7 +146,7 @@ export default function CheckoutPage() {
     // Allow non-logged users to proceed - they'll need to provide address info
     fetchDeliveryOptions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, router]);
+  }, [items, router, isMounted]);
 
   const handleDeliveryInfoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setDeliveryInfo({
@@ -144,13 +156,21 @@ export default function CheckoutPage() {
   };
 
   const validateDeliveryInfo = () => {
-    const required = ['full_name', 'phone', 'street_address', 'city', 'region'];
+    const required = ['full_name', 'email', 'phone', 'street_address', 'city', 'region'];
     for (const field of required) {
       if (!deliveryInfo[field as keyof typeof deliveryInfo]) {
         toast.error(`${field.replace('_', ' ')} is required`);
         return false;
       }
     }
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(deliveryInfo.email)) {
+      toast.error('Please provide a valid email address');
+      return false;
+    }
+    
     return true;
   };
 
@@ -180,6 +200,7 @@ export default function CheckoutPage() {
         items,
         delivery_address: {
           ...deliveryInfo,
+          email: deliveryInfo.email || user?.email, // Include email for guest orders
           country: 'Ghana',
           is_default: false,
         },
@@ -188,51 +209,70 @@ export default function CheckoutPage() {
         notes,
       };
 
-      // For cash on delivery, create order directly
-      if (paymentMethod === 'cash_on_delivery') {
-        const order = await orderService.createOrder(checkoutData, userId);
-        dispatch(clearCart());
-        toast.success('Order placed successfully!');
-        router.push(`/orders/${order.id}`);
-        return;
-      }
-
-      // For mobile money and card, create order first, then initialize payment
-      const order = await orderService.createOrder(checkoutData, userId);
-
-      // Initialize Paystack payment for mobile_money or card
-      if (paymentMethod === 'mobile_money' || paymentMethod === 'card') {
-        const email = user?.email || deliveryInfo.phone || 'customer@ventech.com';
+      // For Paystack (Momo/Card), initialize payment first, then create order after payment
+      if (paymentMethod === 'paystack') {
+        // Use email from delivery info (collected from form, includes guest emails)
+        const email = deliveryInfo.email || user?.email;
         
-        // Initialize Paystack payment
+        if (!email) {
+          throw new Error('Email is required for payment. Please provide your email address.');
+        }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          throw new Error('Please provide a valid email address.');
+        }
+        
+        // Generate a unique reference for this payment
+        const paymentReference = `ORDER-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Store checkout data temporarily for order creation after payment
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('pending_checkout_data', JSON.stringify({
+            ...checkoutData,
+            payment_method: 'paystack',
+            payment_reference: paymentReference,
+            grand_total: grandTotal,
+            user_id: userId, // Include user_id for order creation (null for guests)
+            customer_email: email, // Store customer email for order emails
+          }));
+          sessionStorage.setItem('pending_payment_reference', paymentReference);
+        }
+        
+        // Initialize Paystack payment via backend
         const paymentResult = await paymentService.initializePayment({
           email,
           amount: Math.round(grandTotal * 100), // Convert to pesewas
-          reference: order.order_number,
+          reference: paymentReference,
+          callback_url: `${window.location.origin}/payment/callback`,
           metadata: {
-            order_id: order.id,
             user_id: userId || 'guest',
-            payment_method: paymentMethod,
+            payment_method: 'paystack',
+            payment_reference: paymentReference,
+            customer_email: email,
+            checkout_data: checkoutData,
           },
         });
 
         if (paymentResult.success) {
           // Payment modal will open automatically
-          // Store order ID in sessionStorage for verification after payment
-          if (typeof window !== 'undefined') {
-            sessionStorage.setItem('pending_order_id', order.id);
-            sessionStorage.setItem('pending_order_reference', order.order_number);
-          }
-          
           // Don't clear cart yet - wait for payment verification
           toast.success('Redirecting to payment...');
+          // The payment callback will handle order creation
         } else {
-          throw new Error(paymentResult.message || 'Failed to initialize payment');
+          const errorMsg = paymentResult.message || 'Failed to initialize payment. Please check your backend server is running and NEXT_PUBLIC_API_URL is configured correctly.';
+          console.error('Payment initialization failed:', {
+            message: paymentResult.message,
+            API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
+          });
+          throw new Error(errorMsg);
         }
       } else {
-        // For other payment methods, just redirect
+        // For Cash on Delivery, create order directly (emails and notifications handled by backend)
+        const order = await orderService.createOrder(checkoutData, userId);
         dispatch(clearCart());
-        toast.success('Order placed successfully!');
+        toast.success('Order placed successfully! You will receive a confirmation email shortly.');
         router.push(`/orders/${order.id}`);
       }
     } catch (error: any) {
@@ -248,7 +288,21 @@ export default function CheckoutPage() {
   const tax = 0;
   const grandTotal = total + deliveryFee + tax;
 
-  // Early return for empty cart - but render something to avoid hydration mismatch
+  // Handle empty cart on client-side only to avoid hydration mismatch
+  if (!isMounted) {
+    // Return a consistent structure during SSR - matches the actual checkout page structure
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="container mx-auto px-4">
+          <div className="mb-8">
+            <div className="h-10 w-24 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Client-side check for empty cart
   if (items.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
@@ -266,11 +320,15 @@ export default function CheckoutPage() {
       <div className="container mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
-          <Link href="/cart">
-            <Button variant="ghost" size="sm" icon={<ChevronLeft size={16} />} className="mb-4">
-              Back to Cart
-            </Button>
-          </Link>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            icon={<ChevronLeft size={16} />} 
+            className="mb-4"
+            onClick={() => router.push('/cart')}
+          >
+            Back to Cart
+          </Button>
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Checkout</h1>
         </div>
 
@@ -325,6 +383,15 @@ export default function CheckoutPage() {
                     value={deliveryInfo.full_name}
                     onChange={handleDeliveryInfoChange}
                     required
+                  />
+                  <Input
+                    label="Email Address"
+                    name="email"
+                    type="email"
+                    value={deliveryInfo.email}
+                    onChange={handleDeliveryInfoChange}
+                    required
+                    placeholder="your@email.com"
                   />
                   <Input
                     label="Phone Number"
@@ -417,35 +484,18 @@ export default function CheckoutPage() {
 
                 <div className="space-y-3 mb-6">
                   <button
-                    onClick={() => setPaymentMethod('mobile_money')}
+                    onClick={() => setPaymentMethod('paystack')}
                     className={`w-full p-4 rounded-lg border-2 transition-all text-left ${
-                      paymentMethod === 'mobile_money'
+                      paymentMethod === 'paystack'
                         ? 'border-[#FF7A19] bg-orange-50'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <Smartphone className={paymentMethod === 'mobile_money' ? 'text-[#FF7A19]' : 'text-gray-600'} size={24} />
+                      <CreditCard className={paymentMethod === 'paystack' ? 'text-[#FF7A19]' : 'text-gray-600'} size={24} />
                       <div>
-                        <p className="font-semibold text-gray-900">Mobile Money</p>
-                        <p className="text-sm text-gray-600">Pay with MTN Mobile Money via Paystack</p>
-                      </div>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => setPaymentMethod('card')}
-                    className={`w-full p-4 rounded-lg border-2 transition-all text-left ${
-                      paymentMethod === 'card'
-                        ? 'border-[#FF7A19] bg-orange-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <CreditCard className={paymentMethod === 'card' ? 'text-[#FF7A19]' : 'text-gray-600'} size={24} />
-                      <div>
-                        <p className="font-semibold text-gray-900">Debit/Credit Card</p>
-                        <p className="text-sm text-gray-600">Pay securely with Visa, Mastercard via Paystack</p>
+                        <p className="font-semibold text-gray-900">Momo/Card</p>
+                        <p className="text-sm text-gray-600">Pay with Mobile Money or Card via Paystack</p>
                       </div>
                     </div>
                   </button>
@@ -454,12 +504,12 @@ export default function CheckoutPage() {
                     onClick={() => setPaymentMethod('cash_on_delivery')}
                     className={`w-full p-4 rounded-lg border-2 transition-all text-left ${
                       paymentMethod === 'cash_on_delivery'
-                        ? 'border-blue-600 bg-blue-50'
+                        ? 'border-[#FF7A19] bg-orange-50'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <Banknote className="text-green-600" size={24} />
+                      <Banknote className={paymentMethod === 'cash_on_delivery' ? 'text-[#FF7A19]' : 'text-gray-600'} size={24} />
                       <div>
                         <p className="font-semibold text-gray-900">Cash on Delivery</p>
                         <p className="text-sm text-gray-600">Pay when you receive your order</p>
@@ -517,6 +567,7 @@ export default function CheckoutPage() {
                             src={item.thumbnail || '/placeholder-product.webp'}
                             alt={item.name}
                             fill
+                            sizes="64px"
                             className="object-cover"
                           />
                         </div>
@@ -544,7 +595,7 @@ export default function CheckoutPage() {
                 {/* Payment Method */}
                 <div className="bg-white rounded-xl shadow-sm p-6">
                   <h3 className="font-bold text-gray-900 mb-2">Payment Method</h3>
-                  <p className="text-gray-600 capitalize">{paymentMethod.replace('_', ' ')}</p>
+                  <p className="text-gray-600 capitalize">{paymentMethod === 'paystack' ? 'Momo/Card' : paymentMethod.replace('_', ' ')}</p>
                 </div>
 
                 <div className="flex gap-4">

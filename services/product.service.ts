@@ -8,6 +8,7 @@ interface GetProductsParams {
   minPrice?: number;
   maxPrice?: number;
   inStock?: boolean;
+  featured?: boolean;
   sortBy?: 'price_asc' | 'price_desc' | 'newest' | 'rating';
   limit?: number;
   offset?: number;
@@ -39,6 +40,9 @@ export const getProducts = async (params: GetProductsParams = {}): Promise<Produ
     }
     if (params.inStock !== undefined) {
       query = query.eq('in_stock', params.inStock);
+    }
+    if (params.featured !== undefined) {
+      query = query.eq('is_featured', params.featured);
     }
 
     // Apply sorting
@@ -74,22 +78,36 @@ export const getProducts = async (params: GetProductsParams = {}): Promise<Produ
       
       // Fallback: Try fetching without explicit foreign key
       console.log('Attempting to fetch products with simple relations...');
-      const { data: productsOnly, error: fallbackError } = await supabase
+      let fallbackQuery = supabase
         .from('products')
         .select(`
           *,
           categories:category_id(id, name, slug),
           brands:brand_id(id, name, slug)
-        `)
+        `);
+      
+      // Apply featured filter if provided
+      if (params.featured !== undefined) {
+        fallbackQuery = fallbackQuery.eq('is_featured', params.featured);
+      }
+      
+      const { data: productsOnly, error: fallbackError } = await fallbackQuery
         .order('created_at', { ascending: false })
         .limit(params.limit || 50);
       
       if (fallbackError) {
         console.error('Fallback query also failed:', fallbackError);
         // Last resort: fetch without relations
-        const { data: productsBasic } = await supabase
+        let basicQuery = supabase
           .from('products')
-          .select('*')
+          .select('*');
+        
+        // Apply featured filter if provided
+        if (params.featured !== undefined) {
+          basicQuery = basicQuery.eq('is_featured', params.featured);
+        }
+        
+        const { data: productsBasic } = await basicQuery
           .order('created_at', { ascending: false })
           .limit(params.limit || 50);
         
@@ -98,11 +116,19 @@ export const getProducts = async (params: GetProductsParams = {}): Promise<Produ
           original_price: p.price,
           category_name: null,
           brand: p.brand_name || '',
+          featured: p.is_featured || false,
         }));
       }
       
       console.log('Fetched products with simple relations:', productsOnly?.length || 0);
-      return productsOnly || [];
+      return (productsOnly || []).map((p: any) => ({
+        ...p,
+        original_price: p.price || p.original_price || 0,
+        category_name: p.categories?.name || p.category_name || null,
+        category_slug: p.categories?.slug || p.category_slug || null,
+        brand: p.brands?.name || p.brand || '',
+        featured: p.is_featured || false,
+      }));
     }
     
     // Transform products to ensure proper structure
@@ -112,6 +138,7 @@ export const getProducts = async (params: GetProductsParams = {}): Promise<Produ
       category_name: product.categories?.name || product.category_name || null,
       category_slug: product.categories?.slug || product.category_slug || null,
       brand: product.brands?.name || product.brand || '',
+      featured: product.is_featured || false,
       // Remove nested objects that might cause issues
       categories: undefined,
       brands: undefined,
@@ -145,7 +172,8 @@ export const getProducts = async (params: GetProductsParams = {}): Promise<Produ
 // Fetch single product by slug
 export const getProductBySlug = async (slug: string): Promise<Product | null> => {
   try {
-    const { data, error } = await supabase
+    // Try with explicit foreign key names first
+    let { data, error } = await supabase
       .from('products')
       .select(`
         *,
@@ -154,6 +182,50 @@ export const getProductBySlug = async (slug: string): Promise<Product | null> =>
       `)
       .eq('slug', slug)
       .single();
+
+    // If that fails, try with automatic foreign key resolution
+    if (error) {
+      console.warn('First query failed, trying alternative query:', error);
+      const result = await supabase
+        .from('products')
+        .select(`
+          *,
+          categories:category_id(id, name, slug),
+          brands:brand_id(id, name, slug)
+        `)
+        .eq('slug', slug)
+        .single();
+      
+      data = result.data;
+      error = result.error;
+    }
+
+    // If still fails, try without relations
+    if (error) {
+      console.warn('Second query failed, fetching without relations:', error);
+      const result = await supabase
+        .from('products')
+        .select('*')
+        .eq('slug', slug)
+        .single();
+      
+      data = result.data;
+      error = result.error;
+      
+      // If we got data but no relations, fetch them separately
+      if (data && !error) {
+        const [categoryResult, brandResult] = await Promise.all([
+          data.category_id ? supabase.from('categories').select('id, name, slug').eq('id', data.category_id).single() : { data: null },
+          data.brand_id ? supabase.from('brands').select('id, name, slug').eq('id', data.brand_id).single() : { data: null },
+        ]);
+        
+        data = {
+          ...data,
+          categories: categoryResult.data,
+          brands: brandResult.data,
+        };
+      }
+    }
 
     if (error) {
       console.error('Error fetching product by slug:', error);
@@ -170,8 +242,11 @@ export const getProductBySlug = async (slug: string): Promise<Product | null> =>
       name: data.name,
       slug: data.slug,
       description: data.description || '',
+      key_features: data.key_features || null,
+      specifications: data.specifications || null,
       category_id: data.category_id,
       brand: data.brands?.name || '',
+      brand_id: data.brand_id || null,
       original_price: data.price,
       discount_price: data.discount_price,
       in_stock: data.in_stock,

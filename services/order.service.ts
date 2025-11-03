@@ -52,6 +52,8 @@ export const orderService = {
           payment_method: checkoutData.payment_method,
           delivery_address: checkoutData.delivery_address,
           delivery_option: checkoutData.delivery_option,
+          notes: checkoutData.notes || null,
+          payment_reference: checkoutData.payment_reference || null, // Include payment reference for transaction linking
           order_items,
         }),
       });

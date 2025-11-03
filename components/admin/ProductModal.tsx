@@ -30,6 +30,8 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
     name: '',
     slug: '',
     description: '',
+    key_features: '', // Key features as comma-separated string
+    specifications: '', // Specifications as JSON string
     category_id: '',
     brand_id: '',
     price: '',
@@ -53,10 +55,29 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
 
   useEffect(() => {
     if (product) {
+      // Parse key_features and specifications if they're arrays/objects
+      const keyFeatures = product.key_features 
+        ? (Array.isArray(product.key_features) 
+            ? product.key_features.join(', ')
+            : typeof product.key_features === 'string' 
+              ? (product.key_features.startsWith('[') 
+                  ? JSON.parse(product.key_features).join(', ')
+                  : product.key_features)
+              : '')
+        : '';
+      
+      const specifications = product.specifications
+        ? (typeof product.specifications === 'string'
+            ? product.specifications
+            : JSON.stringify(product.specifications))
+        : '';
+
       setFormData({
         name: product.name || '',
         slug: product.slug || '',
         description: product.description || '',
+        key_features: keyFeatures,
+        specifications: specifications,
         category_id: product.category_id || '',
         brand_id: product.brand_id || '',
         price: product.original_price?.toString() || '',
@@ -80,6 +101,8 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
       name: '',
       slug: '',
       description: '',
+      key_features: '',
+      specifications: '',
       category_id: '',
       brand_id: '',
       price: '',
@@ -262,10 +285,31 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
 
     setLoading(true);
     try {
+      // Parse key_features (comma-separated string to JSON array)
+      const keyFeatures = formData.key_features
+        ? JSON.stringify(formData.key_features.split(',').map(f => f.trim()).filter(f => f))
+        : null;
+
+      // Parse specifications (JSON string, validate it)
+      let specifications = null;
+      if (formData.specifications) {
+        try {
+          // Try to parse to validate JSON
+          JSON.parse(formData.specifications);
+          specifications = formData.specifications;
+        } catch (error) {
+          toast.error('Invalid JSON format in specifications field');
+          setLoading(false);
+          return;
+        }
+      }
+
       const productData = {
         name: formData.name,
         slug: formData.slug,
         description: formData.description,
+        key_features: keyFeatures,
+        specifications: specifications,
         category_id: formData.category_id,
         brand_id: formData.brand_id,
         price: parseFloat(formData.price),
@@ -467,6 +511,36 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
               rows={4}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
             />
+          </div>
+
+          {/* Key Features */}
+          <div>
+            <label className="block text-sm font-semibold text-[#1A1A1A] mb-2">
+              Key Features
+            </label>
+            <textarea
+              value={formData.key_features}
+              onChange={(e) => setFormData({ ...formData, key_features: e.target.value })}
+              placeholder="Enter key features separated by commas (e.g., Fast processor, Long battery life, HD display)"
+              rows={4}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
+            />
+            <p className="text-xs text-gray-500 mt-1">Separate each feature with a comma</p>
+          </div>
+
+          {/* Specifications */}
+          <div>
+            <label className="block text-sm font-semibold text-[#1A1A1A] mb-2">
+              Specifications (JSON)
+            </label>
+            <textarea
+              value={formData.specifications}
+              onChange={(e) => setFormData({ ...formData, specifications: e.target.value })}
+              placeholder='{"processor": "Intel i7", "ram": "16GB", "storage": "512GB SSD", "screen": "15.6 inch"}'
+              rows={6}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19] font-mono text-sm"
+            />
+            <p className="text-xs text-gray-500 mt-1">Enter specifications as JSON object (e.g., {`{"key": "value"}`})</p>
           </div>
 
           {/* Pricing */}

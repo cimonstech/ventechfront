@@ -1,4 +1,4 @@
-// Dynamically load Paystack script
+// Dynamically load Paystack script (Paystack Popup V2)
 export const loadPaystack = (): Promise<any> => {
   return new Promise((resolve, reject) => {
     // Check if Paystack is already loaded
@@ -12,7 +12,7 @@ export const loadPaystack = (): Promise<any> => {
       return;
     }
 
-    // Load Paystack script
+    // Load Paystack Inline JS script (Popup V2)
     const script = document.createElement('script');
     script.src = 'https://js.paystack.co/v1/inline.js';
     script.async = true;

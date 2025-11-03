@@ -1,0 +1,20 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+
+# Disallow admin dashboard
+Disallow: /admin/
+
+# Allow all other pages
+Allow: /shop
+Allow: /categories
+Allow: /product/
+Allow: /deals
+Allow: /about
+Allow: /contact
+Allow: /register
+Allow: /laptop-banking
+
+# Sitemap
+Sitemap: https://ventechgadgets.com/sitemap.xml
+

@@ -36,7 +36,10 @@ export const notificationService = {
       if (error) throw error;
       return data;
     } catch (error) {
-      console.error('Error creating notification:', error);
+      // Silently handle notification errors - notifications are non-critical
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error creating notification:', error);
+      }
       return null;
     }
   },
@@ -100,10 +103,16 @@ export const notificationService = {
       });
 
       if (!response.ok) {
-        console.error('Failed to send low stock email');
+        // Silently handle email errors - emails are non-critical
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Failed to send low stock email');
+        }
       }
     } catch (error) {
-      console.error('Error sending low stock email:', error);
+      // Silently handle email errors - emails are non-critical
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error sending low stock email:', error);
+      }
     }
   },
 

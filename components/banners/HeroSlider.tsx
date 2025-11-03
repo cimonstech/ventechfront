@@ -45,7 +45,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
   }
 
   return (
-    <div className="relative w-full aspect-[16/6] max-h-[250px] sm:max-h-[300px] md:max-h-[350px] rounded-xl overflow-hidden group">
+    <div className="relative w-full aspect-[16/9] md:aspect-[16/5] rounded-xl overflow-hidden group">
       {/* Slides */}
       {banners.map((banner, index) => (
         <div
@@ -59,6 +59,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
             src={banner.image_url || '/placeholders/placeholder-banner.webp'}
             alt={banner.title}
             fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 100vw, 100vw"
             className="object-cover"
             priority={index === 0}
             unoptimized

@@ -3,6 +3,8 @@ export interface Product {
   name: string;
   slug: string;
   description: string;
+  key_features?: string | string[]; // Key features as JSON string or array
+  specifications?: string | Record<string, any>; // Specifications as JSON string or object
   category_id: string;
   brand: string;
   brand_id?: string; // Optional brand_id for database relationships

@@ -18,8 +18,9 @@ export const CategoryCard: React.FC<CategoryCardProps> = ({ category }) => {
         <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-orange-50 to-gray-50">
           <Image
             src={category.thumbnail || '/placeholders/placeholder-category.webp'}
-            alt={category.name}
+            alt={`${category.name} products in Ghana - Shop ${category.name} at VENTECH`}
             fill
+            sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 20vw"
             className="object-cover group-hover:scale-110 transition-transform duration-500"
           />
 
@@ -55,7 +56,7 @@ export const CategoryCardSimple: React.FC<CategoryCardProps> = ({ category }) =>
         <div className="w-12 h-12 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0 group-hover:bg-orange-100 transition-colors">
           <Image
             src={category.thumbnail || '/placeholders/imageplaceholder.webp'}
-            alt={category.name}
+            alt={`${category.name} icon`}
             width={32}
             height={32}
             className="object-contain"

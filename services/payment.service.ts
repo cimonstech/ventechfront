@@ -5,6 +5,7 @@ export interface PaymentData {
   email: string;
   amount: number; // Amount in pesewas (GHS * 100)
   reference: string;
+  callback_url?: string;
   metadata?: {
     order_id?: string;
     user_id?: string;
@@ -21,47 +22,86 @@ export interface PaymentResponse {
 }
 
 export const paymentService = {
-  // Initialize Paystack payment
+  // Initialize Paystack payment via backend (proper Paystack flow)
   async initializePayment(data: PaymentData): Promise<PaymentResponse> {
     try {
-      const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '';
+      // Get API URL from environment or use default
+      const API_URL = typeof window !== 'undefined' 
+        ? (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000')
+        : 'http://localhost:5000';
       
-      if (!publicKey) {
-        throw new Error('Paystack public key is not configured');
+      if (!API_URL) {
+        throw new Error('API URL is not configured. Please set NEXT_PUBLIC_API_URL in your environment variables.');
       }
-
-      const PaystackPop = await loadPaystack();
       
-      // Create payment handler
-      const handler = PaystackPop.setup({
-        key: publicKey,
-        email: data.email,
-        amount: data.amount,
-        ref: data.reference,
-        metadata: data.metadata || {},
-        currency: 'GHS',
-        callback: (response: any) => {
-          // This callback is called after payment
-          if (typeof window !== 'undefined') {
-            const orderId = sessionStorage.getItem('pending_order_id');
-            if (orderId) {
-              window.location.href = `/orders/${orderId}?payment=success&reference=${response.reference}`;
-            }
-          }
+      console.log('Initializing payment with API URL:', API_URL);
+      
+      // Initialize transaction from backend (as per Paystack best practices)
+      const response = await fetch(`${API_URL}/api/payments/initialize`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        onClose: () => {
-          // User closed payment modal
-          toast.error('Payment cancelled');
-        },
+        body: JSON.stringify({
+          email: data.email,
+          amount: data.amount,
+          reference: data.reference,
+          callback_url: data.callback_url || `${typeof window !== 'undefined' ? window.location.origin : ''}/payment/callback`,
+          metadata: data.metadata || {},
+        }),
       });
 
-      // Open Paystack payment modal
-      handler.openIframe();
+      if (!response.ok) {
+        let errorMessage = 'Failed to initialize payment';
+        try {
+          const error = await response.json();
+          errorMessage = error.message || errorMessage;
+        } catch (parseError) {
+          // If response is not JSON, use status text
+          errorMessage = `HTTP ${response.status}: ${response.statusText || 'Failed to connect to payment server. Please check if your backend server is running and NEXT_PUBLIC_API_URL is configured correctly.'}`;
+          console.error('Payment API error:', {
+            status: response.status,
+            statusText: response.statusText,
+            url: `${API_URL}/api/payments/initialize`,
+            API_URL,
+          });
+        }
+        throw new Error(errorMessage);
+      }
 
-      return {
-        success: true,
-        reference: data.reference,
-      };
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        const { access_code, authorization_url } = result.data;
+        
+        // Use Paystack Popup to complete transaction
+        if (typeof window !== 'undefined') {
+          const PaystackPop = await loadPaystack();
+          
+          // Use resumeTransaction with access_code (Paystack Popup V2)
+          const popup = new PaystackPop();
+          popup.resumeTransaction(access_code);
+        }
+
+        // Store checkout data for order creation after payment
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('pending_checkout_data', JSON.stringify({
+            reference: data.reference,
+            email: data.email,
+            metadata: data.metadata,
+          }));
+          sessionStorage.setItem('pending_payment_reference', data.reference);
+        }
+
+        return {
+          success: true,
+          reference: data.reference,
+          access_code,
+          authorization_url,
+        };
+      } else {
+        throw new Error(result.message || 'Failed to initialize payment');
+      }
     } catch (error: any) {
       console.error('Payment initialization error:', error);
       return {
@@ -74,7 +114,14 @@ export const paymentService = {
   // Verify payment (for callback after payment)
   async verifyPayment(reference: string): Promise<PaymentResponse> {
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      // Get API URL from environment or use default
+      const API_URL = typeof window !== 'undefined' 
+        ? (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000')
+        : 'http://localhost:5000';
+      
+      if (!API_URL) {
+        throw new Error('API URL is not configured. Please set NEXT_PUBLIC_API_URL in your environment variables.');
+      }
       
       const response = await fetch(`${API_URL}/api/payments/verify`, {
         method: 'POST',
@@ -85,7 +132,19 @@ export const paymentService = {
       });
 
       if (!response.ok) {
-        throw new Error('Payment verification failed');
+        let errorMessage = 'Payment verification failed';
+        try {
+          const error = await response.json();
+          errorMessage = error.message || errorMessage;
+        } catch (parseError) {
+          errorMessage = `HTTP ${response.status}: ${response.statusText || 'Failed to connect to payment server'}`;
+          console.error('Payment verification API error:', {
+            status: response.status,
+            statusText: response.statusText,
+            url: `${API_URL}/api/payments/verify`,
+          });
+        }
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();

@@ -33,6 +33,7 @@ interface Order {
   payment_status: 'pending' | 'paid' | 'failed';
   created_at: string;
   items_count: number;
+  notes?: string | null;
 }
 
 export default function AdminOrdersPage() {
@@ -86,6 +87,7 @@ export default function AdminOrdersPage() {
         payment_status: order.payment_status,
         created_at: order.created_at,
         items_count: order.order_items?.length || 0,
+        notes: order.notes || null,
       })) || [];
 
       // Apply search filter client-side

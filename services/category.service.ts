@@ -1,39 +1,70 @@
 import { supabase } from '@/lib/supabase';
 import { Category } from '@/types/product';
 
-// Fetch all categories
+// Fetch all categories with accurate product counts
 export const getCategories = async (): Promise<Category[]> => {
   try {
     console.log('Fetching categories...');
-    const { data, error } = await supabase
+    
+    // First, fetch all categories
+    const { data: categories, error: categoriesError } = await supabase
       .from('categories')
       .select('*')
       .order('order', { ascending: true });
 
-    if (error) {
-      console.error('Supabase error fetching categories:', error);
-      throw error;
+    if (categoriesError) {
+      console.error('Supabase error fetching categories:', categoriesError);
+      throw categoriesError;
     }
     
-    console.log('Categories fetched successfully:', data);
-    return data || [];
+    if (!categories || categories.length === 0) {
+      console.log('Categories fetched successfully: (empty)');
+      return [];
+    }
+    
+    // Fetch product counts for each category
+    const categoryIds = categories.map(cat => cat.id);
+    const { data: productCounts, error: countsError } = await supabase
+      .from('products')
+      .select('category_id')
+      .in('category_id', categoryIds);
+    
+    if (countsError) {
+      console.warn('Error fetching product counts, using stored values:', countsError);
+    }
+    
+    // Calculate product counts for each category
+    const countsMap = new Map<string, number>();
+    if (productCounts) {
+      productCounts.forEach((product: any) => {
+        if (product.category_id) {
+          countsMap.set(product.category_id, (countsMap.get(product.category_id) || 0) + 1);
+        }
+      });
+    }
+    
+    // Map categories with accurate product counts
+    const categoriesWithCounts = categories.map(category => ({
+      ...category,
+      product_count: countsMap.get(category.id) || 0,
+    }));
+    
+    console.log('Categories fetched successfully:', categoriesWithCounts);
+    return categoriesWithCounts;
   } catch (error) {
     console.error('Error fetching categories:', error);
     return [];
   }
 };
 
-// Fetch categories for filters (active, with products)
+// Fetch categories for filters (active, with products) - uses getCategories for accurate counts
 export const getFilterCategories = async (): Promise<Category[]> => {
   try {
-    const { data, error } = await supabase
-      .from('categories')
-      .select('*')
-      .gt('product_count', 0)
-      .order('name', { ascending: true });
-
-    if (error) throw error;
-    return data || [];
+    // Use getCategories which calculates accurate product counts
+    const categories = await getCategories();
+    
+    // Filter out categories with no products
+    return categories.filter(cat => cat.product_count > 0);
   } catch (error) {
     console.error('Error fetching filter categories:', error);
     return [];

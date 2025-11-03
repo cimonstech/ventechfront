@@ -75,7 +75,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
         <div className="relative aspect-square overflow-hidden bg-gray-50">
           <Image
             src={product.thumbnail || '/placeholders/placeholder-product.webp'}
-            alt={product.name}
+            alt={`${product.name}${product.brand ? ` by ${product.brand}` : ''} - Buy in Ghana`}
             fill
             sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 20vw"
             className="object-cover group-hover:scale-110 transition-transform duration-500"

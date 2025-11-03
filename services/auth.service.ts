@@ -206,6 +206,68 @@ export const getUserProfile = async (userId?: string) => {
 
     if (!data) {
       console.warn('No user profile found for ID:', userId);
+      
+      // Try to create the profile if it doesn't exist
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && user.id === userId) {
+          // Build profile data - handle both name and first_name/last_name schemas
+          const firstName = user.user_metadata?.first_name || user.user_metadata?.firstName || '';
+          const lastName = user.user_metadata?.last_name || user.user_metadata?.lastName || '';
+          const fullName = `${firstName} ${lastName}`.trim() || user.email?.split('@')[0] || 'User';
+          
+          const profileData: any = {
+            id: user.id,
+            email: user.email || '',
+            phone: user.user_metadata?.phone || user.phone || null,
+            role: 'customer',
+          };
+
+          // Try to use first_name/last_name if columns exist, otherwise use name
+          try {
+            const { data: newProfile, error: createError } = await supabase
+              .from('users')
+              .insert({
+                ...profileData,
+                first_name: firstName,
+                last_name: lastName,
+              })
+              .select()
+              .single();
+
+            if (createError) {
+              // If error, try with 'name' field instead (might be the actual schema)
+              if (createError.message?.includes('column') || createError.code === '42703') {
+                const { data: newProfile2, error: createError2 } = await supabase
+                  .from('users')
+                  .insert({
+                    ...profileData,
+                    name: fullName,
+                  })
+                  .select()
+                  .single();
+
+                if (createError2) {
+                  console.error('Error creating user profile (with name field):', createError2);
+                  return null;
+                }
+                return newProfile2;
+              } else {
+                console.error('Error creating user profile:', createError);
+                return null;
+              }
+            }
+
+            return newProfile;
+          } catch (insertError: any) {
+            console.error('Error inserting user profile:', insertError);
+            return null;
+          }
+        }
+      } catch (error: any) {
+        console.error('Error creating user profile:', error);
+      }
+      
       return null;
     }
 

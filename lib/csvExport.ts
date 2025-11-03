@@ -91,13 +91,51 @@ export class CSVExporter {
 export const ProductColumns: CSVColumn[] = [
   { key: 'name', label: 'Product Name' },
   { key: 'sku', label: 'SKU' },
+  { key: 'description', label: 'Description' },
+  { key: 'key_features', label: 'Key Features', format: (v) => {
+    if (!v) return 'N/A';
+    if (typeof v === 'string') {
+      try {
+        const parsed = JSON.parse(v);
+        return Array.isArray(parsed) ? parsed.join('; ') : parsed;
+      } catch {
+        return v;
+      }
+    }
+    return Array.isArray(v) ? v.join('; ') : String(v);
+  }},
+  { key: 'specifications', label: 'Specifications', format: (v) => {
+    if (!v) return 'N/A';
+    if (typeof v === 'string') {
+      try {
+        return JSON.stringify(JSON.parse(v));
+      } catch {
+        return v;
+      }
+    }
+    return typeof v === 'object' ? JSON.stringify(v) : String(v);
+  }},
   { key: 'price', label: 'Price', format: CSVExporter.formatCurrency },
   { key: 'discount_price', label: 'Discount Price', format: (v) => v ? CSVExporter.formatCurrency(v) : 'N/A' },
+  { key: 'price_range', label: 'Price Range', format: (v) => {
+    if (!v) return 'N/A';
+    if (typeof v === 'object' && v.min !== undefined && v.max !== undefined) {
+      if (v.min === v.max) return CSVExporter.formatCurrency(v.min);
+      return `${CSVExporter.formatCurrency(v.min)} - ${CSVExporter.formatCurrency(v.max)}`;
+    }
+    return 'N/A';
+  }},
   { key: 'stock_quantity', label: 'Stock' },
+  { key: 'in_stock', label: 'In Stock', format: CSVExporter.formatBoolean },
   { key: 'category_name', label: 'Category' },
   { key: 'brand_name', label: 'Brand' },
   { key: 'is_featured', label: 'Featured', format: CSVExporter.formatBoolean },
+  { key: 'rating', label: 'Rating', format: (v) => v ? v.toFixed(2) : '0.00' },
+  { key: 'review_count', label: 'Review Count' },
+  { key: 'images', label: 'Images', format: (v) => Array.isArray(v) ? v.join(' | ') : (v || 'N/A') },
+  { key: 'thumbnail', label: 'Thumbnail' },
   { key: 'created_at', label: 'Created Date', format: CSVExporter.formatDate },
+  { key: 'updated_at', label: 'Updated Date', format: CSVExporter.formatDate },
 ];
 
 export const CustomerColumns: CSVColumn[] = [
