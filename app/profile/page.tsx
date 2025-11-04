@@ -50,8 +50,7 @@ export default function ProfilePage() {
     date_of_birth: '',
     gender: '',
     shipping_address: {
-      address_line1: '',
-      address_line2: '',
+      street_address: '',
       city: '',
       region: '',
       postal_code: '',
@@ -90,9 +89,14 @@ export default function ProfilePage() {
         phone: user.phone || '',
         date_of_birth: user.date_of_birth || '',
         gender: user.gender || '',
-        shipping_address: user.shipping_address || {
-          address_line1: '',
-          address_line2: '',
+        shipping_address: user.shipping_address ? {
+          street_address: user.shipping_address.street_address || user.shipping_address.address_line1 || '',
+          city: user.shipping_address.city || '',
+          region: user.shipping_address.region || '',
+          postal_code: user.shipping_address.postal_code || '',
+          country: user.shipping_address.country || 'Ghana',
+        } : {
+          street_address: '',
           city: '',
           region: '',
           postal_code: '',
@@ -352,33 +356,17 @@ export default function ProfilePage() {
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-semibold text-[#1A1A1A] mb-2">
-                        Address Line 1 *
+                        Street Address *
                       </label>
                       <input
                         type="text"
-                        value={formData.shipping_address.address_line1}
+                        value={formData.shipping_address.street_address}
                         onChange={(e) => setFormData({
                           ...formData,
-                          shipping_address: { ...formData.shipping_address, address_line1: e.target.value }
+                          shipping_address: { ...formData.shipping_address, street_address: e.target.value }
                         })}
-                        placeholder="Street address, P.O. box, company name"
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19] text-sm"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-[#1A1A1A] mb-2">
-                        Address Line 2
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.shipping_address.address_line2}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          shipping_address: { ...formData.shipping_address, address_line2: e.target.value }
-                        })}
-                        placeholder="Apartment, suite, unit, building, floor, etc."
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19] text-sm"
+                        required
                       />
                     </div>
 
@@ -395,36 +383,26 @@ export default function ProfilePage() {
                             shipping_address: { ...formData.shipping_address, city: e.target.value }
                           })}
                           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19] text-sm"
+                          required
                         />
                       </div>
                       <div>
                         <label className="block text-sm font-semibold text-[#1A1A1A] mb-2">
                           Region *
                         </label>
-                        <select
+                        <input
+                          type="text"
                           value={formData.shipping_address.region}
                           onChange={(e) => setFormData({
                             ...formData,
                             shipping_address: { ...formData.shipping_address, region: e.target.value }
                           })}
                           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19] text-sm"
-                        >
-                          <option value="">Select region</option>
-                          <option value="Greater Accra">Greater Accra</option>
-                          <option value="Ashanti">Ashanti</option>
-                          <option value="Central">Central</option>
-                          <option value="Eastern">Eastern</option>
-                          <option value="Northern">Northern</option>
-                          <option value="Volta">Volta</option>
-                          <option value="Western">Western</option>
-                          <option value="Upper East">Upper East</option>
-                          <option value="Upper West">Upper West</option>
-                          <option value="Brong-Ahafo">Brong-Ahafo</option>
-                        </select>
+                          required
+                        />
                       </div>
                     </div>
 
-                    <div className="grid md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-semibold text-[#1A1A1A] mb-2">
                           Postal Code
@@ -436,21 +414,8 @@ export default function ProfilePage() {
                             ...formData,
                             shipping_address: { ...formData.shipping_address, postal_code: e.target.value }
                           })}
-                          placeholder="GA-XXX-XXXX"
                           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19] text-sm"
                         />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-semibold text-[#1A1A1A] mb-2">
-                          Country *
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.shipping_address.country}
-                          disabled
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 text-sm text-[#3A3A3A]"
-                        />
-                      </div>
                     </div>
                   </div>
                 </div>

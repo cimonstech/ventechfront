@@ -53,7 +53,25 @@ export default function OrderDetailPage() {
     try {
       setIsLoading(true);
       const data = await orderService.getOrderById(orderId);
-      setOrder(data);
+      
+      // Transform order data to match Order interface
+      const formattedOrder: Order = {
+        ...data,
+        items: data.items || data.order_items || [],
+        delivery_address: data.shipping_address || data.delivery_address,
+        delivery_option: data.delivery_option || 
+          data.shipping_address?.delivery_option || 
+          data.delivery_address?.delivery_option || 
+          {
+            id: 'standard',
+            name: 'Standard Delivery',
+            description: 'Standard delivery option',
+            price: data.shipping_fee || data.delivery_fee || 0,
+          },
+        delivery_fee: data.shipping_fee || data.delivery_fee || 0,
+      };
+      
+      setOrder(formattedOrder);
     } catch (error: any) {
       console.error('Error fetching order:', error);
       toast.error('Failed to load order details');
@@ -133,7 +151,9 @@ export default function OrderDetailPage() {
                       )}
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-gray-900">{formatCurrency(item.subtotal)}</p>
+                      <p className="font-bold text-gray-900">
+                        {formatCurrency(item.total_price || item.subtotal || (item.unit_price * item.quantity))}
+                      </p>
                       <p className="text-sm text-gray-600">{formatCurrency(item.unit_price)} each</p>
                     </div>
                   </div>
@@ -142,20 +162,40 @@ export default function OrderDetailPage() {
             </div>
 
             {/* Delivery Address */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <MapPin size={20} />
-                Delivery Address
-              </h2>
-              <div className="text-gray-600">
-                <p className="font-semibold text-gray-900 mb-1">{order.delivery_address.full_name}</p>
-                <p>{order.delivery_address.phone}</p>
-                <p>{order.delivery_address.street_address}</p>
-                <p>{order.delivery_address.city}, {order.delivery_address.region}</p>
-                {order.delivery_address.postal_code && <p>{order.delivery_address.postal_code}</p>}
-                <p>{order.delivery_address.country}</p>
+            {(order.delivery_address || order.shipping_address) && (
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <MapPin size={20} />
+                  Delivery Address
+                </h2>
+                <div className="text-gray-600">
+                  {(order.delivery_address || order.shipping_address)?.full_name && (
+                    <p className="font-semibold text-gray-900 mb-1">
+                      {(order.delivery_address || order.shipping_address).full_name}
+                    </p>
+                  )}
+                  {(order.delivery_address || order.shipping_address)?.phone && (
+                    <p>{(order.delivery_address || order.shipping_address).phone}</p>
+                  )}
+                  {(order.delivery_address || order.shipping_address)?.street_address && (
+                    <p>{(order.delivery_address || order.shipping_address).street_address}</p>
+                  )}
+                  {(order.delivery_address || order.shipping_address)?.city && (
+                    <p>
+                      {(order.delivery_address || order.shipping_address).city}
+                      {(order.delivery_address || order.shipping_address)?.region && 
+                        `, ${(order.delivery_address || order.shipping_address).region}`}
+                    </p>
+                  )}
+                  {(order.delivery_address || order.shipping_address)?.postal_code && (
+                    <p>{(order.delivery_address || order.shipping_address).postal_code}</p>
+                  )}
+                  {(order.delivery_address || order.shipping_address)?.country && (
+                    <p>{(order.delivery_address || order.shipping_address).country}</p>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Payment & Delivery Info */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -178,8 +218,25 @@ export default function OrderDetailPage() {
                   <Package size={18} />
                   Delivery Option
                 </h3>
-                <p className="text-gray-900 font-medium">{order.delivery_option.name}</p>
-                <p className="text-sm text-gray-600">{order.delivery_option.description}</p>
+                {order.delivery_option || (order.shipping_address?.delivery_option || order.delivery_address?.delivery_option) ? (
+                  <>
+                    <p className="text-gray-900 font-medium">
+                      {(order.delivery_option || order.shipping_address?.delivery_option || order.delivery_address?.delivery_option)?.name || 'Standard Delivery'}
+                    </p>
+                    {(order.delivery_option || order.shipping_address?.delivery_option || order.delivery_address?.delivery_option)?.description && (
+                      <p className="text-sm text-gray-600">
+                        {(order.delivery_option || order.shipping_address?.delivery_option || order.delivery_address?.delivery_option).description}
+                      </p>
+                    )}
+                    {(order.shipping_fee || order.delivery_fee) && (
+                      <p className="text-sm text-gray-600 mt-1">
+                        Fee: {formatCurrency(order.shipping_fee || order.delivery_fee || 0)}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-gray-600">Standard Delivery</p>
+                )}
               </div>
             </div>
 

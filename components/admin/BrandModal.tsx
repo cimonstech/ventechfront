@@ -68,37 +68,22 @@ export function BrandModal({ isOpen, onClose, brand, onSuccess }: BrandModalProp
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please upload an image file');
-      return;
-    }
-
-    // Validate file size (max 2MB)
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error('Image size should be less than 2MB');
-      return;
-    }
-
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('folder', 'brands');
-
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${apiUrl}/api/upload?folder=${encodeURIComponent('brands')}`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (data.success && data.url) {
-        setFormData((prev) => ({ ...prev, logo_url: data.url }));
-        toast.success('Logo uploaded successfully');
+      // Use centralized upload service that checks media library first
+      const { uploadImage } = await import('@/services/image-upload.service');
+      
+      const result = await uploadImage(file, 'brands', true);
+      
+      if (result.success && result.url) {
+        setFormData((prev) => ({ ...prev, logo_url: result.url! }));
+        if (result.fromLibrary) {
+          toast.success('Logo selected from media library');
+        } else {
+          toast.success('Logo uploaded successfully');
+        }
       } else {
-        throw new Error(data.error || 'Upload failed');
+        throw new Error(result.error || 'Upload failed');
       }
     } catch (error: any) {
       console.error('Upload error:', error);

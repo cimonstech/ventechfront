@@ -85,11 +85,56 @@ export const paymentService = {
         
         // Use Paystack Popup to complete transaction
         if (typeof window !== 'undefined') {
-          const PaystackPop = await loadPaystack();
-          
-          // Use resumeTransaction with access_code (Paystack Popup V2)
-          const popup = new PaystackPop();
-          popup.resumeTransaction(access_code);
+          try {
+            const PaystackPop = await loadPaystack();
+            
+            // PaystackPop is not a constructor - it's an object with methods
+            // Check if resumeTransaction exists (Paystack Popup V2 method)
+            if (PaystackPop && typeof PaystackPop.resumeTransaction === 'function') {
+              // Use resumeTransaction with access_code (Paystack Popup V2)
+              PaystackPop.resumeTransaction(access_code);
+            } else if (PaystackPop && typeof PaystackPop.setup === 'function') {
+              // Fallback: Use setup method with payment details
+              const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
+              if (publicKey) {
+                const handler = PaystackPop.setup({
+                  key: publicKey,
+                  email: data.email,
+                  amount: data.amount,
+                  ref: data.reference,
+                  currency: 'GHS',
+                  callback: (response: any) => {
+                    // Handle callback - payment will be verified via callback page
+                    console.log('Payment callback:', response);
+                  },
+                  onClose: () => {
+                    console.log('Payment popup closed');
+                  },
+                });
+                handler.openIframe();
+              } else {
+                // If no public key, redirect to authorization_url
+                if (authorization_url) {
+                  window.location.href = authorization_url;
+                } else {
+                  throw new Error('Paystack public key is not configured');
+                }
+              }
+            } else if (authorization_url) {
+              // Fallback: Redirect to authorization URL if PaystackPop methods don't work
+              window.location.href = authorization_url;
+            } else {
+              throw new Error('Paystack is not properly configured. Please check your Paystack public key.');
+            }
+          } catch (paystackError: any) {
+            console.error('Paystack initialization error:', paystackError);
+            // Fallback to redirect if Paystack popup fails
+            if (authorization_url) {
+              window.location.href = authorization_url;
+            } else {
+              throw new Error(`Paystack error: ${paystackError.message || 'Failed to initialize payment popup'}`);
+            }
+          }
         }
 
         // Store checkout data for order creation after payment

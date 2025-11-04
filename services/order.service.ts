@@ -13,15 +13,18 @@ export const orderService = {
     const tax = subtotal * 0.0; // Ghana VAT if applicable
     const total = subtotal + deliveryFee + tax;
 
-    // Generate order number in format: ORD-XXXDDMM
+    // Generate order number in format: ORD-XXXDDMMYY
+    // XXX = sequential order number, DDMMYY = date (e.g., 041125 = 4th Nov 2025)
     const now = new Date();
     const day = String(now.getDate()).padStart(2, '0');
     const month = String(now.getMonth() + 1).padStart(2, '0');
-    const dateStr = `${day}${month}`;
+    const year = String(now.getFullYear()).slice(-2);
+    const dateStr = `${day}${month}${year}`;
     
-    // Count orders created today (via backend API or use timestamp)
-    const orderNumberForDay = String(Date.now()).slice(-3);
-    const orderNumber = `ORD-${orderNumberForDay}${dateStr}`;
+    // Generate sequential order number (using timestamp last 3 digits for uniqueness)
+    // In production, this should be fetched from backend to ensure sequential numbering
+    const orderNumberSequence = String(Date.now()).slice(-3);
+    const orderNumber = `ORD-${orderNumberSequence}${dateStr}`;
 
     // Map items for backend
     const order_items = checkoutData.items.map((item) => ({
@@ -50,7 +53,7 @@ export const orderService = {
           delivery_fee: deliveryFee,
           total,
           payment_method: checkoutData.payment_method,
-          delivery_address: checkoutData.delivery_address,
+          delivery_address: checkoutData.delivery_address, // Backend will map this to shipping_address
           delivery_option: checkoutData.delivery_option,
           notes: checkoutData.notes || null,
           payment_reference: checkoutData.payment_reference || null, // Include payment reference for transaction linking
@@ -60,13 +63,38 @@ export const orderService = {
 
       if (response.ok) {
         const result = await response.json();
-        return result.data;
+        if (result.success && result.data) {
+          return result.data;
+        } else {
+          throw new Error(result.message || 'Order creation failed');
+        }
       } else {
-        throw new Error('Backend API failed');
+        // Try to parse error response
+        let errorMessage = 'Backend API failed';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+          console.error('Backend API error response:', {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorData,
+          });
+        } catch (parseError) {
+          errorMessage = `HTTP ${response.status}: ${response.statusText || 'Unknown error'}`;
+          console.error('Backend API error (non-JSON):', {
+            status: response.status,
+            statusText: response.statusText,
+          });
+        }
+        throw new Error(errorMessage);
       }
-    } catch (apiError) {
+    } catch (apiError: any) {
       // Fallback to direct Supabase insert if backend API fails
-      console.warn('Backend API failed, using Supabase fallback:', apiError);
+      console.warn('Backend API failed, using Supabase fallback:', {
+        error: apiError,
+        message: apiError?.message,
+        stack: apiError?.stack,
+      });
       
       const { supabase } = await import('@/lib/supabase');
       
@@ -80,20 +108,28 @@ export const orderService = {
             status: 'pending',
             subtotal,
             discount: 0,
-            delivery_fee: deliveryFee,
+            shipping_fee: deliveryFee, // Use shipping_fee instead of delivery_fee
             tax,
             total,
             payment_method: checkoutData.payment_method,
             payment_status: 'pending',
-            delivery_address: checkoutData.delivery_address,
-            delivery_option: checkoutData.delivery_option,
+            shipping_address: checkoutData.delivery_address, // Map to shipping_address
             notes: checkoutData.notes,
           },
         ])
         .select()
         .single();
 
-      if (orderError) throw orderError;
+      if (orderError) {
+        console.error('Supabase order creation error:', {
+          error: orderError,
+          message: orderError.message,
+          code: orderError.code,
+          details: orderError.details,
+          hint: orderError.hint,
+        });
+        throw new Error(orderError.message || 'Failed to create order');
+      }
 
       // Create order items
       const orderItems = checkoutData.items.map((item) => ({
@@ -103,7 +139,7 @@ export const orderService = {
         product_image: item.thumbnail,
         quantity: item.quantity,
         unit_price: item.discount_price || item.original_price,
-        subtotal: item.subtotal,
+        total_price: item.subtotal, // Use total_price as per schema
         selected_variants: item.selected_variants,
       }));
 
@@ -111,7 +147,16 @@ export const orderService = {
         .from('order_items')
         .insert(orderItems);
 
-      if (itemsError) throw itemsError;
+      if (itemsError) {
+        console.error('Supabase order items creation error:', {
+          error: itemsError,
+          message: itemsError.message,
+          code: itemsError.code,
+          details: itemsError.details,
+          hint: itemsError.hint,
+        });
+        throw new Error(itemsError.message || 'Failed to create order items');
+      }
 
       return order;
     }

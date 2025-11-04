@@ -61,36 +61,82 @@ export default function RevenueAnalyticsPage() {
           startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
       }
 
-      // Fetch paid orders in date range
-      const { data: orders, error: ordersError } = await supabase
-        .from('orders')
-        .select('total, created_at, order_items(*)')
+      // Fetch paid transactions in date range (use transactions table as source of truth)
+      // This ensures we capture all revenue from transactions, including those that might not be linked to orders
+      let orders: any[] = [];
+      let total = 0;
+      let transactionCount = 0;
+      let averageOrder = 0;
+
+      const { data: transactions, error: transactionsError } = await supabase
+        .from('transactions')
+        .select('amount, payment_status, paid_at, created_at, order:orders!transactions_order_id_fkey(id, order_number, order_items(*))')
         .eq('payment_status', 'paid')
         .gte('created_at', startDate.toISOString())
         .order('created_at', { ascending: true });
 
-      if (ordersError) throw ordersError;
+      if (transactionsError) {
+        console.error('Error fetching transactions, falling back to orders:', transactionsError);
+        // Fallback to orders if transactions fail
+        const { data: ordersData, error: ordersError } = await supabase
+          .from('orders')
+          .select('total, created_at, order_items(*)')
+          .eq('payment_status', 'paid')
+          .gte('created_at', startDate.toISOString())
+          .order('created_at', { ascending: true });
 
-      // Calculate total revenue and transactions
-      const total = orders?.reduce((sum, order) => sum + (parseFloat(order.total) || 0), 0) || 0;
-      const transactions = orders?.length || 0;
-      const averageOrder = transactions > 0 ? total / transactions : 0;
+        if (ordersError) throw ordersError;
+
+        orders = ordersData || [];
+        // Calculate total revenue and transactions from orders
+        total = orders.reduce((sum, order) => sum + (parseFloat(order.total) || 0), 0);
+        transactionCount = orders.length;
+        averageOrder = transactionCount > 0 ? total / transactionCount : 0;
+      } else {
+        // Calculate total revenue and transactions from transactions table
+        transactionCount = transactions?.length || 0;
+        total = transactions?.reduce((sum, tx) => sum + (parseFloat(tx.amount) || 0), 0) || 0;
+        averageOrder = transactionCount > 0 ? total / transactionCount : 0;
+        
+        // Map transactions to orders format for compatibility with rest of code
+        orders = transactions?.map((tx: any) => ({
+          total: tx.amount,
+          created_at: tx.paid_at || tx.created_at,
+          order_items: tx.order?.order_items || [],
+        })) || [];
+      }
 
       // Calculate previous period for growth
       const previousStartDate = new Date(startDate.getTime() - (now.getTime() - startDate.getTime()));
-      const { data: previousOrders } = await supabase
-        .from('orders')
-        .select('total')
+      
+      // Try to fetch previous period transactions
+      const { data: previousTransactions } = await supabase
+        .from('transactions')
+        .select('amount, paid_at, created_at')
         .eq('payment_status', 'paid')
         .gte('created_at', previousStartDate.toISOString())
         .lt('created_at', startDate.toISOString());
 
-      const previousTotal = previousOrders?.reduce((sum, order) => sum + (parseFloat(order.total) || 0), 0) || 0;
+      let previousTotal = 0;
+      if (previousTransactions && previousTransactions.length > 0) {
+        previousTotal = previousTransactions.reduce((sum, tx) => sum + (parseFloat(tx.amount) || 0), 0);
+      } else {
+        // Fallback to orders if transactions not available
+        const { data: previousOrders } = await supabase
+          .from('orders')
+          .select('total')
+          .eq('payment_status', 'paid')
+          .gte('created_at', previousStartDate.toISOString())
+          .lt('created_at', startDate.toISOString());
+
+        previousTotal = previousOrders?.reduce((sum, order) => sum + (parseFloat(order.total) || 0), 0) || 0;
+      }
+      
       const growth = previousTotal > 0 ? ((total - previousTotal) / previousTotal) * 100 : 0;
 
       // Group by day
       const byDayMap: { [key: string]: number } = {};
-      orders?.forEach(order => {
+      orders.forEach(order => {
         const date = new Date(order.created_at).toISOString().split('T')[0];
         byDayMap[date] = (byDayMap[date] || 0) + (parseFloat(order.total) || 0);
       });
@@ -118,7 +164,7 @@ export default function RevenueAnalyticsPage() {
         }, {} as any) || {};
       }
 
-      orders?.forEach(order => {
+      orders.forEach(order => {
         order.order_items?.forEach((item: any) => {
           const product = productsMap[item.product_id];
           const categoryName = product?.category?.name || 'Uncategorized';
@@ -139,7 +185,7 @@ export default function RevenueAnalyticsPage() {
       setRevenueData({
         total,
         growth: parseFloat(growth.toFixed(1)),
-        transactions,
+        transactions: transactionCount,
         averageOrder: parseFloat(averageOrder.toFixed(2)),
         byDay,
         byCategory,

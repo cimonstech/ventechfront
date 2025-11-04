@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import toast from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 import { MediaPicker } from './MediaPicker';
+import { ProductPicker } from './ProductPicker';
 
 interface SidebarAdModalProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ export function SidebarAdModal({ isOpen, onClose, ad, onSuccess }: SidebarAdModa
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [showMediaPicker, setShowMediaPicker] = useState(false);
+  const [showProductPicker, setShowProductPicker] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     image_url: '',
@@ -59,34 +61,22 @@ export function SidebarAdModal({ isOpen, onClose, ad, onSuccess }: SidebarAdModa
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please upload an image file');
-      return;
-    }
-
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error('Image size should be less than 2MB');
-      return;
-    }
-
     setUploading(true);
     try {
-      const formDataUpload = new FormData();
-      formDataUpload.append('file', file);
+      // Use centralized upload service that checks media library first
+      const { uploadImage } = await import('@/services/image-upload.service');
       
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${apiUrl}/api/upload?folder=${encodeURIComponent('sidebar-ads')}`, {
-        method: 'POST',
-        body: formDataUpload,
-      });
-
-      const data = await response.json();
-
-      if (data.success && data.url) {
-        setFormData((prev) => ({ ...prev, image_url: data.url }));
-        toast.success('Image uploaded successfully');
+      const result = await uploadImage(file, 'sidebar-ads', true);
+      
+      if (result.success && result.url) {
+        setFormData((prev) => ({ ...prev, image_url: result.url! }));
+        if (result.fromLibrary) {
+          toast.success('Image selected from media library');
+        } else {
+          toast.success('Image uploaded successfully');
+        }
       } else {
-        throw new Error(data.error || 'Upload failed');
+        throw new Error(result.error || 'Upload failed');
       }
     } catch (error: any) {
       console.error('Upload error:', error);
@@ -160,11 +150,8 @@ export function SidebarAdModal({ isOpen, onClose, ad, onSuccess }: SidebarAdModa
   if (!isOpen) return null;
 
   const availablePages = [
-    { value: 'homepage', label: 'Homepage' },
     { value: 'shop', label: 'Shop' },
     { value: 'product', label: 'Product Details' },
-    { value: 'cart', label: 'Cart' },
-    { value: 'checkout', label: 'Checkout' },
   ];
 
   return (
@@ -206,10 +193,7 @@ export function SidebarAdModal({ isOpen, onClose, ad, onSuccess }: SidebarAdModa
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  // TODO: Open product picker
-                  toast('Product picker coming soon');
-                }}
+                onClick={() => setShowProductPicker(true)}
                 className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
               >
                 Select Product
@@ -379,6 +363,22 @@ export function SidebarAdModal({ isOpen, onClose, ad, onSuccess }: SidebarAdModa
             setShowMediaPicker(false);
           }}
           folder="uploads"
+        />
+
+        {/* Product Picker */}
+        <ProductPicker
+          isOpen={showProductPicker}
+          onClose={() => setShowProductPicker(false)}
+          onSelect={(product) => {
+            setFormData(prev => ({ 
+              ...prev, 
+              link: `/product/${product.slug}`,
+              title: prev.title || product.name,
+              image_url: prev.image_url || product.image_url || '',
+            }));
+            setShowProductPicker(false);
+            toast.success(`Product "${product.name}" selected`);
+          }}
         />
       </div>
     </div>

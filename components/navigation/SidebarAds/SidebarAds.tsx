@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { ShoppingCart } from 'lucide-react';
 import { useAppDispatch } from '@/store';
 import { addToCart } from '@/store/cartSlice';
+import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 
 interface SidebarAdsProps {
@@ -27,67 +28,65 @@ export const SidebarAds: React.FC<SidebarAdsProps> = ({ position, page }) => {
 
   const loadAds = async () => {
     try {
-      // TODO: Replace with actual API call
-      // const response = await fetch(`/api/sidebar-ads?position=${position}&page=${page}`);
-      // const data = await response.json();
+      setIsLoading(true);
       
-      // Mock data for now
-      const mockAds: SidebarAd[] = [
-        {
-          id: '1',
-          title: 'Summer Sale',
-          image_url: '/banners/store2-home-pic2.webp',
-          link: '/deals',
-          position: 'right',
-          show_on: ['homepage', 'shop'],
-          active: true,
-          sort_order: 1,
-        },
-        {
-          id: '2',
-          title: 'New Arrivals',
-          image_url: '/banners/store2-home-pic3.webp',
-          link: '/categories/new',
-          position: 'right',
-          show_on: ['homepage', 'shop'],
-          slider_group: 'group-1',
-          active: true,
-          sort_order: 2,
-        },
-        {
-          id: '3',
-          title: 'Hot Deals',
-          image_url: '/banners/store2-slider-bg3.webp',
-          link: '/deals',
-          position: 'right',
-          show_on: ['homepage', 'shop'],
-          slider_group: 'group-1',
-          active: true,
-          sort_order: 3,
-        },
-        // Product ad example
-        {
-          id: '4',
-          title: 'Featured Product',
-          image_url: '/placeholders/placeholder-product.webp',
-          link: '/product/iphone-15-pro',
-          position: 'right',
-          show_on: ['homepage', 'shop'],
-          active: true,
-          sort_order: 4,
-          is_product_ad: true,
-          product_id: 'iphone-15-pro',
-          product_name: 'iPhone 15 Pro',
-          product_price: 1399.99,
-          product_discount_price: 1199.99,
-          add_to_cart_enabled: true,
-        },
-      ];
+      // Fetch ads from database
+      const { data, error } = await supabase
+        .from('sidebar_ads')
+        .select('*')
+        .eq('active', true)
+        .eq('position', position)
+        .order('sort_order', { ascending: true });
 
-      const grouped = groupAdsBySlider(mockAds);
+      if (error) {
+        console.error('Error fetching sidebar ads:', error);
+        // If table doesn't exist, return empty array
+        if (error.code === 'PGRST116' || error.message?.includes('does not exist')) {
+          setAdGroups([]);
+          return;
+        }
+        throw error;
+      }
+
+      // Filter ads by current page
+      // Only show on shop and product details pages
+      if (page !== 'shop' && page !== 'product') {
+        // Not a valid page for sidebar ads
+        setAdGroups([]);
+        return;
+      }
+
+      const filteredAds: SidebarAd[] = (data || [])
+        .filter((ad: any) => {
+          // Check if ad should show on this page
+          const showOn = Array.isArray(ad.show_on) ? ad.show_on : (ad.show_on ? [ad.show_on] : []);
+          // Only show ads that are configured for the current page
+          return showOn.includes(page);
+        })
+        .map((ad: any) => ({
+          id: ad.id,
+          title: ad.title || '',
+          image_url: ad.image_url || '',
+          link: ad.link || '',
+          position: ad.position || 'right',
+          show_on: Array.isArray(ad.show_on) ? ad.show_on : (ad.show_on ? [ad.show_on] : []),
+          slider_group: ad.slider_group || undefined,
+          active: ad.active !== false,
+          sort_order: ad.sort_order || 0,
+          // Product ad fields
+          is_product_ad: ad.is_product_ad || false,
+          product_id: ad.product_id || undefined,
+          product_name: ad.product_name || undefined,
+          product_price: ad.product_price || undefined,
+          product_discount_price: ad.product_discount_price || undefined,
+          add_to_cart_enabled: ad.add_to_cart_enabled || false,
+        }));
+
+      const grouped = groupAdsBySlider(filteredAds);
       setAdGroups(grouped);
     } catch (error) {
       console.error('Failed to load sidebar ads:', error);
+      setAdGroups([]);
     } finally {
       setIsLoading(false);
     }

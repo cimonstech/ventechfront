@@ -73,7 +73,15 @@ export default function VerifyEmailPage() {
       setResendCooldown(60); // 60 second cooldown
     } catch (error: any) {
       console.error('Resend error:', error);
+      // Handle rate limiting (429 error)
+      if (error.status === 429 || error.message?.includes('429') || error.message?.toLowerCase().includes('rate limit')) {
+        toast.error('Too many requests. Please wait a few minutes before requesting another email.', {
+          duration: 5000,
+        });
+        setResendCooldown(300); // 5 minute cooldown for rate limiting
+      } else {
       toast.error(error.message || 'Failed to resend email. Please try again.');
+      }
     } finally {
       setIsResending(false);
     }

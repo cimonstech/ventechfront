@@ -93,47 +93,22 @@ export function CategoryModal({ isOpen, onClose, category, onSuccess }: Category
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please upload an image file');
-      return;
-    }
-
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error('Image size should be less than 2MB');
-      return;
-    }
-
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('folder', 'categories');
-
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${apiUrl}/api/upload?folder=${encodeURIComponent('categories')}`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (data.success && data.url) {
-        console.log('Uploaded image URL:', data.url);
-        // Verify the URL is accessible before setting it
-        const testImg = new Image();
-        testImg.onload = () => {
-          setFormData((prev) => ({ ...prev, image_url: data.url }));
+      // Use centralized upload service that checks media library first
+      const { uploadImage } = await import('@/services/image-upload.service');
+      
+      const result = await uploadImage(file, 'categories', true);
+      
+      if (result.success && result.url) {
+        setFormData((prev) => ({ ...prev, image_url: result.url! }));
+        if (result.fromLibrary) {
+          toast.success('Image selected from media library');
+        } else {
           toast.success('Image uploaded successfully');
-        };
-        testImg.onerror = () => {
-          console.error('Image URL not accessible:', data.url);
-          toast.error('Image uploaded but URL is not accessible. Please enable R2 public access.');
-          // Still set the URL so user can see it
-          setFormData((prev) => ({ ...prev, image_url: data.url }));
-        };
-        testImg.src = data.url;
+        }
       } else {
-        throw new Error(data.error || 'Upload failed');
+        throw new Error(result.error || 'Upload failed');
       }
     } catch (error: any) {
       console.error('Upload error:', error);

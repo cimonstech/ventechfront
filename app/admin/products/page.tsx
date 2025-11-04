@@ -238,15 +238,6 @@ export default function AdminProductsPage() {
               >
                 Export {selectedProducts.length > 0 ? `(${selectedProducts.length})` : 'All'}
               </Button>
-              <Button 
-                variant="outline" 
-                size="sm"
-                icon={<Download size={16} />}
-                onClick={handleExportExample}
-                title="Export example template for product import"
-              >
-                Export Example
-              </Button>
             </div>
           </div>
         </div>

@@ -96,6 +96,8 @@ export const searchService = {
         // Transform products to flatten nested objects
         const transformedProducts = uniqueProducts.map(product => ({
           ...product,
+          // Map price field to original_price for Product interface compatibility
+          original_price: product.price || 0,
           category_name: product.category?.name || null,
           category_slug: product.category?.slug || null,
           brand_name: product.brand?.name || null,
@@ -158,6 +160,8 @@ export const searchService = {
       // Transform products to flatten nested objects
       const transformedProducts = (products || []).map(product => ({
         ...product,
+        // Map price field to original_price for Product interface compatibility
+        original_price: product.price || 0,
         category_name: product.category?.name || null,
         category_slug: product.category?.slug || null,
         brand_name: product.brand?.name || null,
@@ -220,6 +224,8 @@ export const searchService = {
         const p = product as any;
         return {
           ...product,
+          // Map price field to original_price for Product interface compatibility
+          original_price: p.price || 0,
           category_name: Array.isArray(p.category) ? null : p.category?.name || null,
           brand_name: Array.isArray(p.brand) ? null : p.brand?.name || null,
           // Remove nested objects
@@ -275,14 +281,19 @@ export const searchService = {
       );
 
       // Transform unique products to flatten nested objects
-      const transformedUniqueProducts = uniqueProducts.map(product => ({
-        ...product,
-        category_name: product.category?.name || null,
-        brand_name: product.brand?.name || null,
-        // Remove nested objects
-        category: undefined,
-        brand: undefined
-      }));
+      const transformedUniqueProducts = uniqueProducts.map(product => {
+        const p = product as any;
+        return {
+          ...product,
+          // Map price field to original_price for Product interface compatibility
+          original_price: p.price || 0,
+          category_name: Array.isArray(p.category) ? null : p.category?.name || null,
+          brand_name: Array.isArray(p.brand) ? null : p.brand?.name || null,
+          // Remove nested objects
+          category: undefined,
+          brand: undefined
+        };
+      });
 
       return {
         products: transformedUniqueProducts,

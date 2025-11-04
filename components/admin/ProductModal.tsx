@@ -207,37 +207,39 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
 
     setUploading(true);
     try {
-      const uploadPromises = Array.from(files).map(async (file) => {
-        if (!file.type.startsWith('image/')) {
-          throw new Error('Please upload image files only');
-        }
-        if (file.size > 2 * 1024 * 1024) {
-          throw new Error('Image size should be less than 2MB');
-        }
-
-        const formData = new FormData();
-        formData.append('file', file);
+      // Use centralized upload service that checks media library first
+      const { uploadImages } = await import('@/services/image-upload.service');
+      
+      const filesArray = Array.from(files);
+      const uploadResults = await uploadImages(filesArray, 'products', true);
+      
+      // Filter successful uploads
+      const successfulUploads = uploadResults.filter(r => r.success && r.url);
+      const failedUploads = uploadResults.filter(r => !r.success);
+      
+      if (failedUploads.length > 0) {
+        const errors = failedUploads.map(r => r.error).filter(Boolean);
+        toast.error(errors.join(', ') || 'Some uploads failed');
+      }
+      
+      if (successfulUploads.length > 0) {
+        const uploadedUrls = successfulUploads.map(r => r.url!);
+        const fromLibrary = successfulUploads.filter(r => r.fromLibrary).length;
         
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-        const response = await fetch(`${apiUrl}/api/upload?folder=${encodeURIComponent('products')}`, {
-          method: 'POST',
-          body: formData,
-        });
-
-        const data = await response.json();
-        if (!data.success || !data.url) {
-          throw new Error(data.error || 'Upload failed');
+        setFormData(prev => ({
+          ...prev,
+          images: [...prev.images, ...uploadedUrls],
+          thumbnail: prev.thumbnail || uploadedUrls[0],
+        }));
+        
+        if (fromLibrary > 0) {
+          toast.success(`${uploadedUrls.length} image(s) selected (${fromLibrary} from library)`);
+        } else {
+          toast.success(`${uploadedUrls.length} image(s) uploaded successfully`);
         }
-        return data.url;
-      });
-
-      const uploadedUrls = await Promise.all(uploadPromises);
-      setFormData(prev => ({
-        ...prev,
-        images: [...prev.images, ...uploadedUrls],
-        thumbnail: prev.thumbnail || uploadedUrls[0],
-      }));
-      toast.success(`${uploadedUrls.length} image(s) uploaded successfully`);
+      } else {
+        toast.error('No images were uploaded successfully');
+      }
     } catch (error: any) {
       console.error('Upload error:', error);
       toast.error(error.message || 'Failed to upload images');
@@ -275,6 +277,13 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
 
     if (!formData.name || !formData.slug || !formData.price) {
       toast.error('Please fill in all required fields');
+      return;
+    }
+
+    // Validate stock quantity is provided and is a valid number
+    const stockQuantity = parseInt(formData.stock_quantity);
+    if (!formData.stock_quantity || isNaN(stockQuantity) || stockQuantity < 0) {
+      toast.error('Please enter a valid stock quantity (must be 0 or greater)');
       return;
     }
 
@@ -602,14 +611,16 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-semibold text-[#1A1A1A] mb-2">
-                Stock Quantity
+                Stock Quantity <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
                 value={formData.stock_quantity}
                 onChange={(e) => setFormData({ ...formData, stock_quantity: e.target.value })}
-                placeholder="0"
+                placeholder="Enter stock quantity (required)"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
+                min="0"
+                required
               />
             </div>
 

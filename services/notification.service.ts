@@ -33,12 +33,43 @@ export const notificationService = {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // Check if it's a "table doesn't exist" error
+        const errorMessage = error.message || '';
+        const errorCode = (error as any).code || '';
+        
+        if (
+          errorCode === '42P01' || // Table doesn't exist
+          errorCode === 'PGRST116' ||
+          errorMessage.includes('does not exist') ||
+          errorMessage.includes('relation') ||
+          errorMessage.includes('not found')
+        ) {
+          // Table doesn't exist - silently fail (user needs to run SQL script)
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('Notifications table does not exist. Run create_notifications_table.sql in Supabase.');
+          }
+          return null;
+        }
+        throw error;
+      }
       return data;
     } catch (error) {
       // Silently handle notification errors - notifications are non-critical
       if (process.env.NODE_ENV === 'development') {
-        console.error('Error creating notification:', error);
+        const errorMessage = (error as any)?.message || JSON.stringify(error);
+        const errorCode = (error as any)?.code || '';
+        
+        // Only log if it's not a "table doesn't exist" error
+        if (
+          errorCode !== '42P01' &&
+          errorCode !== 'PGRST116' &&
+          !errorMessage.includes('does not exist') &&
+          !errorMessage.includes('relation') &&
+          !errorMessage.includes('not found')
+        ) {
+          console.error('Error creating notification:', error);
+        }
       }
       return null;
     }

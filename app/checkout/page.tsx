@@ -276,8 +276,36 @@ export default function CheckoutPage() {
         router.push(`/orders/${order.id}`);
       }
     } catch (error: any) {
-      console.error('Order error:', error);
-      toast.error(error.message || 'Failed to place order');
+      console.error('Order error:', {
+        error,
+        message: error?.message || 'Unknown error',
+        stack: error?.stack,
+        name: error?.name,
+        response: error?.response,
+        data: error?.data,
+        details: error?.details,
+        hint: error?.hint,
+        code: error?.code,
+        fullError: JSON.stringify(error, null, 2),
+      });
+      
+      // Extract error message from various possible locations
+      let errorMessage = 'Failed to place order';
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error?.data?.message) {
+        errorMessage = error.data.message;
+      } else if (error?.details) {
+        errorMessage = error.details;
+      } else if (error?.hint) {
+        errorMessage = error.hint;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setIsProcessing(false);
     }

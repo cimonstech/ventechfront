@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { CheckCircle, XCircle, Loader } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -17,18 +17,27 @@ export default function PaymentCallbackPage() {
   const dispatch = useAppDispatch();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Verifying payment...');
+  const hasProcessedRef = React.useRef(false);
 
   useEffect(() => {
+    // Prevent multiple executions
+    if (hasProcessedRef.current || status !== 'loading') {
+      return;
+    }
+
+    // Extract reference inside useEffect to avoid dependency issues
+    const reference = searchParams.get('reference');
+    
+    // Only run if we have a reference
+    if (!reference) {
+      setStatus('error');
+      setMessage('No payment reference found');
+      return;
+    }
+
     const handlePaymentCallback = async () => {
       try {
-        // Get reference from URL
-        const reference = searchParams.get('reference');
-
-        if (!reference) {
-          setStatus('error');
-          setMessage('No payment reference found');
-          return;
-        }
+        hasProcessedRef.current = true;
 
         // Verify payment with backend
         const verifyResult = await paymentService.verifyPayment(reference);
@@ -90,9 +99,9 @@ export default function PaymentCallbackPage() {
               setStatus('success');
               setMessage('Payment successful! Your order has been created.');
               
-              // Redirect to order page after 2 seconds
+              // Redirect to success page
               setTimeout(() => {
-                router.push(`/orders/${order.id}?payment=success&reference=${reference}`);
+                router.push(`/orders/success?order=${order.id}&reference=${reference}`);
               }, 2000);
             } catch (orderError: any) {
               console.error('Error creating order:', orderError);
@@ -115,7 +124,8 @@ export default function PaymentCallbackPage() {
     };
 
     handlePaymentCallback();
-  }, [searchParams, router, dispatch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">

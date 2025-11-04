@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import {
   Search,
   Filter,
@@ -12,10 +13,12 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
+import toast from 'react-hot-toast';
 
 interface Transaction {
   id: string;
   order_number: string;
+  order_id?: string;
   customer_name: string;
   customer_email: string;
   amount: number;
@@ -34,13 +37,57 @@ export default function TransactionsPage() {
   // Fetch real data from Supabase
   useEffect(() => {
     fetchTransactions();
-  }, []);
+  }, [statusFilter]);
 
   const fetchTransactions = async () => {
     try {
       setLoading(true);
       
-      // Fetch transactions from database
+      // Try backend API first (bypasses RLS)
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      try {
+        let apiUrl = `${API_URL}/api/transactions`;
+        if (statusFilter !== 'all') {
+          const dbStatus = statusFilter === 'completed' ? 'paid' : 
+                          statusFilter === 'pending' ? 'pending' : 
+                          statusFilter === 'failed' ? 'failed' : 
+                          statusFilter === 'refunded' ? 'refunded' : statusFilter;
+          apiUrl += `?status=${dbStatus}`;
+        }
+
+        const response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.data) {
+            const formattedTransactions: Transaction[] = (result.data || []).map((tx: any) => ({
+              id: tx.id,
+              order_number: tx.order?.order_number || tx.metadata?.order_number || 'N/A',
+              order_id: tx.order_id || tx.order?.id,
+              customer_name: tx.customer_name || tx.user 
+                ? `${tx.user?.first_name || ''} ${tx.user?.last_name || ''}`.trim() || tx.customer_email || 'Unknown'
+                : tx.customer_email || 'Guest',
+              customer_email: tx.customer_email || tx.user?.email || 'No email',
+              amount: typeof tx.amount === 'string' ? parseFloat(tx.amount) || 0 : (tx.amount || 0),
+              status: tx.payment_status === 'paid' ? 'completed' : tx.payment_status === 'pending' ? 'pending' : tx.payment_status === 'failed' ? 'failed' : 'refunded',
+              payment_method: tx.payment_method || 'paystack',
+              date: new Date(tx.paid_at || tx.created_at).toLocaleDateString(),
+              created_at: tx.created_at,
+            }));
+            setTransactions(formattedTransactions);
+            return;
+          }
+        }
+      } catch (apiError) {
+        console.warn('Backend API failed, trying Supabase:', apiError);
+      }
+
+      // Fallback: Fetch transactions from Supabase
       let query = supabase
         .from('transactions')
         .select(`
@@ -52,18 +99,32 @@ export default function TransactionsPage() {
 
       // Apply status filter
       if (statusFilter !== 'all') {
-        query = query.eq('payment_status', statusFilter);
+        // Map frontend status to database payment_status
+        const dbStatus = statusFilter === 'completed' ? 'paid' : 
+                        statusFilter === 'pending' ? 'pending' : 
+                        statusFilter === 'failed' ? 'failed' : 
+                        statusFilter === 'refunded' ? 'refunded' : statusFilter;
+        query = query.eq('payment_status', dbStatus);
       }
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching transactions:', error);
+        // Check if table doesn't exist
+        if (error.code === '42P01' || error.code === 'PGRST116' || error.message?.includes('does not exist')) {
+          console.error('Transactions table does not exist or RLS is blocking access');
+          toast.error('Transactions table not accessible. Please check database setup.');
+        }
+        throw error;
+      }
 
       // Format transactions for display
       const formattedTransactions: Transaction[] = (data || []).map((tx: any) => ({
         id: tx.id,
-        order_number: tx.order?.order_number || 'N/A',
-        customer_name: tx.user 
+        order_number: tx.order?.order_number || tx.metadata?.order_number || 'N/A',
+        order_id: tx.order_id || tx.order?.id,
+        customer_name: tx.metadata?.customer_name || tx.user 
           ? `${tx.user.first_name || ''} ${tx.user.last_name || ''}`.trim() || tx.customer_email || 'Unknown'
           : tx.customer_email || 'Guest',
         customer_email: tx.customer_email || tx.user?.email || 'No email',
@@ -78,6 +139,7 @@ export default function TransactionsPage() {
     } catch (error) {
       console.error('Error fetching transactions:', error);
       setTransactions([]);
+      toast.error('Failed to load transactions. Please check console for details.');
     } finally {
       setLoading(false);
     }
@@ -289,9 +351,15 @@ export default function TransactionsPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                        <Eye size={18} className="text-[#3A3A3A]" />
-                      </button>
+                      {transaction.order_id ? (
+                        <Link href={`/admin/orders/${transaction.order_id}`}>
+                          <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="View order details">
+                            <Eye size={18} className="text-[#3A3A3A]" />
+                          </button>
+                        </Link>
+                      ) : (
+                        <span className="text-gray-400 text-sm">No order</span>
+                      )}
                     </td>
                   </tr>
                 ))

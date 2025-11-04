@@ -47,9 +47,18 @@ export default function ForgotPasswordPage() {
       toast.success('Password reset email sent! Check your inbox.');
     } catch (error: any) {
       console.error('Password reset error:', error);
+      // Handle rate limiting (429 error)
+      if (error.status === 429 || error.message?.includes('429') || error.message?.toLowerCase().includes('rate limit')) {
+        const errorMessage = 'Too many requests. Please wait a few minutes before trying again.';
+        setError(errorMessage);
+        toast.error(errorMessage, {
+          duration: 5000,
+        });
+      } else {
       const errorMessage = error.message || 'Failed to send reset email. Please try again.';
       setError(errorMessage);
       toast.error(errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }

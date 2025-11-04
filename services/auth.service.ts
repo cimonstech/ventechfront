@@ -154,7 +154,7 @@ export const resendVerificationEmail = async (email: string): Promise<{ error: E
       type: 'signup',
       email: email,
       options: {
-        emailRedirectTo: `${window.location.origin}/verify-email`,
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     });
 
@@ -251,14 +251,26 @@ export const getUserProfile = async (userId?: string) => {
                   console.error('Error creating user profile (with name field):', createError2);
                   return null;
                 }
-                return newProfile2;
+                // Format the response to match User type
+                return {
+                  ...newProfile2,
+                  full_name: fullName,
+                  first_name: firstName,
+                  last_name: lastName,
+                };
               } else {
                 console.error('Error creating user profile:', createError);
                 return null;
               }
             }
 
-            return newProfile;
+            // Format the response to match User type
+            return {
+              ...newProfile,
+              full_name: fullName,
+              first_name: firstName,
+              last_name: lastName,
+            };
           } catch (insertError: any) {
             console.error('Error inserting user profile:', insertError);
             return null;
@@ -271,7 +283,17 @@ export const getUserProfile = async (userId?: string) => {
       return null;
     }
 
-    return data;
+    // Format the response to match User type - construct full_name from first_name + last_name
+    const firstName = data.first_name || '';
+    const lastName = data.last_name || '';
+    const fullName = `${firstName} ${lastName}`.trim() || data.full_name || data.name || data.email?.split('@')[0] || 'User';
+    
+    return {
+      ...data,
+      full_name: fullName,
+      first_name: firstName,
+      last_name: lastName,
+    };
   } catch (error: any) {
     // Only log actual errors, not "user not authenticated"
     if (error?.message && !error.message.includes('not authenticated')) {

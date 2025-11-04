@@ -99,20 +99,21 @@ export default function CustomersAnalyticsPage() {
         .sort((a, b) => b.spent - a.spent)
         .slice(0, 5);
 
-      // Calculate customer segments
-      const segments = {
-        vip: customerSpending[Object.keys(customerSpending).find(k => customerSpending[k].orders >= 10) || ''] || { count: 0 },
-        loyal: Object.values(customerSpending).filter(c => c.orders >= 5 && c.orders < 10).length,
-        regular: Object.values(customerSpending).filter(c => c.orders >= 2 && c.orders < 5).length,
-        new: Object.values(customerSpending).filter(c => c.orders === 1).length,
-      };
-
+      // Calculate customer segments - include all customers (even those without orders)
       const totalWithOrders = Object.keys(customerSpending).length;
+      const totalCustomersWithoutOrders = Math.max(0, totalCustomers - totalWithOrders);
+      
+      const vipCount = Object.values(customerSpending).filter(c => c.orders >= 10).length;
+      const loyalCount = Object.values(customerSpending).filter(c => c.orders >= 5 && c.orders < 10).length;
+      const regularCount = Object.values(customerSpending).filter(c => c.orders >= 2 && c.orders < 4).length;
+      const newCount = Object.values(customerSpending).filter(c => c.orders === 1).length;
+
       const customerSegments = [
-        { segment: 'VIP (10+ orders)', count: Object.values(customerSpending).filter(c => c.orders >= 10).length, percentage: totalWithOrders > 0 ? (Object.values(customerSpending).filter(c => c.orders >= 10).length / totalWithOrders) * 100 : 0 },
-        { segment: 'Loyal (5-9 orders)', count: segments.loyal, percentage: totalWithOrders > 0 ? (segments.loyal / totalWithOrders) * 100 : 0 },
-        { segment: 'Regular (2-4 orders)', count: segments.regular, percentage: totalWithOrders > 0 ? (segments.regular / totalWithOrders) * 100 : 0 },
-        { segment: 'New (1 order)', count: segments.new, percentage: totalWithOrders > 0 ? (segments.new / totalWithOrders) * 100 : 0 },
+        { segment: 'VIP (10+ orders)', count: vipCount, percentage: totalCustomers > 0 ? (vipCount / totalCustomers) * 100 : 0 },
+        { segment: 'Loyal (5-9 orders)', count: loyalCount, percentage: totalCustomers > 0 ? (loyalCount / totalCustomers) * 100 : 0 },
+        { segment: 'Regular (2-4 orders)', count: regularCount, percentage: totalCustomers > 0 ? (regularCount / totalCustomers) * 100 : 0 },
+        { segment: 'New (1 order)', count: newCount, percentage: totalCustomers > 0 ? (newCount / totalCustomers) * 100 : 0 },
+        { segment: 'No Orders Yet', count: totalCustomersWithoutOrders, percentage: totalCustomers > 0 ? (totalCustomersWithoutOrders / totalCustomers) * 100 : 0 },
       ];
 
       // Calculate returning rate

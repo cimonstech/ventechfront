@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Upload, Plus, Trash2, Eye, EyeOff, MoveUp, MoveDown } from 'lucide-react';
+import { Upload, Plus, Trash2, Eye, EyeOff, MoveUp, MoveDown, ImageIcon, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import toast from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
+import { MediaPicker } from '@/components/admin/MediaPicker';
 
 interface Banner {
   id: string;
@@ -15,13 +16,16 @@ interface Banner {
   button_text: string;
   display_order: number;
   active: boolean;
+  text_color?: string;
 }
 
 export default function BannersPage() {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [showMediaPicker, setShowMediaPicker] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -31,6 +35,7 @@ export default function BannersPage() {
     button_text: 'Shop Now',
     display_order: 1,
     active: true,
+    text_color: '#FFFFFF',
   });
 
   const fetchBanners = async () => {
@@ -72,6 +77,7 @@ export default function BannersPage() {
           button_text: b.button_text || 'Shop Now',
           display_order: b.position || b.order || b.display_order || 1,
           active: b.active !== false,
+          text_color: b.text_color || '#FFFFFF',
         }))
         .sort((a: any, b: any) => a.display_order - b.display_order);
 
@@ -99,44 +105,59 @@ export default function BannersPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file');
-      return;
-    }
-
-    // Validate file size (5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be less than 5MB');
-      return;
-    }
-
     setUploading(true);
-
     try {
-      const uploadFormData = new FormData();
-      uploadFormData.append('file', file);
-
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${apiUrl}/api/upload?folder=${encodeURIComponent('banners')}`, {
-        method: 'POST',
-        body: uploadFormData,
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setFormData({ ...formData, image_url: data.url });
-        toast.success('Image uploaded successfully!');
+      // Use centralized upload service that checks media library first
+      const { uploadImage } = await import('@/services/image-upload.service');
+      
+      const result = await uploadImage(file, 'banners', true);
+      
+      if (result.success && result.url) {
+        setFormData({ ...formData, image_url: result.url });
+        if (result.fromLibrary) {
+          toast.success('Image selected from media library');
+        } else {
+          toast.success('Image uploaded successfully!');
+        }
       } else {
-        toast.error(data.error || 'Upload failed');
+        throw new Error(result.error || 'Upload failed');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Upload error:', error);
-      toast.error('Failed to upload image');
+      toast.error(error.message || 'Failed to upload image');
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleEdit = (banner: Banner) => {
+    setEditingBanner(banner);
+    setFormData({
+      title: banner.title || '',
+      subtitle: banner.subtitle || '',
+      image_url: banner.image_url || '',
+      link_url: banner.link_url || '',
+      button_text: banner.button_text || 'Shop Now',
+      display_order: banner.display_order || 1,
+      active: banner.active !== false,
+      text_color: banner.text_color || '#FFFFFF',
+    });
+    setShowForm(true);
+  };
+
+  const handleCancel = () => {
+    setShowForm(false);
+    setEditingBanner(null);
+    setFormData({
+      title: '',
+      subtitle: '',
+      image_url: '',
+      link_url: '',
+      button_text: 'Shop Now',
+      display_order: banners.length + 1,
+      active: true,
+      text_color: '#FFFFFF',
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -147,55 +168,45 @@ export default function BannersPage() {
       return;
     }
 
-    if (!formData.title) {
-      toast.error('Please enter a title');
-      return;
-    }
-
     try {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
-        toast.error('Please login to create banners');
+        toast.error('Please login to manage banners');
         return;
       }
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${apiUrl}/api/banners`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          title: formData.title,
-          subtitle: formData.subtitle || null,
-          image_url: formData.image_url,
-          link: formData.link_url || null, // Use 'link' column (matches database schema)
-          button_text: formData.button_text || 'Shop Now',
-          order: formData.display_order || 0, // Use 'order' column (matches database schema)
-          active: formData.active !== false,
-        }),
-      });
+      const isEditing = !!editingBanner;
+      
+      const response = await fetch(
+        isEditing ? `${apiUrl}/api/banners/${editingBanner!.id}` : `${apiUrl}/api/banners`,
+        {
+          method: isEditing ? 'PUT' : 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            title: formData.title || null,
+            subtitle: formData.subtitle || null,
+            image_url: formData.image_url,
+            link: formData.link_url || null, // Use 'link' column (matches database schema)
+            button_text: formData.button_text || null,
+            order: formData.display_order || 0, // Use 'order' column (matches database schema)
+            active: formData.active !== false,
+            text_color: formData.text_color || '#FFFFFF',
+          }),
+        }
+      );
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Failed to create banner');
+        throw new Error(error.message || `Failed to ${isEditing ? 'update' : 'create'} banner`);
       }
 
-      toast.success('Banner added successfully!');
-      setShowForm(false);
-      
-      // Reset form
-      setFormData({
-        title: '',
-        subtitle: '',
-        image_url: '',
-        link_url: '',
-        button_text: 'Shop Now',
-        display_order: banners.length + 1,
-        active: true,
-      });
+      toast.success(`Banner ${isEditing ? 'updated' : 'added'} successfully!`);
+      handleCancel();
 
       // Refresh banners list
       fetchBanners();
@@ -290,16 +301,25 @@ export default function BannersPage() {
           <Button
             variant="primary"
             icon={<Plus size={20} />}
-            onClick={() => setShowForm(!showForm)}
+            onClick={() => {
+              if (showForm) {
+                handleCancel();
+              } else {
+                setShowForm(true);
+                setEditingBanner(null);
+              }
+            }}
           >
             {showForm ? 'Cancel' : 'Add New Banner'}
           </Button>
         </div>
 
-        {/* Add Banner Form */}
+        {/* Add/Edit Banner Form */}
         {showForm && (
           <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
-            <h2 className="text-xl font-bold text-[#1A1A1A] mb-6">Add New Hero Slider</h2>
+            <h2 className="text-xl font-bold text-[#1A1A1A] mb-6">
+              {editingBanner ? 'Edit Hero Slider' : 'Add New Hero Slider'}
+            </h2>
             
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Image Upload */}
@@ -307,51 +327,64 @@ export default function BannersPage() {
                 <label className="block text-sm font-semibold text-[#1A1A1A] mb-2">
                   Hero Image *
                 </label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-[#FF7A19] transition-colors">
-                  {formData.image_url ? (
-                    <div className="relative">
-                      <img
-                        src={formData.image_url}
-                        alt="Preview"
-                        className="max-h-64 mx-auto rounded-lg"
-                      />
-                      <button
+                {formData.image_url ? (
+                  <div className="relative">
+                    <img
+                      src={formData.image_url}
+                      alt="Preview"
+                      className="max-h-64 mx-auto rounded-lg border border-gray-300"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, image_url: '' })}
+                      className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full hover:bg-red-600"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex gap-3">
+                      <Button
                         type="button"
-                        onClick={() => setFormData({ ...formData, image_url: '' })}
-                        className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full hover:bg-red-600"
+                        variant="outline"
+                        icon={<ImageIcon size={18} />}
+                        onClick={() => setShowMediaPicker(true)}
                       >
-                        <Trash2 size={16} />
-                      </button>
+                        Select from R2/Media Library
+                      </Button>
+                      <div className="relative flex-1">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          disabled={uploading}
+                          className="hidden"
+                          id="banner-upload"
+                        />
+                        <label
+                          htmlFor="banner-upload"
+                          className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors w-full justify-center"
+                        >
+                          <Upload size={18} />
+                          {uploading ? 'Uploading...' : 'Upload from Local'}
+                        </label>
+                      </div>
                     </div>
-                  ) : (
-                    <div>
-                      <Upload className="mx-auto text-gray-400 mb-4" size={48} />
-                      <p className="text-[#3A3A3A] mb-2">
-                        {uploading ? 'Uploading...' : 'Click to upload or drag and drop'}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        JPEG, PNG, WEBP (max 5MB) - Recommended: 1920x600px
-                      </p>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        disabled={uploading}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      />
-                    </div>
-                  )}
-                </div>
+                    <p className="text-xs text-[#3A3A3A] text-center">
+                      Choose from media library or upload a new image. Recommended: 1920x600px, max 5MB
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Title */}
               <div>
                 <label className="block text-sm font-semibold text-[#1A1A1A] mb-2">
-                  Title *
+                  Title
                 </label>
                 <input
                   type="text"
-                  required
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   placeholder="e.g., iPhone 15 Pro Max Now Available"
@@ -401,6 +434,31 @@ export default function BannersPage() {
                 </div>
               </div>
 
+              {/* Text Color */}
+              <div>
+                <label className="block text-sm font-semibold text-[#1A1A1A] mb-2">
+                  Text Color
+                </label>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="color"
+                    value={formData.text_color}
+                    onChange={(e) => setFormData({ ...formData, text_color: e.target.value })}
+                    className="w-20 h-12 border border-gray-300 rounded-lg cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={formData.text_color}
+                    onChange={(e) => setFormData({ ...formData, text_color: e.target.value })}
+                    placeholder="#FFFFFF"
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
+                  />
+                </div>
+                <p className="text-xs text-[#3A3A3A] mt-1">
+                  Choose the color for title, subtitle, and button text
+                </p>
+              </div>
+
               {/* Display Order & Active */}
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
@@ -433,12 +491,12 @@ export default function BannersPage() {
               {/* Submit */}
               <div className="flex gap-4">
                 <Button type="submit" variant="primary" className="flex-1">
-                  Add Banner
+                  {editingBanner ? 'Update Banner' : 'Add Banner'}
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setShowForm(false)}
+                  onClick={handleCancel}
                   className="flex-1"
                 >
                   Cancel
@@ -487,6 +545,13 @@ export default function BannersPage() {
                     {/* Actions */}
                     <div className="flex flex-col gap-2">
                       <button
+                        onClick={() => handleEdit(banner)}
+                        className="p-2 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors"
+                        title="Edit Banner"
+                      >
+                        <Edit size={20} />
+                      </button>
+                      <button
                         onClick={() => toggleActive(banner.id)}
                         className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
                         title={banner.active ? 'Deactivate' : 'Activate'}
@@ -508,6 +573,18 @@ export default function BannersPage() {
           )}
         </div>
       </div>
+
+      {/* Media Picker */}
+      <MediaPicker
+        isOpen={showMediaPicker}
+        onClose={() => setShowMediaPicker(false)}
+        onSelect={(url) => {
+          setFormData(prev => ({ ...prev, image_url: url }));
+          setShowMediaPicker(false);
+          toast.success('Image selected from media library');
+        }}
+        folder="banners"
+      />
     </div>
   );
 }

@@ -59,6 +59,18 @@ export function ProductContent({ product }: ProductContentProps) {
     ? Math.round(((product.original_price - product.discount_price!) / product.original_price) * 100)
     : 0;
 
+  // Debug: Log price values to identify doubling issue
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Product price debug:', {
+      productId: product.id,
+      productName: product.name,
+      discount_price: product.discount_price,
+      original_price: product.original_price,
+      variantPrice,
+      finalPrice: (product.discount_price || product.original_price) + variantPrice,
+    });
+  }
+  
   const finalPrice = (product.discount_price || product.original_price) + variantPrice;
   const productImages = product.images && product.images.length > 0 ? product.images : [product.thumbnail || '/placeholders/placeholder-product.webp'];
 

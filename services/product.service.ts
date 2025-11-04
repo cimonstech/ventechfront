@@ -123,7 +123,8 @@ export const getProducts = async (params: GetProductsParams = {}): Promise<Produ
       console.log('Fetched products with simple relations:', productsOnly?.length || 0);
       return (productsOnly || []).map((p: any) => ({
         ...p,
-        original_price: p.price || p.original_price || 0,
+        // Always use 'price' field from DB as original_price (source of truth)
+        original_price: p.price || 0,
         category_name: p.categories?.name || p.category_name || null,
         category_slug: p.categories?.slug || p.category_slug || null,
         brand: p.brands?.name || p.brand || '',
@@ -134,7 +135,9 @@ export const getProducts = async (params: GetProductsParams = {}): Promise<Produ
     // Transform products to ensure proper structure
     const transformedProducts = (data || []).map((product: any) => ({
       ...product,
-      original_price: product.price || product.original_price || 0,
+      // Always use 'price' field from DB as original_price (source of truth)
+      // Ignore product.original_price if it exists (it might be stale or wrong)
+      original_price: product.price || 0,
       category_name: product.categories?.name || product.category_name || null,
       category_slug: product.categories?.slug || product.category_slug || null,
       brand: product.brands?.name || product.brand || '',
@@ -247,8 +250,11 @@ export const getProductBySlug = async (slug: string): Promise<Product | null> =>
       category_id: data.category_id,
       brand: data.brands?.name || '',
       brand_id: data.brand_id || null,
-      original_price: data.price,
-      discount_price: data.discount_price,
+      // Always use 'price' field from DB as original_price
+      // The 'price' column is the source of truth (updated when products are saved)
+      // Ignore data.original_price if it exists (it might be stale or wrong)
+      original_price: data.price || 0,
+      discount_price: data.discount_price || null,
       in_stock: data.in_stock,
       stock_quantity: data.stock_quantity || 0,
       images: data.images || [],

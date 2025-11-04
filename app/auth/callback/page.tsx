@@ -13,43 +13,13 @@ export default function AuthCallbackPage() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Verifying your email...');
 
-  useEffect(() => {
-    const handleCallback = async () => {
-      try {
-        // Get the code from the URL
-        const code = searchParams.get('code');
-        const error = searchParams.get('error');
-        const error_description = searchParams.get('error_description');
-
-        if (error) {
-          setStatus('error');
-          setMessage(error_description || 'Verification failed');
-          return;
-        }
-
-        if (!code) {
-          setStatus('error');
-          setMessage('No verification code found');
-          return;
-        }
-
-        // Exchange the code for a session
-        const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-
-        if (exchangeError) {
-          console.error('Exchange error:', exchangeError);
-          setStatus('error');
-          setMessage(exchangeError.message || 'Failed to verify email');
-          return;
-        }
-
-        if (data.session && data.user) {
-          // Ensure user profile exists in public.users
+  // Helper function to handle user profile creation
+  const handleUserProfile = async (user: any) => {
           try {
             const { data: profile, error: profileError } = await supabase
               .from('users')
               .select('*')
-              .eq('id', data.user.id)
+        .eq('id', user.id)
               .maybeSingle();
 
             if (profileError && profileError.code !== 'PGRST116') {
@@ -59,19 +29,18 @@ export default function AuthCallbackPage() {
             // Create profile if it doesn't exist
             if (!profile) {
               // Build profile data - handle both name and first_name/last_name schemas
-              const firstName = data.user.user_metadata?.first_name || data.user.user_metadata?.firstName || '';
-              const lastName = data.user.user_metadata?.last_name || data.user.user_metadata?.lastName || '';
-              const fullName = `${firstName} ${lastName}`.trim() || data.user.email?.split('@')[0] || 'User';
+        const firstName = user.user_metadata?.first_name || user.user_metadata?.firstName || '';
+        const lastName = user.user_metadata?.last_name || user.user_metadata?.lastName || '';
+        const fullName = `${firstName} ${lastName}`.trim() || user.email?.split('@')[0] || 'User';
               
               const profileData: any = {
-                id: data.user.id,
-                email: data.user.email || '',
-                phone: data.user.user_metadata?.phone || data.user.phone || null,
+          id: user.id,
+          email: user.email || '',
+          phone: user.user_metadata?.phone || user.phone || null,
                 role: 'customer',
               };
 
               // Try to use first_name/last_name if columns exist, otherwise use name
-              // We'll try with first_name/last_name first
               try {
                 const { data: newProfile, error: createError } = await supabase
                   .from('users')
@@ -113,20 +82,94 @@ export default function AuthCallbackPage() {
           } catch (error) {
             console.error('Error ensuring user profile exists:', error);
           }
+  };
 
+  useEffect(() => {
+    const handleCallback = async () => {
+      try {
+        // Get the code from the URL (check both query params and hash)
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const code = searchParams.get('code') || hashParams.get('code');
+        const type = searchParams.get('type') || hashParams.get('type');
+        const error = searchParams.get('error') || hashParams.get('error');
+        const error_description = searchParams.get('error_description') || hashParams.get('error_description');
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+
+        if (error) {
+          setStatus('error');
+          setMessage(error_description || 'Authentication failed');
+          return;
+        }
+
+        // If we have tokens in the hash, set the session directly (password reset flow)
+        if (accessToken && refreshToken) {
+          const { data: { session }, error: sessionError } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (sessionError) {
+            console.error('Session error:', sessionError);
+            setStatus('error');
+            setMessage(sessionError.message || 'Failed to authenticate');
+            return;
+          }
+
+          if (session && session.user) {
+            // If it's a password reset, redirect to reset password page
+            if (type === 'recovery') {
+              router.push('/reset-password');
+              return;
+            }
+
+            // Otherwise, proceed with email verification flow
+            await handleUserProfile(session.user);
           setStatus('success');
           setMessage('Email verified successfully!');
-          
-          // Clear stored email from localStorage
+            localStorage.removeItem('pendingVerificationEmail');
+            setTimeout(() => {
+              router.push('/');
+            }, 2000);
+            return;
+          }
+        }
+
+        // If we have a code, exchange it for a session
+        if (code) {
+          const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+
+          if (exchangeError) {
+            console.error('Exchange error:', exchangeError);
+            setStatus('error');
+            setMessage(exchangeError.message || 'Failed to verify email');
+            return;
+          }
+
+          if (data.session && data.user) {
+            // If it's a password reset, redirect to reset password page
+            if (type === 'recovery') {
+              router.push('/reset-password');
+              return;
+            }
+
+            // Otherwise, proceed with email verification flow
+            await handleUserProfile(data.user);
+            setStatus('success');
+            setMessage('Email verified successfully!');
           localStorage.removeItem('pendingVerificationEmail');
-          
-          // Redirect to home after 2 seconds
           setTimeout(() => {
             router.push('/');
           }, 2000);
-        } else {
+            return;
+          }
+        }
+
+        // No code or tokens found
+        if (!code && !accessToken) {
           setStatus('error');
-          setMessage('Verification failed. Please try again.');
+          setMessage('No verification code found');
+          return;
         }
       } catch (error: any) {
         console.error('Callback error:', error);
@@ -192,4 +235,3 @@ export default function AuthCallbackPage() {
     </div>
   );
 }
-

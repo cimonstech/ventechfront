@@ -61,6 +61,20 @@ export function ReduxProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, session?.user?.id);
       
+      // Handle INITIAL_SESSION - this happens on page refresh
+      if (event === 'INITIAL_SESSION' && session?.user) {
+        // Initial session load - fetch user profile
+        const profile = await getUserProfile(session.user.id);
+        if (profile) {
+          store.dispatch(setUser(profile));
+        } else {
+          // Session exists but profile fetch failed - clear state
+          store.dispatch(setUser(null));
+        }
+        store.dispatch(setLoading(false));
+        return;
+      }
+      
       if (event === 'SIGNED_IN' && session?.user) {
         // User signed in - fetch their profile
         const profile = await getUserProfile(session.user.id);
@@ -72,6 +86,12 @@ export function ReduxProvider({ children }: { children: React.ReactNode }) {
         store.dispatch(setUser(null));
       } else if (event === 'TOKEN_REFRESHED' && session?.user) {
         // Token refreshed - ensure user is still set
+        const profile = await getUserProfile(session.user.id);
+        if (profile) {
+          store.dispatch(setUser(profile));
+        }
+      } else if (event === 'USER_UPDATED' && session?.user) {
+        // User updated - refresh profile
         const profile = await getUserProfile(session.user.id);
         if (profile) {
           store.dispatch(setUser(profile));

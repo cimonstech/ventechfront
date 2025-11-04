@@ -14,7 +14,7 @@ interface HeroSliderProps {
 
 export const HeroSlider: React.FC<HeroSliderProps> = ({
   banners,
-  autoPlayInterval = 5000,
+  autoPlayInterval = 4000,
 }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
 
@@ -69,25 +69,36 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
           <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/30 to-transparent" />
 
           {/* Content */}
-          <div className="relative h-full container mx-auto px-4 flex items-center">
-            <div className="max-w-2xl text-white">
+          <div className="relative h-full container mx-auto px-4 flex items-center justify-center">
+            <div className="max-w-2xl text-center">
               {banner.subtitle && (
-                <p className="text-sm md:text-base font-medium text-blue-300 mb-2 uppercase tracking-wide">
+                <p 
+                  className="text-sm md:text-base font-medium mb-2 uppercase tracking-wide"
+                  style={{ color: banner.text_color || '#FFFFFF' }}
+                >
                   {banner.subtitle}
                 </p>
               )}
-              <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-4">
-                {banner.title}
-              </h2>
+              {banner.title && (
+                <h2 
+                  className="text-3xl md:text-5xl lg:text-6xl font-bold mb-4"
+                  style={{ color: banner.text_color || '#FFFFFF' }}
+                >
+                  {banner.title}
+                </h2>
+              )}
               {banner.description && (
-                <p className="text-base md:text-xl text-gray-200 mb-6 max-w-xl">
+                <p 
+                  className="text-base md:text-xl mb-6 max-w-xl mx-auto"
+                  style={{ color: banner.text_color || '#FFFFFF' }}
+                >
                   {banner.description}
                 </p>
               )}
-              {banner.link_url && (
+              {banner.link_url && banner.link_text && (
                 <Link href={banner.link_url}>
                   <Button variant="primary" size="lg">
-                    {banner.link_text || 'Shop Now'}
+                    {banner.link_text}
                   </Button>
                 </Link>
               )}

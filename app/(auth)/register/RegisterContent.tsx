@@ -85,11 +85,28 @@ export function RegisterContent() {
       });
 
       if (error) {
-        toast.error(error.message || 'Failed to create account. Please try again.');
+        // Handle rate limiting (429 error)
+        if (error.status === 429 || error.message?.includes('429') || error.message?.toLowerCase().includes('rate limit')) {
+          toast.error('Too many requests. Please wait a few minutes before trying again.', {
+            duration: 5000,
+          });
+        } else if (error.message?.includes('already registered') || error.message?.includes('already exists')) {
+          toast.error('This email is already registered. Please sign in instead.', {
+            duration: 5000,
+          });
+        } else {
+          toast.error(error.message || 'Failed to create account. Please try again.');
+        }
         return;
       }
 
       if (user) {
+        // Store email for verification page before clearing form
+        const userEmail = formData.email;
+        if (userEmail) {
+          localStorage.setItem('pendingVerificationEmail', userEmail);
+        }
+        
         toast.success('Account created successfully! Please check your email to verify your account.');
         // Clear form
         setFormData({
@@ -100,9 +117,9 @@ export function RegisterContent() {
           password: '',
           confirmPassword: '',
         });
-        // Redirect to login or home after a short delay
+        // Redirect to verification page
         setTimeout(() => {
-          router.push('/login?registered=true');
+          router.push(`/verify-email${userEmail ? `?email=${encodeURIComponent(userEmail)}` : ''}`);
         }, 2000);
       }
     } catch (error: any) {

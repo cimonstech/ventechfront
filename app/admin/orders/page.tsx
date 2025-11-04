@@ -22,6 +22,7 @@ import { useAppSelector } from '@/store';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 import { CSVExporter, OrderColumns } from '@/lib/csvExport';
+import { OrderDetailModal } from '@/components/admin/OrderDetailModal';
 
 interface Order {
   id: string;
@@ -43,6 +44,8 @@ export default function AdminOrdersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated && user?.role !== 'admin') {
@@ -366,12 +369,17 @@ export default function AdminOrdersPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                          <Link href={`/admin/orders/${order.id}`}>
-                            <Button variant="ghost" size="sm">
-                              <Eye size={16} />
-                              View
-                            </Button>
-                          </Link>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => {
+                              setSelectedOrderId(order.id);
+                              setIsModalOpen(true);
+                            }}
+                          >
+                            <Eye size={16} />
+                            View
+                          </Button>
                           
                           <Button
                             variant="ghost"
@@ -405,6 +413,21 @@ export default function AdminOrdersPage() {
           )}
         </div>
       </div>
+
+      {/* Order Detail Modal */}
+      {selectedOrderId && (
+        <OrderDetailModal
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setSelectedOrderId(null);
+          }}
+          orderId={selectedOrderId}
+          onStatusUpdate={() => {
+            fetchOrders();
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { signOut } from '@/services/auth.service';
+import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 
 interface MenuItem {
@@ -45,11 +46,70 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['products', 'analytics']);
   const [mounted, setMounted] = useState(false);
+  const [pendingOrdersCount, setPendingOrdersCount] = useState<number | undefined>(undefined);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     // Mark as mounted to prevent hydration mismatch
     setMounted(true);
   }, []);
+
+  // Fetch badge counts
+  useEffect(() => {
+    if (!isAuthenticated || !user || user.role !== 'admin') return;
+
+    const fetchBadgeCounts = async () => {
+      try {
+        // Fetch pending orders count
+        const { count: pendingCount, error: ordersError } = await supabase
+          .from('orders')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'pending');
+
+        if (!ordersError) {
+          setPendingOrdersCount(pendingCount || 0);
+        }
+
+        // Fetch unread notifications count
+        // Handle gracefully if notifications table doesn't exist
+        try {
+          const { count: unreadCount, error: notificationsError } = await supabase
+            .from('notifications')
+            .select('*', { count: 'exact', head: true })
+            .eq('is_read', false);
+
+          if (!notificationsError) {
+            setUnreadNotificationsCount(unreadCount || 0);
+          } else {
+            // If table doesn't exist, set to 0 and don't show badge
+            const errorCode = notificationsError.code || '';
+            const errorMessage = notificationsError.message || '';
+            
+            if (
+              errorCode === '42P01' || // Table doesn't exist
+              errorCode === 'PGRST116' ||
+              errorMessage.includes('does not exist') ||
+              errorMessage.includes('relation') ||
+              errorMessage.includes('not found')
+            ) {
+              setUnreadNotificationsCount(0); // Set to 0 so badge doesn't show
+            }
+          }
+        } catch (err) {
+          // Table doesn't exist or other error - set to 0
+          setUnreadNotificationsCount(0);
+        }
+      } catch (error) {
+        console.error('Error fetching badge counts:', error);
+      }
+    };
+
+    fetchBadgeCounts();
+    
+    // Refresh counts every 30 seconds
+    const interval = setInterval(fetchBadgeCounts, 30000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, user]);
 
   useEffect(() => {
     // Wait for component to mount and auth state to finish loading before checking
@@ -57,8 +117,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       return; // Still mounting or loading auth state, don't redirect yet
     }
 
-    // Small delay to ensure auth state is fully settled
+    // Longer delay to ensure auth state is fully settled after INITIAL_SESSION
+    // INITIAL_SESSION can cause temporary state where isLoading is false but user isn't loaded yet
     const timeoutId = setTimeout(() => {
+      // Double-check: Wait a bit more if user is still null but we're not loading
+      if (!user && !isLoading) {
+        // Check session directly from Supabase as a fallback
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (!session) {
+            // No session - redirect to login
+            if (pathname !== '/login' && pathname !== '/register') {
+              router.replace('/login');
+            }
+          }
+        });
+        return;
+      }
+      
       // After loading is complete, check authentication status
       // Only redirect if we're absolutely certain the user is not authenticated or not admin
       if (!isAuthenticated || !user) {
@@ -80,7 +155,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       }
       
       // User is authenticated and is admin - allow access
-    }, 100);
+    }, 500); // Increased delay to handle INITIAL_SESSION
 
     return () => clearTimeout(timeoutId);
   }, [isAuthenticated, user, isLoading, mounted, router, pathname]);
@@ -123,7 +198,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       icon: ShoppingBag,
       label: 'Orders',
       href: '/admin/orders',
-      badge: 5, // TODO: Get from API
+      badge: pendingOrdersCount !== undefined ? (pendingOrdersCount > 0 ? pendingOrdersCount : undefined) : undefined,
     },
     {
       icon: Package,
@@ -177,7 +252,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       icon: Bell,
       label: 'Notifications',
       href: '/admin/notifications',
-      badge: 3, // TODO: Get from API
+      badge: unreadNotificationsCount !== undefined ? (unreadNotificationsCount > 0 ? unreadNotificationsCount : undefined) : undefined,
     },
     {
       icon: Settings,

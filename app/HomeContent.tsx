@@ -78,11 +78,12 @@ export function HomeContent() {
             description: b.description || undefined,
             image_url: b.image_url || '',
             link_url: b.link_url || b.link || undefined,
-            link_text: b.button_text || b.link_text || 'Shop Now',
+            link_text: b.button_text || b.link_text || undefined,
             display_order: b.order || b.sort_order || b.display_order || 0,
             active: b.active !== false,
             type: (b.type || 'hero') as 'hero',
             position: b.order || b.sort_order || b.display_order || 0,
+            text_color: b.text_color || '#FFFFFF',
             created_at: b.created_at || new Date().toISOString(),
             updated_at: b.updated_at || new Date().toISOString(),
           }))
