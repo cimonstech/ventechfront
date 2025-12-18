@@ -14,8 +14,9 @@ interface OrderItem {
   product_image: string;
   quantity: number;
   unit_price: number;
-  total_price: number;
+  subtotal: number;
   selected_variants?: any;
+  is_pre_order?: boolean;
 }
 
 interface Order {
@@ -38,6 +39,9 @@ interface Order {
   customer_name?: string;
   customer_email?: string;
   items?: OrderItem[];
+  is_pre_order?: boolean;
+  pre_order_shipping_option?: string;
+  estimated_arrival_date?: string;
 }
 
 interface OrderDetailModalProps {
@@ -78,6 +82,11 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
             const orderData = result.data;
             const orderItems = orderData.order_items || orderData.items || [];
             
+            // Extract is_pre_order from shipping_address if it exists there
+            const isPreOrder = orderData.is_pre_order || orderData.shipping_address?.is_pre_order || false;
+            const preOrderShippingOption = orderData.pre_order_shipping_option || orderData.shipping_address?.pre_order_shipping_option || null;
+            const estimatedArrivalDate = orderData.estimated_arrival_date || orderData.shipping_address?.estimated_arrival_date || null;
+
             const formattedOrder: Order = {
               ...orderData,
               items: orderItems,
@@ -85,6 +94,9 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
                 ? `${orderData.user.first_name || ''} ${orderData.user.last_name || ''}`.trim() || 'Customer'
                 : (orderData.shipping_address?.full_name || 'Guest Customer'),
               customer_email: orderData.user?.email || orderData.shipping_address?.email || 'No email',
+              is_pre_order: isPreOrder,
+              pre_order_shipping_option: preOrderShippingOption,
+              estimated_arrival_date: estimatedArrivalDate,
             };
             
             console.log('Fetched order via API:', {
@@ -162,6 +174,11 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
         ? items 
         : (orderData.order_items || orderData.items || []);
       
+      // Extract is_pre_order from shipping_address if it exists there
+      const isPreOrder = orderData.is_pre_order || orderData.shipping_address?.is_pre_order || false;
+      const preOrderShippingOption = orderData.pre_order_shipping_option || orderData.shipping_address?.pre_order_shipping_option || null;
+      const estimatedArrivalDate = orderData.estimated_arrival_date || orderData.shipping_address?.estimated_arrival_date || null;
+
       const formattedOrder: Order = {
         ...orderData,
         items: orderItems,
@@ -169,6 +186,9 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
           ? `${orderData.user.first_name || ''} ${orderData.user.last_name || ''}`.trim() || 'Customer'
           : (orderData.shipping_address?.full_name || 'Guest Customer'),
         customer_email: orderData.user?.email || orderData.shipping_address?.email || 'No email',
+        is_pre_order: isPreOrder,
+        pre_order_shipping_option: preOrderShippingOption,
+        estimated_arrival_date: estimatedArrivalDate,
       };
       
       // Debug: Log what we got
@@ -178,6 +198,8 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
         items: orderItems,
         orderItemsFromData: orderData.order_items?.length || 0,
         itemsFromData: orderData.items?.length || 0,
+        is_pre_order: isPreOrder,
+        shipping_address: orderData.shipping_address,
       });
 
       setOrder(formattedOrder);
@@ -289,7 +311,14 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
         {/* Header */}
         <div className="p-6 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white z-10">
           <div>
-            <h2 className="text-2xl font-bold text-[#1A1A1A]">Order Details</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-bold text-[#1A1A1A]">Order Details</h2>
+              {order?.is_pre_order && (
+                <span className="px-3 py-1 bg-black text-white text-xs font-semibold rounded-full">
+                  PRE-ORDER
+                </span>
+              )}
+            </div>
             {order && (
               <p className="text-sm text-[#3A3A3A] mt-1">Order #{order.order_number}</p>
             )}
@@ -368,12 +397,51 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
                 </div>
               </div>
 
+              {/* Pre-Order Shipping Info */}
+              {order.is_pre_order && (
+                <div className="bg-orange-50 border-l-4 border-[#FF7A19] rounded-lg p-4">
+                  <h3 className="font-semibold text-[#1A1A1A] mb-3 flex items-center gap-2">
+                    <Package size={18} className="text-[#FF7A19]" />
+                    Pre-Order Shipping Details
+                  </h3>
+                  <div className="space-y-2 text-sm">
+                    {order.pre_order_shipping_option && (
+                      <div className="flex justify-between">
+                        <span className="text-[#3A3A3A]">Shipping Method:</span>
+                        <span className="font-medium text-[#1A1A1A] capitalize">
+                          {order.pre_order_shipping_option.replace('_', ' ')}
+                        </span>
+                      </div>
+                    )}
+                    {order.estimated_arrival_date && (
+                      <div className="flex justify-between">
+                        <span className="text-[#3A3A3A]">Estimated Arrival:</span>
+                        <span className="font-medium text-[#1A1A1A]">
+                          {new Date(order.estimated_arrival_date).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </span>
+                      </div>
+                    )}
+                    <div className="mt-3 pt-3 border-t border-orange-200">
+                      <p className="text-xs text-orange-800">
+                        <strong>Note:</strong> Full payment is required upfront for pre-orders. Items will be shipped according to the selected shipping method.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Shipping Address */}
               {order.shipping_address && (
                 <div className="bg-gray-50 rounded-lg p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <MapPin size={18} className="text-[#FF7A19]" />
-                    <h3 className="font-semibold text-[#1A1A1A]">Shipping Address</h3>
+                    <h3 className="font-semibold text-[#1A1A1A]">
+                      {order.is_pre_order ? 'Delivery Address' : 'Shipping Address'}
+                    </h3>
                   </div>
                   <div className="text-sm text-[#1A1A1A]">
                     {order.shipping_address.full_name && <p>{order.shipping_address.full_name}</p>}
@@ -415,8 +483,15 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
                                   alt={item.product_name}
                                   className="w-12 h-12 object-cover rounded"
                                 />
-                                <div>
-                                  <p className="text-sm font-medium text-[#1A1A1A]">{item.product_name}</p>
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-sm font-medium text-[#1A1A1A]">{item.product_name}</p>
+                                    {(item.is_pre_order || order.is_pre_order) && (
+                                      <span className="px-2 py-0.5 bg-black text-white text-xs font-semibold rounded">
+                                        Pre-Order
+                                      </span>
+                                    )}
+                                  </div>
                                   {item.selected_variants && (
                                     <p className="text-xs text-[#3A3A3A]">
                                       {Object.entries(item.selected_variants).map(([key, value]) => `${key}: ${value}`).join(', ')}
@@ -430,7 +505,7 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
                               GHS {(item.unit_price || 0).toFixed(2)}
                             </td>
                             <td className="px-4 py-3 text-sm text-right font-semibold text-[#1A1A1A]">
-                              GHS {((item.total_price || item.subtotal || (item.unit_price || 0) * (item.quantity || 0))).toFixed(2)}
+                              GHS {(item.subtotal || (item.unit_price || 0) * (item.quantity || 0)).toFixed(2)}
                             </td>
                           </tr>
                         ))
@@ -462,7 +537,9 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
                   )}
                   {order.shipping_fee > 0 && (
                     <div className="flex justify-between">
-                      <span className="text-[#3A3A3A]">Shipping:</span>
+                      <span className="text-[#3A3A3A]">
+                        {order.is_pre_order ? 'Pre-Order Shipping:' : 'Shipping:'}
+                      </span>
                       <span className="font-medium text-[#1A1A1A]">GHS {order.shipping_fee.toFixed(2)}</span>
                     </div>
                   )}

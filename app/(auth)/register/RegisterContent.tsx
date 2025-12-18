@@ -69,6 +69,11 @@ export function RegisterContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Prevent multiple rapid submissions
+    if (isLoading) {
+      return;
+    }
+
     if (!validateForm()) {
       return;
     }
@@ -85,17 +90,61 @@ export function RegisterContent() {
       });
 
       if (error) {
-        // Handle rate limiting (429 error)
-        if (error.status === 429 || error.message?.includes('429') || error.message?.toLowerCase().includes('rate limit')) {
-          toast.error('Too many requests. Please wait a few minutes before trying again.', {
-            duration: 5000,
+        // Handle rate limiting (429 error) - check multiple error properties
+        const errorWithStatus = error as any;
+        const statusCode = errorWithStatus.status || errorWithStatus.statusCode || errorWithStatus.code;
+        const errorCode = errorWithStatus.code || '';
+        const errorMessage = error.message || errorWithStatus.message || '';
+        const errorString = JSON.stringify(error).toLowerCase();
+        
+        // Check for email sending rate limit (specific Supabase error)
+        if (
+          errorCode === 'over_email_send_rate_limit' ||
+          errorMessage.toLowerCase().includes('email rate limit') ||
+          errorMessage.toLowerCase().includes('email send rate limit')
+        ) {
+          // Still allow account creation, but show warning about email delay
+          // The account is created, just the verification email is delayed
+          toast.error(
+            'Your account was created successfully, but verification email sending is temporarily limited. We\'ll send your verification email shortly. Please check your inbox in a few minutes, or contact support if you need immediate assistance.',
+            {
+              duration: 12000,
+            }
+          );
+          console.error('Email rate limit error (account created but email delayed):', error);
+          
+          // Still proceed to show success - account is created
+          // The user can still sign in if email verification is not strictly required
+          const userEmail = formData.email;
+          if (userEmail) {
+            localStorage.setItem('pendingVerificationEmail', userEmail);
+          }
+          setTimeout(() => {
+            router.push(`/verify-email${userEmail ? `?email=${encodeURIComponent(userEmail)}` : ''}`);
+          }, 2000);
+          return;
+        }
+        // Check for general 429 rate limit errors
+        else if (
+          statusCode === 429 || 
+          errorMessage.includes('429') || 
+          errorMessage.toLowerCase().includes('rate limit') ||
+          errorMessage.toLowerCase().includes('too many requests') ||
+          errorString.includes('429') ||
+          errorString.includes('rate limit') ||
+          errorString.includes('too many requests')
+        ) {
+          toast.error('Too many signup attempts. Please wait 5-10 minutes before trying again.', {
+            duration: 8000,
           });
-        } else if (error.message?.includes('already registered') || error.message?.includes('already exists')) {
+          console.error('Rate limit error:', error);
+        } else if (errorMessage.includes('already registered') || errorMessage.includes('already exists') || errorMessage.includes('User already registered')) {
           toast.error('This email is already registered. Please sign in instead.', {
             duration: 5000,
           });
         } else {
-          toast.error(error.message || 'Failed to create account. Please try again.');
+          toast.error(errorMessage || 'Failed to create account. Please try again.');
+          console.error('Registration error:', error);
         }
         return;
       }

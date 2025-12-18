@@ -21,6 +21,8 @@ export interface Product {
   variants: ProductVariant[];
   created_at: string;
   updated_at: string;
+  is_pre_order?: boolean; // Pre-order product flag
+  pre_order_available?: boolean; // Pre-order availability
   // Flattened properties for search results
   category_name?: string | null;
   category_slug?: string | null;
@@ -88,6 +90,8 @@ export interface CartItem extends Product {
     [key: string]: ProductVariant;
   };
   subtotal: number;
+  is_pre_order?: boolean;
+  pre_order_shipping_option?: 'air_cargo' | 'ship_cargo';
 }
 
 export interface Wishlist {

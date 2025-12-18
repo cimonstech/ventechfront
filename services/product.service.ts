@@ -21,6 +21,8 @@ export const getProducts = async (params: GetProductsParams = {}): Promise<Produ
       .from('products')
       .select(`
         *,
+        rating,
+        review_count,
         categories!products_category_id_fkey(id, name, slug),
         brands!products_brand_id_fkey(id, name, slug)
       `);
@@ -43,6 +45,10 @@ export const getProducts = async (params: GetProductsParams = {}): Promise<Produ
     }
     if (params.featured !== undefined) {
       query = query.eq('is_featured', params.featured);
+      // If fetching featured products, exclude pre-orders (pre-orders cannot be featured)
+      if (params.featured === true) {
+        query = query.eq('is_pre_order', false);
+      }
     }
 
     // Apply sorting
@@ -82,6 +88,8 @@ export const getProducts = async (params: GetProductsParams = {}): Promise<Produ
         .from('products')
         .select(`
           *,
+          rating,
+          review_count,
           categories:category_id(id, name, slug),
           brands:brand_id(id, name, slug)
         `);
@@ -89,6 +97,10 @@ export const getProducts = async (params: GetProductsParams = {}): Promise<Produ
       // Apply featured filter if provided
       if (params.featured !== undefined) {
         fallbackQuery = fallbackQuery.eq('is_featured', params.featured);
+        // If fetching featured products, exclude pre-orders (pre-orders cannot be featured)
+        if (params.featured === true) {
+          fallbackQuery = fallbackQuery.eq('is_pre_order', false);
+        }
       }
       
       const { data: productsOnly, error: fallbackError } = await fallbackQuery
@@ -100,28 +112,65 @@ export const getProducts = async (params: GetProductsParams = {}): Promise<Produ
         // Last resort: fetch without relations
         let basicQuery = supabase
           .from('products')
-          .select('*');
+          .select('*, rating, review_count');
         
         // Apply featured filter if provided
         if (params.featured !== undefined) {
           basicQuery = basicQuery.eq('is_featured', params.featured);
+          // If fetching featured products, exclude pre-orders (pre-orders cannot be featured)
+          if (params.featured === true) {
+            basicQuery = basicQuery.eq('is_pre_order', false);
+          }
         }
         
         const { data: productsBasic } = await basicQuery
           .order('created_at', { ascending: false })
           .limit(params.limit || 50);
         
-        return (productsBasic || []).map((p: any) => ({
+        const basicProducts = (productsBasic || []).map((p: any) => ({
           ...p,
           original_price: p.price,
           category_name: null,
           brand: p.brand_name || '',
           featured: p.is_featured || false,
+          // Ensure rating and review_count are properly included and defaulted
+          rating: (() => {
+            const ratingValue = p.rating;
+            if (typeof ratingValue === 'number' && !isNaN(ratingValue)) return ratingValue;
+            if (typeof ratingValue === 'string') {
+              const parsed = parseFloat(ratingValue);
+              return !isNaN(parsed) ? parsed : 0;
+            }
+            return 0;
+          })(),
+          review_count: (() => {
+            const reviewCountValue = p.review_count;
+            if (typeof reviewCountValue === 'number' && !isNaN(reviewCountValue)) return reviewCountValue;
+            if (typeof reviewCountValue === 'string') {
+              const parsed = parseInt(reviewCountValue, 10);
+              return !isNaN(parsed) ? parsed : 0;
+            }
+            return 0;
+          })(),
         }));
+        
+        // Calculate price ranges for basic products too
+        const priceRanges = await calculatePriceRangesForProducts(basicProducts);
+        return basicProducts.map((product: any) => {
+          const range = priceRanges.get(product.id);
+          return {
+            ...product,
+            price_range: range || {
+              min: product.discount_price || product.original_price || 0,
+              max: product.discount_price || product.original_price || 0,
+              hasRange: false,
+            },
+          };
+        });
       }
       
       console.log('Fetched products with simple relations:', productsOnly?.length || 0);
-      return (productsOnly || []).map((p: any) => ({
+      const transformedProducts = (productsOnly || []).map((p: any) => ({
         ...p,
         // Always use 'price' field from DB as original_price (source of truth)
         original_price: p.price || 0,
@@ -129,7 +178,42 @@ export const getProducts = async (params: GetProductsParams = {}): Promise<Produ
         category_slug: p.categories?.slug || p.category_slug || null,
         brand: p.brands?.name || p.brand || '',
         featured: p.is_featured || false,
+        // Ensure rating and review_count are properly included and defaulted
+        rating: (() => {
+          const ratingValue = p.rating;
+          if (typeof ratingValue === 'number' && !isNaN(ratingValue)) return ratingValue;
+          if (typeof ratingValue === 'string') {
+            const parsed = parseFloat(ratingValue);
+            return !isNaN(parsed) ? parsed : 0;
+          }
+          return 0;
+        })(),
+        review_count: (() => {
+          const reviewCountValue = p.review_count;
+          if (typeof reviewCountValue === 'number' && !isNaN(reviewCountValue)) return reviewCountValue;
+          if (typeof reviewCountValue === 'string') {
+            const parsed = parseInt(reviewCountValue, 10);
+            return !isNaN(parsed) ? parsed : 0;
+          }
+          return 0;
+        })(),
       }));
+      
+      // Calculate price ranges for products with variants
+      const priceRanges = await calculatePriceRangesForProducts(transformedProducts);
+      
+      // Add price ranges to products
+      return transformedProducts.map((product: any) => {
+        const range = priceRanges.get(product.id);
+        return {
+          ...product,
+          price_range: range || {
+            min: product.discount_price || product.original_price || 0,
+            max: product.discount_price || product.original_price || 0,
+            hasRange: false,
+          },
+        };
+      });
     }
     
     // Transform products to ensure proper structure
@@ -142,6 +226,26 @@ export const getProducts = async (params: GetProductsParams = {}): Promise<Produ
       category_slug: product.categories?.slug || product.category_slug || null,
       brand: product.brands?.name || product.brand || '',
       featured: product.is_featured || false,
+      // Ensure rating and review_count are properly included and defaulted
+      // Handle both number and string types, and parse if needed
+      rating: (() => {
+        const ratingValue = product.rating;
+        if (typeof ratingValue === 'number' && !isNaN(ratingValue)) return ratingValue;
+        if (typeof ratingValue === 'string') {
+          const parsed = parseFloat(ratingValue);
+          return !isNaN(parsed) ? parsed : 0;
+        }
+        return 0;
+      })(),
+      review_count: (() => {
+        const reviewCountValue = product.review_count;
+        if (typeof reviewCountValue === 'number' && !isNaN(reviewCountValue)) return reviewCountValue;
+        if (typeof reviewCountValue === 'string') {
+          const parsed = parseInt(reviewCountValue, 10);
+          return !isNaN(parsed) ? parsed : 0;
+        }
+        return 0;
+      })(),
       // Remove nested objects that might cause issues
       categories: undefined,
       brands: undefined,
@@ -180,6 +284,8 @@ export const getProductBySlug = async (slug: string): Promise<Product | null> =>
       .from('products')
       .select(`
         *,
+        rating,
+        review_count,
         categories!products_category_id_fkey(id, name, slug),
         brands!products_brand_id_fkey(id, name, slug)
       `)
@@ -193,6 +299,8 @@ export const getProductBySlug = async (slug: string): Promise<Product | null> =>
         .from('products')
         .select(`
           *,
+          rating,
+          review_count,
           categories:category_id(id, name, slug),
           brands:brand_id(id, name, slug)
         `)
@@ -208,7 +316,7 @@ export const getProductBySlug = async (slug: string): Promise<Product | null> =>
       console.warn('Second query failed, fetching without relations:', error);
       const result = await supabase
         .from('products')
-        .select('*')
+        .select('*, rating, review_count')
         .eq('slug', slug)
         .single();
       
@@ -260,8 +368,24 @@ export const getProductBySlug = async (slug: string): Promise<Product | null> =>
       images: data.images || [],
       thumbnail: data.thumbnail || '',
       featured: data.is_featured || false,
-      rating: data.rating || 0,
-      review_count: data.review_count ?? 0,
+      rating: (() => {
+        const ratingValue = data.rating;
+        if (typeof ratingValue === 'number' && !isNaN(ratingValue)) return ratingValue;
+        if (typeof ratingValue === 'string') {
+          const parsed = parseFloat(ratingValue);
+          return !isNaN(parsed) ? parsed : 0;
+        }
+        return 0;
+      })(),
+      review_count: (() => {
+        const reviewCountValue = data.review_count;
+        if (typeof reviewCountValue === 'number' && !isNaN(reviewCountValue)) return reviewCountValue;
+        if (typeof reviewCountValue === 'string') {
+          const parsed = parseInt(reviewCountValue, 10);
+          return !isNaN(parsed) ? parsed : 0;
+        }
+        return 0;
+      })(),
       specs: data.specs || {},
       variants: [], // TODO: Add variants if needed
       created_at: data.created_at,
@@ -304,18 +428,44 @@ export const getProductBySlug = async (slug: string): Promise<Product | null> =>
   }
 };
 
-// Fetch featured products
+// Fetch featured products (excludes pre-order products - pre-orders cannot be featured)
 export const getFeaturedProducts = async (limit: number = 8): Promise<Product[]> => {
   try {
     const { data, error } = await supabase
       .from('products')
       .select('*, categories(name, slug), brands(name, slug)')
       .eq('is_featured', true)
-      .eq('in_stock', true)
+      .eq('is_pre_order', false) // Pre-order products cannot be featured
+      .eq('in_stock', true) // Must be in stock
       .limit(limit);
 
     if (error) throw error;
-    return data || [];
+    
+    // Transform products to ensure proper structure
+    const transformedProducts = (data || []).map((product: any) => ({
+      ...product,
+      original_price: product.price || 0,
+      category_name: product.categories?.name || null,
+      category_slug: product.categories?.slug || null,
+      brand: product.brands?.name || product.brand || '',
+      featured: product.is_featured || false,
+    }));
+    
+    // Calculate price ranges for products with variants
+    const priceRanges = await calculatePriceRangesForProducts(transformedProducts);
+    
+    // Add price ranges to products
+    return transformedProducts.map((product: any) => {
+      const range = priceRanges.get(product.id);
+      return {
+        ...product,
+        price_range: range || {
+          min: product.discount_price || product.original_price || 0,
+          max: product.discount_price || product.original_price || 0,
+          hasRange: false,
+        },
+      };
+    });
   } catch (error) {
     console.error('Error fetching featured products:', error);
     return [];
@@ -334,7 +484,32 @@ export const getSimilarProducts = async (productId: string, categoryId: string, 
       .limit(limit);
 
     if (error) throw error;
-    return data || [];
+    
+    // Transform products to ensure proper structure
+    const transformedProducts = (data || []).map((product: any) => ({
+      ...product,
+      original_price: product.price || 0,
+      category_name: product.categories?.name || null,
+      category_slug: product.categories?.slug || null,
+      brand: product.brands?.name || product.brand || '',
+      featured: product.is_featured || false,
+    }));
+    
+    // Calculate price ranges for products with variants
+    const priceRanges = await calculatePriceRangesForProducts(transformedProducts);
+    
+    // Add price ranges to products
+    return transformedProducts.map((product: any) => {
+      const range = priceRanges.get(product.id);
+      return {
+        ...product,
+        price_range: range || {
+          min: product.discount_price || product.original_price || 0,
+          max: product.discount_price || product.original_price || 0,
+          hasRange: false,
+        },
+      };
+    });
   } catch (error) {
     console.error('Error fetching similar products:', error);
     return [];
@@ -352,7 +527,32 @@ export const searchProducts = async (query: string, limit: number = 20): Promise
       .limit(limit);
 
     if (error) throw error;
-    return data || [];
+    
+    // Transform products to ensure proper structure
+    const transformedProducts = (data || []).map((product: any) => ({
+      ...product,
+      original_price: product.price || 0,
+      category_name: product.categories?.name || null,
+      category_slug: product.categories?.slug || null,
+      brand: product.brands?.name || product.brand || '',
+      featured: product.is_featured || false,
+    }));
+    
+    // Calculate price ranges for products with variants
+    const priceRanges = await calculatePriceRangesForProducts(transformedProducts);
+    
+    // Add price ranges to products
+    return transformedProducts.map((product: any) => {
+      const range = priceRanges.get(product.id);
+      return {
+        ...product,
+        price_range: range || {
+          min: product.discount_price || product.original_price || 0,
+          max: product.discount_price || product.original_price || 0,
+          hasRange: false,
+        },
+      };
+    });
   } catch (error) {
     console.error('Error searching products:', error);
     return [];

@@ -45,19 +45,27 @@ export function ProductContent({ product }: ProductContentProps) {
   const router = useRouter();
   
   const [selectedImage, setSelectedImage] = useState(0);
-  const [selectedVariants, setSelectedVariants] = useState<Record<string, any>>({});
+  const [selectedVariants, setSelectedVariants] = useState<any[]>([]);
   const [variantPrice, setVariantPrice] = useState<number>(0);
   const [quantity, setQuantity] = useState(1);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [activeTab, setActiveTab] = useState<'description' | 'specs' | 'reviews'>('description');
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
   const [similarProducts, setSimilarProducts] = useState<Product[]>([]);
+  const [currentRating, setCurrentRating] = useState(product.rating || 0);
+  const [currentReviewCount, setCurrentReviewCount] = useState(product.review_count || 0);
 
   const isInCart = items.some(item => item.id === product.id);
   const hasDiscount = product.discount_price && product.discount_price < product.original_price;
   const discountPercentage = hasDiscount
     ? Math.round(((product.original_price - product.discount_price!) / product.original_price) * 100)
     : 0;
+
+  // Calculate final price
+  // variantPrice from ProductVariantSelector includes basePrice + modifiers
+  // If variantPrice is 0 or not set, use basePrice as fallback
+  const basePrice = product.discount_price || product.original_price || 0;
+  const finalPrice = variantPrice > 0 ? variantPrice : basePrice;
 
   // Debug: Log price values to identify doubling issue
   if (process.env.NODE_ENV === 'development') {
@@ -66,20 +74,35 @@ export function ProductContent({ product }: ProductContentProps) {
       productName: product.name,
       discount_price: product.discount_price,
       original_price: product.original_price,
+      basePrice,
       variantPrice,
-      finalPrice: (product.discount_price || product.original_price) + variantPrice,
+      finalPrice,
+      hasVariants: variantPrice > 0,
     });
   }
-  
-  const finalPrice = (product.discount_price || product.original_price) + variantPrice;
   const productImages = product.images && product.images.length > 0 ? product.images : [product.thumbnail || '/placeholders/placeholder-product.webp'];
 
   useEffect(() => {
     if (product.id) {
       setIsWishlisted(isInWishlist(product.id));
       fetchSimilarProducts();
+      fetchReviewStats();
     }
   }, [product.id]);
+
+  // Fetch latest review stats to update rating and review count
+  const fetchReviewStats = async () => {
+    try {
+      const { reviewsService } = await import('@/services/reviews.service');
+      const stats = await reviewsService.getReviewStats(product.id);
+      if (stats) {
+        setCurrentRating(stats.averageRating);
+        setCurrentReviewCount(stats.totalReviews);
+      }
+    } catch (error) {
+      console.error('Error fetching review stats:', error);
+    }
+  };
 
   const fetchSimilarProducts = async () => {
     try {
@@ -95,8 +118,10 @@ export function ProductContent({ product }: ProductContentProps) {
     }
   };
 
-  const handleVariantChange = (variants: { [key: string]: any }, totalPrice: number) => {
+  const handleVariantChange = (variants: any[], totalPrice: number) => {
     setSelectedVariants(variants);
+    // totalPrice from ProductVariantSelector already includes basePrice + modifiers
+    // Store the total price (base + modifiers) so we can use it directly
     setVariantPrice(totalPrice);
   };
 
@@ -113,10 +138,28 @@ export function ProductContent({ product }: ProductContentProps) {
   };
 
   const handleAddToCart = () => {
+    // Convert new SelectedVariant format to ProductVariant format for cart
+    const cartVariants: { [key: string]: ProductVariant } = {};
+    
+    selectedVariants.forEach((selectedVariant: any) => {
+      if (selectedVariant && selectedVariant.option) {
+        cartVariants[selectedVariant.attributeId] = {
+          id: selectedVariant.option.id,
+          product_id: product.id,
+          type: 'ram' as any, // Will be determined by attribute type
+          name: selectedVariant.option.label,
+          value: selectedVariant.option.value,
+          price_adjustment: selectedVariant.option.price_modifier,
+          stock_quantity: selectedVariant.option.stock_quantity,
+          sku: `${product.id}-${selectedVariant.option.sku_suffix || selectedVariant.option.value}`,
+        };
+      }
+    });
+
     const cartItem = {
       ...product,
       quantity,
-      selected_variants: selectedVariants,
+      selected_variants: cartVariants,
       subtotal: finalPrice * quantity,
     };
 
@@ -124,7 +167,7 @@ export function ProductContent({ product }: ProductContentProps) {
       addToCart({
         product: cartItem,
         quantity,
-        variants: selectedVariants as { [key: string]: ProductVariant },
+        variants: cartVariants,
       })
     );
 
@@ -237,11 +280,18 @@ export function ProductContent({ product }: ProductContentProps) {
 
           {/* Product Details */}
           <div>
-            {product.brand && (
-              <Badge variant="default" className="mb-3">
-                {product.brand}
-              </Badge>
-            )}
+            <div className="flex items-center gap-2 mb-3">
+              {product.brand && (
+                <Badge variant="default">
+                  {product.brand}
+                </Badge>
+              )}
+              {product.is_pre_order && (
+                <span className="px-3 py-1 bg-black text-white text-xs font-semibold rounded-full">
+                  PRE-ORDER
+                </span>
+              )}
+            </div>
             
             <h1 className="text-2xl md:text-3xl font-bold text-[#1A1A1A] mb-4">{product.name}</h1>
             
@@ -255,21 +305,36 @@ export function ProductContent({ product }: ProductContentProps) {
             <div className="flex items-center gap-4 mb-4">
               <div className="flex items-center gap-1">
                 <Star className="fill-yellow-400 text-yellow-400" size={20} />
-                <span className="font-semibold">{product.rating.toFixed(1)}</span>
-                <span className="text-gray-600 text-sm">({product.review_count} reviews)</span>
+                <span className="font-semibold">{currentRating.toFixed(1)}</span>
+                <span className="text-gray-600 text-sm">({currentReviewCount} {currentReviewCount === 1 ? 'review' : 'reviews'})</span>
               </div>
             </div>
 
             <div className="flex items-center gap-3 mb-6">
-              <span className="text-2xl font-bold text-[#FF7A19]">
-                {formatCurrency(finalPrice)}
-              </span>
-              {hasDiscount && (
+              {/* Always show the calculated final price when variants are available */}
+              {/* Price range is only shown when no variants are selected and product has variants */}
+              {(product as any).price_range?.hasRange && Object.keys(selectedVariants).length === 0 ? (
                 <>
-                  <span className="text-xl text-gray-400 line-through">
-                    {formatCurrency(product.original_price)}
+                  <span className="text-2xl font-bold text-[#FF7A19]">
+                    {formatCurrency((product as any).price_range.min)} - {formatCurrency((product as any).price_range.max)}
                   </span>
-                  <Badge variant="error">-{discountPercentage}%</Badge>
+                  {hasDiscount && (
+                    <Badge variant="error">-{discountPercentage}%</Badge>
+                  )}
+                </>
+              ) : (
+                <>
+                  <span className="text-2xl font-bold text-[#FF7A19]">
+                    {formatCurrency(finalPrice)}
+                  </span>
+                  {hasDiscount && (
+                    <>
+                      <span className="text-xl text-gray-400 line-through">
+                        {formatCurrency(product.original_price)}
+                      </span>
+                      <Badge variant="error">-{discountPercentage}%</Badge>
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -435,7 +500,7 @@ export function ProductContent({ product }: ProductContentProps) {
             )}
 
             {activeTab === 'reviews' && (
-              <Reviews productId={product.id} />
+              <Reviews productId={product.id} onReviewUpdate={fetchReviewStats} />
             )}
           </div>
         </div>

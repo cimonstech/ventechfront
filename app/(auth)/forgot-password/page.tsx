@@ -48,7 +48,7 @@ export default function ForgotPasswordPage() {
     } catch (error: any) {
       console.error('Password reset error:', error);
       // Handle rate limiting (429 error)
-      if (error.status === 429 || error.message?.includes('429') || error.message?.toLowerCase().includes('rate limit')) {
+      if ((error?.status === 429) || error.message?.includes('429') || error.message?.toLowerCase().includes('rate limit')) {
         const errorMessage = 'Too many requests. Please wait a few minutes before trying again.';
         setError(errorMessage);
         toast.error(errorMessage, {

@@ -9,7 +9,7 @@ import {
   CheckCircle,
   Clock,
   XCircle,
-  Eye,
+  RotateCcw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
@@ -33,6 +33,8 @@ export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set());
+  const [isRefunding, setIsRefunding] = useState(false);
 
   // Fetch real data from Supabase
   useEffect(() => {
@@ -187,6 +189,113 @@ export default function TransactionsPage() {
     return matchesSearch && matchesStatus;
   });
 
+  const handleSelectAll = () => {
+    if (selectedTransactions.size === filteredTransactions.length) {
+      setSelectedTransactions(new Set());
+    } else {
+      setSelectedTransactions(new Set(filteredTransactions.map(t => t.id)));
+    }
+  };
+
+  const handleSelectTransaction = (id: string) => {
+    const newSelected = new Set(selectedTransactions);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedTransactions(newSelected);
+  };
+
+  const handleBulkRefund = async () => {
+    if (selectedTransactions.size === 0) {
+      toast.error('Please select at least one transaction to refund');
+      return;
+    }
+
+    const selected = Array.from(selectedTransactions);
+    const transactionsToRefund = filteredTransactions.filter(t => selected.includes(t.id));
+    
+    // Only allow refunding completed transactions
+    const refundableTransactions = transactionsToRefund.filter(t => t.status === 'completed');
+    
+    if (refundableTransactions.length === 0) {
+      toast.error('Only completed transactions can be refunded');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to refund ${refundableTransactions.length} transaction(s)?`)) {
+      return;
+    }
+
+    setIsRefunding(true);
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      
+      const refundPromises = refundableTransactions.map(async (transaction) => {
+        const response = await fetch(`${API_URL}/api/transactions/${transaction.id}/refund`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Refund failed');
+        }
+
+        return response.json();
+      });
+
+      await Promise.all(refundPromises);
+      
+      toast.success(`Successfully refunded ${refundableTransactions.length} transaction(s)`);
+      setSelectedTransactions(new Set());
+      fetchTransactions();
+    } catch (error: any) {
+      console.error('Error refunding transactions:', error);
+      toast.error(error.message || 'Failed to refund transactions');
+    } finally {
+      setIsRefunding(false);
+    }
+  };
+
+  const handleSingleRefund = async (transaction: Transaction) => {
+    if (transaction.status !== 'completed') {
+      toast.error('Only completed transactions can be refunded');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to refund transaction ${transaction.order_number}?`)) {
+      return;
+    }
+
+    setIsRefunding(true);
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${API_URL}/api/transactions/${transaction.id}/refund`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Refund failed');
+      }
+
+      toast.success('Transaction refunded successfully');
+      fetchTransactions();
+    } catch (error: any) {
+      console.error('Error refunding transaction:', error);
+      toast.error(error.message || 'Failed to refund transaction');
+    } finally {
+      setIsRefunding(false);
+    }
+  };
+
   const totalAmount = filteredTransactions.reduce(
     (sum, t) => sum + (t.status === 'completed' ? t.amount : 0),
     0
@@ -264,6 +373,18 @@ export default function TransactionsPage() {
             <option value="refunded">Refunded</option>
           </select>
 
+          {/* Bulk Actions */}
+          {selectedTransactions.size > 0 && (
+            <Button 
+              variant="outline" 
+              icon={<RotateCcw size={18} />}
+              onClick={handleBulkRefund}
+              disabled={isRefunding}
+            >
+              Refund Selected ({selectedTransactions.size})
+            </Button>
+          )}
+
           {/* Export */}
           <Button variant="outline" icon={<Download size={18} />}>
             Export CSV
@@ -277,6 +398,14 @@ export default function TransactionsPage() {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-[#1A1A1A] uppercase">
+                  <input
+                    type="checkbox"
+                    checked={selectedTransactions.size === filteredTransactions.length && filteredTransactions.length > 0}
+                    onChange={handleSelectAll}
+                    className="rounded border-gray-300 text-[#FF7A19] focus:ring-[#FF7A19]"
+                  />
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-[#1A1A1A] uppercase">
                   Order ID
                 </th>
@@ -303,13 +432,21 @@ export default function TransactionsPage() {
             <tbody className="divide-y divide-gray-200">
               {filteredTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-[#3A3A3A]">
+                  <td colSpan={8} className="px-6 py-12 text-center text-[#3A3A3A]">
                     No transactions found
                   </td>
                 </tr>
               ) : (
                 filteredTransactions.map((transaction) => (
                   <tr key={transaction.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedTransactions.has(transaction.id)}
+                        onChange={() => handleSelectTransaction(transaction.id)}
+                        className="rounded border-gray-300 text-[#FF7A19] focus:ring-[#FF7A19]"
+                      />
+                    </td>
                     <td className="px-6 py-4">
                       <span className="font-mono text-sm font-semibold text-[#1A1A1A]">
                         {transaction.order_number}
@@ -351,14 +488,17 @@ export default function TransactionsPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      {transaction.order_id ? (
-                        <Link href={`/admin/orders/${transaction.order_id}`}>
-                          <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="View order details">
-                            <Eye size={18} className="text-[#3A3A3A]" />
-                          </button>
-                        </Link>
+                      {transaction.status === 'completed' ? (
+                        <button
+                          onClick={() => handleSingleRefund(transaction)}
+                          disabled={isRefunding}
+                          className="p-2 hover:bg-red-50 rounded-lg transition-colors text-red-600 disabled:opacity-50"
+                          title="Refund transaction"
+                        >
+                          <RotateCcw size={18} />
+                        </button>
                       ) : (
-                        <span className="text-gray-400 text-sm">No order</span>
+                        <span className="text-gray-400 text-sm">-</span>
                       )}
                     </td>
                   </tr>

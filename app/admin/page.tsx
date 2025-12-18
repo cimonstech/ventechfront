@@ -322,9 +322,9 @@ export default function AdminDashboard() {
         if (response.ok) {
           const result = await response.json();
           if (result.success && result.data) {
-            // Get all orders (paid and pending)
+            // Get only paid orders (actual purchases, not just placed orders)
             const allOrders = (result.data || []).filter((order: any) => 
-              order.payment_status === 'paid' || order.payment_status === 'pending'
+              order.payment_status === 'paid'
             );
 
             // Extract order items from all orders
@@ -354,7 +354,7 @@ export default function AdminDashboard() {
             amount,
             order:orders!transactions_order_id_fkey(id, order_items(product_name, quantity, unit_price))
           `)
-          .in('payment_status', ['paid', 'pending'])
+          .eq('payment_status', 'paid') // Only count paid transactions (actual purchases)
           .limit(1000); // Limit to prevent huge queries
 
         if (!transactionsError && transactions && transactions.length > 0) {

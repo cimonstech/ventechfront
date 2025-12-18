@@ -90,6 +90,11 @@ export const seoConfig = {
       description: 'Contact VENTECH for inquiries, support, or orders. Located in Accra, Ghana. Call +233 55 134 4310 or email ventechgadgets@gmail.com. We\'re here to help!',
       keywords: 'contact ventech, ventech Ghana contact, electronics store contact, gadget store Accra, tech support Ghana',
     },
+    'bulk-order': {
+      title: 'Bulk Order Request - VENTECH Gadgets Ghana | Wholesale Electronics',
+      description: 'Need laptops or gadgets in bulk? Submit your bulk order request to VENTECH. We offer competitive pricing for businesses, schools, and organizations. Get the best deals on bulk electronics orders in Ghana.',
+      keywords: 'bulk order gadgets Ghana, wholesale electronics Ghana, bulk laptops Ghana, bulk smartphones Ghana, corporate orders Ghana, business electronics Ghana, wholesale tech Ghana',
+    },
     register: {
       title: 'Create Account - VENTECH Gadgets Ghana',
       description: 'Create your VENTECH account to shop gadgets, track orders, save addresses, and enjoy exclusive deals. Sign up now for free and start shopping the latest tech!',

@@ -48,7 +48,14 @@ export const FlashDeals: React.FC<FlashDealsProps> = ({ limit = 8 }) => {
       setFlashDeals(deals);
       setFlashDealProducts(products.slice(0, limit));
     } catch (error) {
-      console.error('Error fetching flash deals:', error);
+      // Silently handle errors - service already handles them gracefully
+      // Only log unexpected errors
+      if (error && typeof error === 'object' && 'message' in error) {
+        const errorMessage = String((error as any).message || '');
+        if (!errorMessage.includes('relation') && !errorMessage.includes('does not exist')) {
+          console.warn('Unexpected error in FlashDeals component:', error);
+        }
+      }
     } finally {
       setIsLoading(false);
     }

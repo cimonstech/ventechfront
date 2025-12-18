@@ -18,12 +18,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'daily',
       priority: 0.9,
     },
-    {
-      url: `${baseUrl}/deals`,
-      lastModified: new Date(),
-      changeFrequency: 'daily',
-      priority: 0.9,
-    },
+    // {
+    //   url: `${baseUrl}/deals`,
+    //   lastModified: new Date(),
+    //   changeFrequency: 'daily',
+    //   priority: 0.9,
+    // }, // Disabled for now
     {
       url: `${baseUrl}/about`,
       lastModified: new Date(),

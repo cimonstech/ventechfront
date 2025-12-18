@@ -25,6 +25,7 @@ import {
   ChevronLeft,
   Percent,
   Star,
+  Clock,
 } from 'lucide-react';
 import Link from 'next/link';
 import { signOut } from '@/services/auth.service';
@@ -208,6 +209,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { icon: FolderTree, label: 'Categories', href: '/admin/categories' },
         { icon: Tag, label: 'Brands', href: '/admin/brands' },
       ],
+    },
+    {
+      icon: Clock,
+      label: 'Pre-Orders',
+      href: '/admin/pre-orders',
     },
     {
       icon: Users,

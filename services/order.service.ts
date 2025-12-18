@@ -17,15 +17,37 @@ export const orderService = {
     // Frontend should not generate order number - backend handles it
 
     // Map items for backend
-    const order_items = checkoutData.items.map((item) => ({
-      product_id: item.id,
-      product_name: item.name,
-      product_image: item.thumbnail,
-      quantity: item.quantity,
-      unit_price: item.discount_price || item.original_price,
-      subtotal: item.subtotal,
-      selected_variants: item.selected_variants,
-    }));
+    // Calculate unit_price including variant adjustments
+    const order_items = checkoutData.items.map((item) => {
+      // Calculate base price
+      const basePrice = item.discount_price || item.original_price || 0;
+      
+      // Calculate variant adjustments from selected_variants
+      const variantAdjustments = Object.values(item.selected_variants || {}).reduce(
+        (sum: number, variant: any) => {
+          // Handle both VariantOption format (price_modifier) and ProductVariant format (price_adjustment)
+          const adjustment = variant.price_adjustment ?? variant.price_modifier ?? 0;
+          return sum + (Number(adjustment) || 0);
+        },
+        0
+      );
+      
+      // Unit price should be base price + variant adjustments
+      const unitPrice = basePrice + variantAdjustments;
+      
+      // Ensure subtotal is calculated correctly
+      const calculatedSubtotal = item.subtotal || (unitPrice * item.quantity);
+      
+      return {
+        product_id: item.id,
+        product_name: item.name,
+        product_image: item.thumbnail,
+        quantity: item.quantity,
+        unit_price: unitPrice, // Include variant adjustments in unit_price
+        subtotal: calculatedSubtotal,
+        selected_variants: item.selected_variants,
+      };
+    });
 
     // Try to call backend API first, fallback to Supabase if it fails
     try {
@@ -43,6 +65,10 @@ export const orderService = {
         notes: checkoutData.notes || null,
         payment_reference: checkoutData.payment_reference || null, // Include payment reference for transaction linking
         order_items,
+        // Pre-order fields
+        is_pre_order: (checkoutData as any).is_pre_order || false,
+        pre_order_shipping_option: (checkoutData as any).pre_order_shipping_option || null,
+        estimated_arrival_date: (checkoutData as any).estimated_arrival_date || null,
       };
       
       console.log('Creating order via backend API:', {
@@ -237,16 +263,251 @@ export const orderService = {
   },
 
   // Get order by order number
-  async getOrderByNumber(orderNumber: string) {
-    const { data, error } = await supabase
-      .from('orders')
-      .select('*, items:order_items(*)')
-      .eq('order_number', orderNumber)
-      .single();
+  async getOrderByNumber(orderNumber: string): Promise<Order | null> {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          items:order_items(*)
+        `)
+        .eq('order_number', orderNumber.toUpperCase().trim())
+        .single();
 
-    if (error) throw error;
+      if (error) {
+        // If order not found, return null instead of throwing
+        if (error.code === 'PGRST116') {
+          return null;
+        }
+        throw error;
+      }
 
-    return data;
+      if (!data) return null;
+
+      // Transform the data to match Order interface
+      const order: Order = {
+        id: data.id,
+        user_id: data.user_id,
+        order_number: data.order_number,
+        status: data.status,
+        items: (data.items || []).map((item: any) => ({
+          id: item.id,
+          order_id: item.order_id,
+          product_id: item.product_id,
+          product_name: item.product_name,
+          product_image: item.product_image,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          subtotal: item.subtotal || (item.unit_price * item.quantity),
+          selected_variants: item.selected_variants || {},
+        })),
+        subtotal: data.subtotal || 0,
+        discount: data.discount || 0,
+        delivery_fee: data.delivery_fee || data.shipping_fee || 0,
+        tax: data.tax || 0,
+        total: data.total || 0,
+        payment_method: data.payment_method,
+        payment_status: data.payment_status,
+        delivery_address: data.delivery_address || data.shipping_address || {},
+        delivery_option: data.delivery_option || {},
+        tracking_number: data.tracking_number,
+        notes: data.notes,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        delivered_at: data.delivered_at,
+      };
+
+      return order;
+    } catch (error: any) {
+      console.error('Error fetching order by number:', error);
+      // Return null if order not found, throw for other errors
+      if (error.code === 'PGRST116' || error.message?.includes('No rows')) {
+        return null;
+      }
+      throw error;
+    }
+  },
+
+  async getOrderByNumberAndEmail(orderNumberOrId: string, email: string): Promise<Order | null> {
+    try {
+      // Use backend API to bypass RLS and verify email
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      
+      try {
+        const response = await fetch(`${API_URL}/api/orders/track`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            order_number_or_id: orderNumberOrId,
+            email: email.trim().toLowerCase(),
+          }),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.data) {
+            // Transform the data to match Order interface
+            const data = result.data;
+            const order: Order = {
+              id: data.id,
+              user_id: data.user_id,
+              order_number: data.order_number,
+              status: data.status,
+              items: (data.items || data.order_items || []).map((item: any) => ({
+                id: item.id,
+                order_id: item.order_id,
+                product_id: item.product_id,
+                product_name: item.product_name,
+                product_image: item.product_image,
+                quantity: item.quantity,
+                unit_price: item.unit_price,
+                subtotal: item.subtotal || (item.unit_price * item.quantity),
+                selected_variants: item.selected_variants || {},
+              })),
+              subtotal: data.subtotal || 0,
+              discount: data.discount || 0,
+              delivery_fee: data.delivery_fee || data.shipping_fee || 0,
+              tax: data.tax || 0,
+              total: data.total || 0,
+              payment_method: data.payment_method,
+              payment_status: data.payment_status,
+              delivery_address: data.delivery_address || data.shipping_address || {},
+              delivery_option: data.delivery_option || {},
+              tracking_number: data.tracking_number,
+              notes: data.notes,
+              created_at: data.created_at,
+              updated_at: data.updated_at,
+              delivered_at: data.delivered_at,
+            };
+            return order;
+          } else {
+            // Order not found or email doesn't match
+            return null;
+          }
+        } else if (response.status === 404) {
+          // Order not found
+          return null;
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || 'Failed to fetch order');
+        }
+      } catch (apiError: any) {
+        console.warn('Backend API failed, trying Supabase fallback:', apiError);
+        
+        // Fallback to Supabase direct query
+        // First, try to find order by order_number
+        let { data, error } = await supabase
+          .from('orders')
+          .select(`
+            *,
+            items:order_items(*),
+            user:users!orders_user_id_fkey(id, email)
+          `)
+          .eq('order_number', orderNumberOrId)
+          .maybeSingle();
+
+        // If not found by order_number, try by id
+        if (error || !data) {
+          const { data: dataById, error: errorById } = await supabase
+            .from('orders')
+            .select(`
+              *,
+              items:order_items(*),
+              user:users!orders_user_id_fkey(id, email)
+            `)
+            .eq('id', orderNumberOrId)
+            .maybeSingle();
+          
+          data = dataById;
+          error = errorById;
+        }
+
+        if (error) {
+          console.error('Supabase query error:', {
+            code: error.code,
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+          });
+          
+          // If order not found, return null instead of throwing
+          if (error.code === 'PGRST116' || error.message?.includes('No rows')) {
+            return null;
+          }
+          throw new Error(`Database error: ${error.message || 'Unknown error'}`);
+        }
+
+        if (!data) return null;
+
+        // Check if email matches
+        // Email can be in:
+        // 1. user.email (if order has a user_id)
+        // 2. delivery_address.email or shipping_address.email (for guest orders)
+        const userEmail = data.user?.email?.toLowerCase();
+        const deliveryEmail = (data.delivery_address?.email || data.shipping_address?.email)?.toLowerCase();
+        const providedEmail = email.toLowerCase().trim();
+
+        const emailMatches = 
+          userEmail === providedEmail || 
+          deliveryEmail === providedEmail;
+
+        if (!emailMatches) {
+          // Email doesn't match - return null for security
+          return null;
+        }
+
+        // Transform the data to match Order interface
+        const order: Order = {
+          id: data.id,
+          user_id: data.user_id,
+          order_number: data.order_number,
+          status: data.status,
+          items: (data.items || []).map((item: any) => ({
+            id: item.id,
+            order_id: item.order_id,
+            product_id: item.product_id,
+            product_name: item.product_name,
+            product_image: item.product_image,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            subtotal: item.subtotal || (item.unit_price * item.quantity),
+            selected_variants: item.selected_variants || {},
+          })),
+          subtotal: data.subtotal || 0,
+          discount: data.discount || 0,
+          delivery_fee: data.delivery_fee || data.shipping_fee || 0,
+          tax: data.tax || 0,
+          total: data.total || 0,
+          payment_method: data.payment_method,
+          payment_status: data.payment_status,
+          delivery_address: data.delivery_address || data.shipping_address || {},
+          delivery_option: data.delivery_option || {},
+          tracking_number: data.tracking_number,
+          notes: data.notes,
+          created_at: data.created_at,
+          updated_at: data.updated_at,
+          delivered_at: data.delivered_at,
+        };
+
+        return order;
+      }
+    } catch (error: any) {
+      console.error('Error fetching order by number and email:', {
+        message: error?.message || 'Unknown error',
+        code: error?.code,
+        details: error?.details,
+        hint: error?.hint,
+        error: error,
+      });
+      
+      // Return null if order not found, throw for other errors
+      if (error?.code === 'PGRST116' || error?.message?.includes('No rows') || error?.message?.includes('not found')) {
+        return null;
+      }
+      throw error;
+    }
   },
 
   // Update order status (Admin)

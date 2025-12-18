@@ -57,7 +57,7 @@ export function Footer() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 mb-6">
           {/* Store Info */}
           <div>
-            <h3 className="font-bold text-lg mb-3 text-white">{storeName}</h3>
+            <h3 className="footer-store-name font-bold text-lg mb-3">{storeName}</h3>
             <p className="text-sm text-white mb-4">{storeTagline}</p>
             <div className="space-y-2 text-sm text-gray-400">
               {storePhone && (
@@ -88,11 +88,11 @@ export function Footer() {
                   All Products
                 </Link>
               </li>
-              <li>
+              {/* <li>
                 <Link href="/deals" className="hover:text-[#FF7A19] transition-colors">
                   Deals
                 </Link>
-              </li>
+              </li> */}
               <li>
                 <Link href="/categories" className="hover:text-[#FF7A19] transition-colors">
                   Categories
@@ -104,7 +104,7 @@ export function Footer() {
           {/* Support */}
           <div>
             <h4 className="font-semibold text-sm mb-3">Support</h4>
-            <ul className="space-y-2 text-sm text-gray-400">
+            <ul className="space-y-2 text-sm text-gray-400 mb-4">
               <li>
                 <Link href="/contact" className="hover:text-[#FF7A19] transition-colors">
                   Contact Us
@@ -121,6 +121,20 @@ export function Footer() {
                 </Link>
               </li>
             </ul>
+            
+            {/* Order Tracking */}
+            <div>
+              <h4 className="font-semibold text-sm mb-3">Track Order</h4>
+              <Link 
+                href="/track-order" 
+                className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-[#FF7A19] transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                Track by Order Number
+              </Link>
+            </div>
           </div>
 
           {/* Legal & Social */}

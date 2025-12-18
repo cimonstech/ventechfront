@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useAppSelector, useAppDispatch } from '@/store';
 import { clearCart } from '@/store/cartSlice';
-import { Check, Banknote, ChevronLeft } from 'lucide-react';
+import { Check, Banknote, ChevronLeft, Package, Clock } from 'lucide-react';
 import { formatCurrency } from '@/lib/helpers';
 import { orderService } from '@/services/order.service';
 import { deliveryOptionsService } from '@/services/deliveryOptions.service';
@@ -16,6 +16,12 @@ import { deliveryOptionsService } from '@/services/deliveryOptions.service';
 import { DeliveryOption } from '@/types/order';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
+import { 
+  PRE_ORDER_SHIPPING_OPTIONS, 
+  PreOrderShippingOption,
+  calculateEstimatedArrival,
+  formatEstimatedDelivery 
+} from '@/services/preOrder.service';
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -87,6 +93,16 @@ export default function CheckoutPage() {
   // Delivery Options
   const [deliveryOptions, setDeliveryOptions] = useState<DeliveryOption[]>([]);
   
+  // Pre-order shipping options
+  const [selectedPreOrderShipping, setSelectedPreOrderShipping] = useState<PreOrderShippingOption | null>(null);
+  
+  // Split items into regular and pre-order groups
+  const regularItems = items.filter(item => !item.is_pre_order);
+  const preOrderItems = items.filter(item => item.is_pre_order);
+  const hasPreOrderItems = preOrderItems.length > 0;
+  const hasRegularItems = regularItems.length > 0;
+  const hasMixedCart = hasRegularItems && hasPreOrderItems;
+  
   // Selected Options
   const [selectedDelivery, setSelectedDelivery] = useState<DeliveryOption | null>(null);
   const [paymentMethod] = useState<'cash_on_delivery'>('cash_on_delivery'); // Only Cash on Delivery enabled
@@ -145,10 +161,18 @@ export default function CheckoutPage() {
       router.push('/cart');
       return;
     }
-    // Allow non-logged users to proceed - they'll need to provide address info
-    fetchDeliveryOptions();
+    
+    // If cart has pre-order items, set pre-order shipping option
+    if (hasPreOrderItems && !selectedPreOrderShipping) {
+      setSelectedPreOrderShipping(PRE_ORDER_SHIPPING_OPTIONS[0]); // Default to Air Cargo
+    }
+    
+    // Fetch regular delivery options if we have regular items (or mixed cart)
+    if (hasRegularItems || !hasPreOrderItems) {
+      fetchDeliveryOptions();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, router, isMounted]);
+  }, [items, router, isMounted, hasPreOrderItems]);
 
   const handleDeliveryInfoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setDeliveryInfo({
@@ -198,25 +222,117 @@ export default function CheckoutPage() {
     setIsProcessing(true);
 
     try {
-      const checkoutData = {
-        items,
-        delivery_address: {
-          ...deliveryInfo,
-          email: deliveryInfo.email || user?.email, // Include email for guest orders
-          country: 'Ghana',
-          is_default: false,
-        },
-        delivery_option: selectedDelivery || deliveryOptions[0],
-        payment_method: paymentMethod,
-        notes,
-      };
+      const orders: any[] = [];
+      const errors: string[] = [];
 
-      // Only Cash on Delivery is enabled - create order directly
-      // Emails and notifications are handled by backend
-      const order = await orderService.createOrder(checkoutData, userId);
-      dispatch(clearCart());
-      toast.success('Order placed successfully! You will receive a confirmation email shortly.');
-      router.push(`/orders/${order.id}`);
+      // Create regular order if we have regular items
+      if (hasRegularItems) {
+        try {
+          const regularDeliveryOption = selectedDelivery || deliveryOptions[0];
+          if (!regularDeliveryOption) {
+            throw new Error('Please select a delivery option for regular items');
+          }
+
+          const regularCheckoutData = {
+            items: regularItems.map(item => ({
+              ...item,
+              is_pre_order: false,
+            })),
+            delivery_address: {
+              ...deliveryInfo,
+              email: deliveryInfo.email || user?.email,
+              country: 'Ghana',
+              is_default: false,
+            },
+            delivery_option: regularDeliveryOption,
+            payment_method: paymentMethod,
+            notes: hasMixedCart ? `${notes || ''}\n\n[Regular Items Order]`.trim() : notes,
+            is_pre_order: false,
+          };
+
+          const regularOrder = await orderService.createOrder(regularCheckoutData, userId);
+          orders.push({ type: 'regular', order: regularOrder });
+          console.log('✅ Regular order created:', regularOrder.id);
+        } catch (error: any) {
+          console.error('❌ Regular order failed:', error);
+          const errorMessage = error?.message || error?.response?.data?.message || 'Failed to create regular order';
+          errors.push(`Regular order: ${errorMessage}`);
+        }
+      }
+
+      // Create pre-order if we have pre-order items
+      if (hasPreOrderItems) {
+        try {
+          if (!selectedPreOrderShipping) {
+            throw new Error('Please select a shipping option for pre-order items');
+          }
+
+          const preOrderDeliveryOption: DeliveryOption = {
+            id: selectedPreOrderShipping.id,
+            name: selectedPreOrderShipping.name,
+            description: `${selectedPreOrderShipping.description} - ${formatEstimatedDelivery(selectedPreOrderShipping)}`,
+            price: selectedPreOrderShipping.price,
+            estimated_days: selectedPreOrderShipping.estimated_days_max,
+          };
+
+          const estimatedArrival = calculateEstimatedArrival(selectedPreOrderShipping);
+
+          const preOrderCheckoutData = {
+            items: preOrderItems.map(item => ({
+              ...item,
+              is_pre_order: true,
+              pre_order_shipping_option: selectedPreOrderShipping.id,
+            })),
+            delivery_address: {
+              ...deliveryInfo,
+              email: deliveryInfo.email || user?.email,
+              country: 'Ghana',
+              is_default: false,
+            },
+            delivery_option: preOrderDeliveryOption,
+            payment_method: paymentMethod,
+            notes: hasMixedCart ? `${notes || ''}\n\n[Pre-Order Items]`.trim() : notes,
+            is_pre_order: true,
+            pre_order_shipping_option: selectedPreOrderShipping.id,
+            estimated_arrival_date: estimatedArrival.date.toISOString(),
+          };
+
+          const preOrder = await orderService.createOrder(preOrderCheckoutData, userId);
+          orders.push({ type: 'pre-order', order: preOrder });
+          console.log('✅ Pre-order created:', preOrder.id);
+        } catch (error: any) {
+          console.error('❌ Pre-order failed:', error);
+          const errorMessage = error?.message || error?.response?.data?.message || 'Failed to create pre-order';
+          errors.push(`Pre-order: ${errorMessage}`);
+        }
+      }
+
+      // Handle results
+      if (errors.length > 0 && orders.length === 0) {
+        // All orders failed
+        toast.error(`Failed to place orders: ${errors.join('; ')}`);
+        setIsProcessing(false);
+        return;
+      } else if (errors.length > 0) {
+        // Some orders succeeded, some failed
+        toast.error(`Some orders were placed successfully, but some failed: ${errors.join('; ')}`);
+      } else {
+        // All orders succeeded
+        if (hasMixedCart) {
+          toast.success(`Both orders placed successfully! You will receive confirmation emails shortly.`);
+        } else {
+          toast.success('Order placed successfully! You will receive a confirmation email shortly.');
+        }
+      }
+
+      // Clear cart only if at least one order succeeded
+      if (orders.length > 0) {
+        dispatch(clearCart());
+        // Redirect to the first order (or could show a summary page)
+        router.push(`/orders/${orders[0].order.id}`);
+      } else {
+        setIsProcessing(false);
+      }
     } catch (error: any) {
       console.error('Order error:', {
         error,
@@ -253,10 +369,26 @@ export default function CheckoutPage() {
     }
   };
 
-  // Free shipping for orders over 20,000 cedis
-  const deliveryFee = total >= 20000 ? 0 : (selectedDelivery?.price || deliveryOptions[0]?.price || 0);
+  // Calculate subtotals separately for regular and pre-order items
+  const regularSubtotal = regularItems.reduce((sum, item) => sum + item.subtotal, 0);
+  const preOrderSubtotal = preOrderItems.reduce((sum, item) => sum + item.subtotal, 0);
+  
+  // Calculate delivery fees separately
+  const regularDeliveryFee = hasRegularItems
+    ? (regularSubtotal >= 20000 ? 0 : (selectedDelivery?.price || deliveryOptions[0]?.price || 0))
+    : 0;
+  const preOrderDeliveryFee = hasPreOrderItems
+    ? (selectedPreOrderShipping?.price || PRE_ORDER_SHIPPING_OPTIONS[0].price)
+    : 0;
+  const totalDeliveryFee = regularDeliveryFee + preOrderDeliveryFee;
+  
   const tax = 0;
-  const grandTotal = total + deliveryFee + tax;
+  const grandTotal = total + totalDeliveryFee + tax;
+  
+  // Calculate estimated arrival for pre-orders
+  const estimatedArrival = hasPreOrderItems && selectedPreOrderShipping
+    ? calculateEstimatedArrival(selectedPreOrderShipping)
+    : null;
 
   // Handle empty cart on client-side only to avoid hydration mismatch
   if (!isMounted) {
@@ -402,36 +534,119 @@ export default function CheckoutPage() {
                   />
                 </div>
 
-                {/* Delivery Options */}
-                <div className="mt-6">
-                  <h3 className="font-semibold text-gray-900 mb-4">Delivery Option</h3>
-                  {deliveryOptions.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      Loading delivery options...
+                {/* Delivery Notice for Outside Accra */}
+                <div className="mt-6 p-4 bg-orange-50 border-l-4 border-[#FF7A19] rounded-lg">
+                  <h3 className="font-bold text-[#1A1A1A] mb-3 text-lg">
+                    VENTECH DELIVERY DETAILS – OUTSIDE ACCRA
+                  </h3>
+                  <p className="text-sm text-[#3A3A3A] mb-4 font-medium">
+                    Please Note: For all orders outside Greater Accra, a <strong>60% commitment payment</strong> is required before processing.
+                  </p>
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-[#1A1A1A] mb-2">We can:</p>
+                    <ul className="list-disc list-inside space-y-1 text-sm text-[#3A3A3A] ml-2">
+                      <li>Deliver to a trusted relative or contact, they inspect the item, and once confirmed, you make payment.</li>
+                      <li>Or, you may pay in full before delivery.</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Delivery Options / Pre-Order Shipping Options */}
+                <div className="mt-6 space-y-6">
+                  {/* Mixed Cart Notice */}
+                  {hasMixedCart && (
+                    <div className="p-4 bg-yellow-50 border-l-4 border-yellow-600 rounded-lg">
+                      <h3 className="font-semibold text-yellow-900 mb-2">Mixed Cart Notice</h3>
+                      <p className="text-sm text-yellow-700">
+                        Your cart contains both regular and pre-order items. These will be processed as separate orders with their respective shipping options.
+                      </p>
                     </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {deliveryOptions.map((option) => (
-                        <button
-                          key={option.id}
-                          onClick={() => setSelectedDelivery(option)}
-                          className={`w-full p-4 rounded-lg border-2 transition-all text-left ${
-                            selectedDelivery?.id === option.id
-                              ? 'border-blue-600 bg-blue-50'
-                              : 'border-gray-200 hover:border-gray-300'
-                          }`}
-                        >
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-semibold text-gray-900">{option.name}</p>
-                              <p className="text-sm text-gray-600">{option.description}</p>
-                            </div>
-                            <span className="font-bold text-gray-900">
-                              {option.price === 0 ? 'FREE' : formatCurrency(option.price)}
-                            </span>
-                          </div>
-                        </button>
-                      ))}
+                  )}
+
+                  {/* Regular Items Delivery Options */}
+                  {hasRegularItems && (
+                    <div>
+                      <div className="mb-4 p-4 bg-blue-50 border-l-4 border-blue-600 rounded-lg">
+                        <h3 className="font-semibold text-blue-900 mb-2">Regular Items Delivery</h3>
+                        <p className="text-sm text-blue-700">
+                          Select your preferred delivery method for regular items ({regularItems.length} item{regularItems.length > 1 ? 's' : ''}).
+                        </p>
+                      </div>
+                      <h3 className="font-semibold text-gray-900 mb-4">Delivery Option</h3>
+                      {deliveryOptions.length === 0 ? (
+                        <div className="text-center py-8 text-gray-500">
+                          Loading delivery options...
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {deliveryOptions.map((option) => (
+                            <button
+                              key={option.id}
+                              onClick={() => setSelectedDelivery(option)}
+                              className={`w-full p-4 rounded-lg border-2 transition-all text-left ${
+                                selectedDelivery?.id === option.id
+                                  ? 'border-blue-600 bg-blue-50'
+                                  : 'border-gray-200 hover:border-gray-300'
+                              }`}
+                            >
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <p className="font-semibold text-gray-900">{option.name}</p>
+                                  <p className="text-sm text-gray-600">{option.description}</p>
+                                </div>
+                                <span className="font-bold text-gray-900">
+                                  {option.price === 0 ? 'FREE' : formatCurrency(option.price)}
+                                </span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Pre-Order Shipping Options */}
+                  {hasPreOrderItems && (
+                    <div>
+                      <div className="mb-4 p-4 bg-orange-50 border-l-4 border-orange-600 rounded-lg">
+                        <h3 className="font-semibold text-orange-900 mb-2">Pre-Order Shipping</h3>
+                        <p className="text-sm text-orange-700">
+                          Select your preferred shipping method for pre-order items ({preOrderItems.length} item{preOrderItems.length > 1 ? 's' : ''}). Estimated delivery dates are provided for each option.
+                        </p>
+                      </div>
+                      <h3 className="font-semibold text-gray-900 mb-4">Shipping Option</h3>
+                      <div className="space-y-3">
+                        {PRE_ORDER_SHIPPING_OPTIONS.map((option) => {
+                          const estimatedArrival = calculateEstimatedArrival(option);
+                          return (
+                            <button
+                              key={option.id}
+                              onClick={() => setSelectedPreOrderShipping(option)}
+                              className={`w-full p-4 rounded-lg border-2 transition-all text-left ${
+                                selectedPreOrderShipping?.id === option.id
+                                  ? 'border-[#FF7A19] bg-orange-50'
+                                  : 'border-gray-200 hover:border-gray-300'
+                              }`}
+                            >
+                              <div className="flex justify-between items-start mb-2">
+                                <div className="flex-1">
+                                  <p className="font-semibold text-gray-900">{option.name}</p>
+                                  <p className="text-sm text-gray-600">{option.description}</p>
+                                </div>
+                                <span className="font-bold text-gray-900 ml-4">
+                                  {formatCurrency(option.price)}
+                                </span>
+                              </div>
+                              <div className="mt-2 pt-2 border-t border-gray-200">
+                                <p className="text-xs text-gray-600">
+                                  <strong>Estimated Delivery:</strong> {formatEstimatedDelivery(option)} 
+                                  {' '}(Arrives by {estimatedArrival.formatted})
+                                </p>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -511,6 +726,47 @@ export default function CheckoutPage() {
             {/* Step 3: Review & Confirm */}
             {step === 3 && (
               <div className="space-y-6">
+                {/* Mixed Cart Notice */}
+                {hasMixedCart && (
+                  <div className="bg-yellow-50 border-l-4 border-yellow-600 rounded-lg p-4">
+                    <h3 className="font-bold text-yellow-900 mb-2 flex items-center gap-2">
+                      <Package size={20} />
+                      Split Order Notice
+                    </h3>
+                    <p className="text-sm text-yellow-800 mb-2">
+                      Your cart contains both regular and pre-order items. These will be processed as <strong>two separate orders</strong>:
+                    </p>
+                    <ul className="list-disc list-inside text-sm text-yellow-800 space-y-1 ml-2">
+                      <li><strong>Regular Order:</strong> {regularItems.length} item{regularItems.length > 1 ? 's' : ''} with standard delivery</li>
+                      <li><strong>Pre-Order:</strong> {preOrderItems.length} item{preOrderItems.length > 1 ? 's' : ''} with pre-order shipping</li>
+                    </ul>
+                  </div>
+                )}
+
+                {/* Pre-Order Notice (only if no regular items) */}
+                {hasPreOrderItems && !hasRegularItems && (
+                  <div className="bg-blue-50 border-l-4 border-blue-600 rounded-lg p-4">
+                    <h3 className="font-bold text-blue-900 mb-2 flex items-center gap-2">
+                      <Package size={20} />
+                      Pre-Order Notice
+                    </h3>
+                    <p className="text-sm text-blue-800 mb-2">
+                      This order contains pre-order items. Full payment is required upfront.
+                    </p>
+                    {selectedPreOrderShipping && estimatedArrival && (
+                      <div className="mt-3 pt-3 border-t border-blue-200">
+                        <p className="text-sm font-semibold text-blue-900">
+                          Selected Shipping: {selectedPreOrderShipping.name}
+                        </p>
+                        <p className="text-sm text-blue-700">
+                          Estimated Arrival: {estimatedArrival.formatted} 
+                          {' '}({formatEstimatedDelivery(selectedPreOrderShipping)})
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Order Items */}
                 <div className="bg-white rounded-xl shadow-sm p-6">
                   <h2 className="text-2xl font-bold text-gray-900 mb-4">Order Items</h2>
@@ -527,7 +783,14 @@ export default function CheckoutPage() {
                           />
                         </div>
                         <div className="flex-1">
-                          <p className="font-semibold text-gray-900">{item.name}</p>
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="font-semibold text-gray-900">{item.name}</p>
+                            {item.is_pre_order && (
+                              <span className="px-2 py-0.5 bg-[#FF7A19] text-white text-xs font-semibold rounded">
+                                Pre-Order
+                              </span>
+                            )}
+                          </div>
                           <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
                         </div>
                         <span className="font-semibold text-gray-900">{formatCurrency(item.subtotal)}</span>
@@ -547,10 +810,62 @@ export default function CheckoutPage() {
                   </p>
                 </div>
 
+                {/* Shipping Method */}
+                {hasMixedCart ? (
+                  <div className="space-y-4">
+                    {hasRegularItems && (
+                      <div className="bg-white rounded-xl shadow-sm p-6">
+                        <h3 className="font-bold text-gray-900 mb-2">Regular Items Delivery</h3>
+                        <p className="text-gray-600">
+                          {selectedDelivery?.name || 'Standard Delivery'}
+                        </p>
+                      </div>
+                    )}
+                    {hasPreOrderItems && selectedPreOrderShipping && (
+                      <div className="bg-white rounded-xl shadow-sm p-6">
+                        <h3 className="font-bold text-gray-900 mb-2">Pre-Order Shipping</h3>
+                        <p className="text-gray-900 font-semibold">{selectedPreOrderShipping.name}</p>
+                        <p className="text-sm text-gray-600">{selectedPreOrderShipping.description}</p>
+                        {estimatedArrival && (
+                          <p className="text-sm text-blue-600 mt-1">
+                            Estimated Arrival: {estimatedArrival.formatted}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-xl shadow-sm p-6">
+                    <h3 className="font-bold text-gray-900 mb-2">
+                      {hasPreOrderItems ? 'Shipping Method' : 'Delivery Method'}
+                    </h3>
+                    {hasPreOrderItems && selectedPreOrderShipping ? (
+                      <div>
+                        <p className="text-gray-900 font-semibold">{selectedPreOrderShipping.name}</p>
+                        <p className="text-sm text-gray-600">{selectedPreOrderShipping.description}</p>
+                        {estimatedArrival && (
+                          <p className="text-sm text-blue-600 mt-1">
+                            Estimated Arrival: {estimatedArrival.formatted}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-gray-600">
+                        {selectedDelivery?.name || 'Standard Delivery'}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {/* Payment Method */}
                 <div className="bg-white rounded-xl shadow-sm p-6">
                   <h3 className="font-bold text-gray-900 mb-2">Payment Method</h3>
                   <p className="text-gray-600 capitalize">Cash on Delivery</p>
+                  {hasPreOrderItems && (
+                    <p className="text-sm text-orange-600 mt-2 font-semibold">
+                      ⚠️ Full payment required for pre-orders
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex gap-4">
@@ -583,13 +898,47 @@ export default function CheckoutPage() {
 
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between text-gray-600">
-                  <span>Subtotal</span>
+                  <span className="font-semibold">Subtotal</span>
                   <span>{formatCurrency(total)}</span>
                 </div>
+                
+                {/* Show breakdown for mixed carts */}
+                {hasMixedCart && (
+                  <>
+                    <div className="flex justify-between text-sm text-gray-500 pl-2">
+                      <span>Regular Items ({regularItems.length})</span>
+                      <span>{formatCurrency(regularSubtotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm text-gray-500 pl-2">
+                      <span>Pre-Order Items ({preOrderItems.length})</span>
+                      <span>{formatCurrency(preOrderSubtotal)}</span>
+                    </div>
+                  </>
+                )}
+                
                 <div className="flex justify-between text-gray-600">
-                  <span>Delivery</span>
-                  <span>{deliveryFee === 0 ? 'FREE' : formatCurrency(deliveryFee)}</span>
+                  <span className="font-semibold">Delivery</span>
+                  <span>{totalDeliveryFee === 0 ? 'FREE' : formatCurrency(totalDeliveryFee)}</span>
                 </div>
+                
+                {/* Show delivery breakdown for mixed carts */}
+                {hasMixedCart && (
+                  <>
+                    {regularDeliveryFee > 0 && (
+                      <div className="flex justify-between text-sm text-gray-500 pl-2">
+                        <span>Regular Delivery</span>
+                        <span>{formatCurrency(regularDeliveryFee)}</span>
+                      </div>
+                    )}
+                    {preOrderDeliveryFee > 0 && (
+                      <div className="flex justify-between text-sm text-gray-500 pl-2">
+                        <span>Pre-Order Shipping</span>
+                        <span>{formatCurrency(preOrderDeliveryFee)}</span>
+                      </div>
+                    )}
+                  </>
+                )}
+                
                 {tax > 0 && (
                   <div className="flex justify-between text-gray-600">
                     <span>Tax</span>

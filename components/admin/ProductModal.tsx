@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { X, Upload, Loader2, Plus, Trash2, ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import toast from 'react-hot-toast';
@@ -17,6 +18,7 @@ interface ProductModalProps {
 }
 
 export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductModalProps) {
+  const pathname = usePathname();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [showMediaPicker, setShowMediaPicker] = useState(false);
@@ -43,6 +45,9 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
     thumbnail: '',
     is_featured: false,
     in_stock: true,
+    is_pre_order: false,
+    pre_order_available: false,
+    estimated_arrival_date: '',
   });
 
   useEffect(() => {
@@ -72,6 +77,12 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
             : JSON.stringify(product.specifications))
         : '';
 
+      // Format estimated_arrival_date if it exists
+      const estimatedDate = product.estimated_arrival_date 
+        ? new Date(product.estimated_arrival_date).toISOString().split('T')[0]
+        : '';
+
+      const isPreOrder = product.is_pre_order || false;
       setFormData({
         name: product.name || '',
         slug: product.slug || '',
@@ -87,16 +98,25 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
         sku: product.sku || '',
         images: product.images || [],
         thumbnail: product.thumbnail || '',
-        is_featured: product.is_featured || false,
+        // Pre-order products cannot be featured
+        is_featured: isPreOrder ? false : (product.is_featured || false),
         in_stock: product.in_stock !== undefined ? product.in_stock : true,
+        is_pre_order: isPreOrder,
+        pre_order_available: isPreOrder, // Auto-set based on is_pre_order
+        estimated_arrival_date: estimatedDate,
       });
       fetchProductAttributes(product.id);
+      // Reset productVariants when opening a product - ProductVariantManager will fetch them
+      setProductVariants([]);
     } else {
       resetForm();
+      setProductVariants([]);
     }
   }, [product, isOpen]);
 
   const resetForm = () => {
+    // Auto-enable pre-order if we're on the pre-orders page
+    const isPreOrderPage = pathname === '/admin/pre-orders';
     setFormData({
       name: '',
       slug: '',
@@ -114,6 +134,9 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
       thumbnail: '',
       is_featured: false,
       in_stock: true,
+      is_pre_order: isPreOrderPage,
+      pre_order_available: isPreOrderPage, // Auto-set to true if on pre-orders page
+      estimated_arrival_date: '',
     });
     setSelectedAttributes([]);
   };
@@ -328,8 +351,12 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
         sku: formData.sku,
         images: formData.images,
         thumbnail: formData.thumbnail,
-        is_featured: formData.is_featured,
+        // Pre-order products cannot be featured
+        is_featured: formData.is_pre_order ? false : formData.is_featured,
         in_stock: formData.in_stock,
+        is_pre_order: formData.is_pre_order,
+        pre_order_available: formData.is_pre_order, // Auto-set to true if is_pre_order is true
+        estimated_arrival_date: formData.estimated_arrival_date ? new Date(formData.estimated_arrival_date).toISOString() : null,
         updated_at: new Date().toISOString(),
       };
 
@@ -365,18 +392,24 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
 
       // Save product variants/attributes
       if (productId) {
-        // Delete existing mappings
+        // Delete existing mappings and selected options
         await supabase
           .from('product_attribute_mappings')
           .delete()
           .eq('product_id', productId);
+        
+        await supabase
+          .from('product_selected_options')
+          .delete()
+          .eq('product_id', productId);
 
-        // Insert new mappings
-        if (selectedAttributes.length > 0) {
-          const mappings = selectedAttributes.map((attrId, index) => ({
+        // Insert new mappings and selected options
+        if (productVariants.length > 0) {
+          // Save attribute mappings
+          const mappings = productVariants.map((variant, index) => ({
             product_id: productId,
-            attribute_id: attrId,
-            is_required: true,
+            attribute_id: variant.attribute_id,
+            is_required: variant.is_required,
             display_order: index,
           }));
 
@@ -385,6 +418,32 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
             .insert(mappings);
 
           if (mappingError) throw mappingError;
+
+          // Save selected options for each variant
+          console.log('Saving productVariants:', productVariants);
+          const selectedOptions = productVariants.flatMap(variant =>
+            variant.selected_options.map((optionId: string) => ({
+              product_id: productId,
+              attribute_id: variant.attribute_id,
+              option_id: optionId,
+            }))
+          );
+
+          console.log('Saving selectedOptions:', selectedOptions);
+
+          if (selectedOptions.length > 0) {
+            const { error: optionsError } = await supabase
+              .from('product_selected_options')
+              .insert(selectedOptions);
+
+            if (optionsError) {
+              console.error('Error saving selected options:', optionsError);
+              throw optionsError;
+            }
+            console.log('Successfully saved selected options');
+          } else {
+            console.warn('No selected options to save');
+          }
         }
       }
 
@@ -638,17 +697,69 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
                 </label>
               </div>
 
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="is_featured"
-                  checked={formData.is_featured}
-                  onChange={(e) => setFormData({ ...formData, is_featured: e.target.checked })}
-                  className="w-5 h-5 text-[#FF7A19] border-gray-300 rounded focus:ring-[#FF7A19]"
-                />
-                <label htmlFor="is_featured" className="text-sm font-medium text-[#1A1A1A]">
-                  Featured
-                </label>
+              {/* Featured checkbox - hidden for pre-order products */}
+              {!formData.is_pre_order && (
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="is_featured"
+                    checked={formData.is_featured}
+                    onChange={(e) => setFormData({ ...formData, is_featured: e.target.checked })}
+                    className="w-5 h-5 text-[#FF7A19] border-gray-300 rounded focus:ring-[#FF7A19]"
+                  />
+                  <label htmlFor="is_featured" className="text-sm font-medium text-[#1A1A1A]">
+                    Featured
+                  </label>
+                </div>
+              )}
+            </div>
+
+            {/* Pre-Order Section */}
+            <div className="pt-8 border-t border-gray-200">
+              <h3 className="text-lg font-semibold text-[#1A1A1A] mb-4">Pre-Order Settings</h3>
+              
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="is_pre_order"
+                    checked={formData.is_pre_order}
+                    onChange={(e) => {
+                      const isPreOrder = e.target.checked;
+                      // If enabling pre-order, disable featured (pre-order products can't be featured)
+                      setFormData({ 
+                        ...formData, 
+                        is_pre_order: isPreOrder,
+                        is_featured: isPreOrder ? false : formData.is_featured // Uncheck featured if pre-order is enabled
+                      });
+                    }}
+                    className="w-5 h-5 text-[#FF7A19] border-gray-300 rounded focus:ring-[#FF7A19]"
+                  />
+                  <label htmlFor="is_pre_order" className="text-sm font-medium text-[#1A1A1A]">
+                    Enable Pre-Order
+                  </label>
+                  <p className="text-xs text-gray-500">
+                    Products added from the pre-orders page will automatically show on the pre-order page
+                  </p>
+                </div>
+
+                {formData.is_pre_order && (
+                  <div>
+                    <label htmlFor="estimated_arrival_date" className="block text-sm font-medium text-[#1A1A1A] mb-2">
+                      Estimated Arrival Date (Optional)
+                    </label>
+                    <input
+                      type="date"
+                      id="estimated_arrival_date"
+                      value={formData.estimated_arrival_date}
+                      onChange={(e) => setFormData({ ...formData, estimated_arrival_date: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      This date will be shown to customers as an estimated arrival date
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -748,9 +859,11 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
               key={product?.id || 'new'} // Force re-render when product changes
               productId={product?.id}
               onVariantChange={(variants) => {
+                console.log('ProductVariantManager: Variants changed', variants);
                 // Use functional update to avoid stale closure issues
                 setProductVariants(prev => {
                   const newVariants = variants;
+                  console.log('ProductModal: Setting productVariants', newVariants);
                   setSelectedAttributes(newVariants.map(v => v.attribute_id));
                   return newVariants;
                 });

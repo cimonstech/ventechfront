@@ -8,7 +8,7 @@ import { ProductCard } from '@/components/cards/ProductCard';
 import { CategoryCard } from '@/components/cards/CategoryCard';
 import { ProductListSkeleton } from '@/components/loaders/ProductCardSkeleton';
 import { QuickView } from '@/components/shop/QuickView';
-import { FlashDeals } from '@/components/shop/FlashDeals';
+// import { FlashDeals } from '@/components/shop/FlashDeals'; // Disabled for now
 import { Button } from '@/components/ui/Button';
 import { 
   ArrowRight, 
@@ -19,7 +19,8 @@ import {
   Award,
   Tag,
   TrendingUp,
-  Star
+  Star,
+  Package
 } from 'lucide-react';
 import { Product, Category } from '@/types/product';
 import { Banner } from '@/types/banner';
@@ -170,9 +171,10 @@ export function HomeContent() {
         ]);
 
         // Get featured products separately - only products explicitly marked as featured
+        // Note: Pre-order products are excluded from featured products
         const featuredData = await productService.getProducts({ featured: true, limit: 10 });
-        // Filter to ensure only products with featured=true are included
-        const actualFeaturedProducts = featuredData.filter(p => p.featured === true);
+        // Filter to ensure only products with featured=true and NOT pre-order are included
+        const actualFeaturedProducts = featuredData.filter(p => p.featured === true && !(p as any).is_pre_order);
         setFeaturedProducts(actualFeaturedProducts);
 
         // Filter out featured products from all products - exclude products that are featured
@@ -321,10 +323,10 @@ export function HomeContent() {
         </div>
       </section>
 
-      {/* Flash Deals */}
-      <section className="container mx-auto px-3 sm:px-4 py-6 sm:py-10">
+      {/* Flash Deals - Disabled for now */}
+      {/* <section className="container mx-auto px-3 sm:px-4 py-6 sm:py-10">
         <FlashDeals />
-      </section>
+      </section> */}
 
       {/* All Products / Trending */}
       <section className="container mx-auto px-3 sm:px-4 py-6 sm:py-10">
@@ -367,21 +369,21 @@ export function HomeContent() {
 
       {/* Special Offers Banner */}
       <section className="container mx-auto px-4 py-10">
-        <div className="relative rounded-2xl overflow-hidden text-white">
+        <div className="relative rounded-2xl overflow-hidden">
           <div className="absolute inset-0 bg-[url('/placeholders/bg-gadgets1.webp')] bg-cover bg-center" />
-          <div className="absolute inset-0 bg-black/50" />
+          <div className="absolute inset-0 bg-white/75" />
           <div className="relative z-10 max-w-2xl p-8 md:p-12">
             <div className="inline-flex items-center gap-2 bg-[#FF7A19] rounded-full px-4 py-1 mb-4">
-              <Tag size={14} />
-              <span className="text-xs font-semibold">SPECIAL OFFER</span>
+              <Tag size={14} className="text-white" />
+              <span className="text-xs font-semibold text-white">SPECIAL OFFER</span>
             </div>
-            <h2 className="text-2xl md:text-3xl font-bold mb-3 text-white">
+            <h2 className="text-2xl md:text-3xl font-bold mb-3 text-[#1A1A1A]">
               Get Up to 50% OFF on Selected Items
             </h2>
-            <p className="text-white/90 text-sm mb-6">
+            <p className="text-[#3A3A3A] text-sm mb-6">
               Don't miss out on our biggest sale of the season. Limited time only!
             </p>
-            <Link href="/deals">
+            <Link href="/shop">
               <Button variant="primary" size="lg" icon={<ArrowRight size={16} />}>
                 Shop Now
               </Button>
@@ -404,7 +406,7 @@ export function HomeContent() {
             <input
               type="email"
               placeholder="Enter your email"
-              className="w-full px-4 py-3 rounded-lg text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-white"
+              className="w-full px-4 py-3 rounded-lg text-[#1A1A1A] bg-white focus:outline-none focus:ring-2 focus:ring-white"
             />
             <Button variant="secondary" size="lg" type="submit" className="w-full sm:w-auto sm:mx-auto">
               Subscribe
@@ -416,17 +418,24 @@ export function HomeContent() {
       {/* Call to Action Section */}
       <section className="bg-[#1A1A1A] py-12">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-2xl md:text-3xl font-bold mb-3 text-white">
+          <h2 className="text-2xl md:text-3xl font-bold mb-3 !text-white" style={{ color: '#ffffff' }}>
             Ready to Upgrade Your Tech?
           </h2>
-          <p className="text-base text-white mb-6">
+          <p className="text-base text-white/90 mb-6">
             Explore our collection of the latest gadgets and electronics
           </p>
-          <Link href="/categories">
-            <Button variant="primary" size="lg" icon={<ShoppingBag size={18} />}>
-              Start Shopping
-            </Button>
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <Link href="/categories">
+              <Button variant="primary" size="lg" icon={<ShoppingBag size={18} />}>
+                Start Shopping
+              </Button>
+            </Link>
+            <Link href="/pre-order">
+              <Button variant="secondary" size="lg" icon={<Package size={18} />}>
+                Pre-Order Now
+              </Button>
+            </Link>
+          </div>
         </div>
       </section>
 

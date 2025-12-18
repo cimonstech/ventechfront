@@ -154,7 +154,7 @@ export default function LaptopBankingPage() {
       {/* Key Benefits */}
       <section className="py-16 bg-gray-50">
         <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-4 gap-8 max-w-6xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 max-w-6xl mx-auto">
             <div className="text-center">
               <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Percent className="text-[#FF7A19]" size={28} />
@@ -227,7 +227,7 @@ export default function LaptopBankingPage() {
             </div>
           </div>
 
-          <div className="grid md:grid-cols-4 gap-6 max-w-6xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-6xl mx-auto">
             {[
               { step: '1', title: 'You Invest', desc: 'Choose your tier and sign agreement' },
               { step: '2', title: 'We Purchase', desc: 'Import laptops from trusted suppliers' },

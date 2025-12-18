@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronUp, Edit2, X, Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/helpers';
@@ -50,6 +50,8 @@ export function ProductVariantManager({ productId, onVariantChange }: ProductVar
   const [newAttributeName, setNewAttributeName] = useState('');
   const [newAttributeType, setNewAttributeType] = useState<'select' | 'radio'>('select');
   const [showAddAttribute, setShowAddAttribute] = useState(false);
+  const [editingPrice, setEditingPrice] = useState<{ optionId: string; value: string } | null>(null);
+  const [deletingOption, setDeletingOption] = useState<string | null>(null);
 
   useEffect(() => {
     fetchAttributes();
@@ -94,7 +96,7 @@ export function ProductVariantManager({ productId, onVariantChange }: ProductVar
       return;
     }
     
-    // Only call if variants actually changed
+    // Only call if variants actually changed (this is a backup in case direct calls miss something)
     if (prevVariantsRef.current !== variantsKey) {
       prevVariantsRef.current = variantsKey;
       
@@ -116,7 +118,7 @@ export function ProductVariantManager({ productId, onVariantChange }: ProductVar
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productVariants.length]); // Only depend on length to prevent infinite loops
+  }, [productVariants.map(v => `${v.attribute_id}:${v.selected_options.join(',')}`).join('|')]); // Depend on a serialized version to detect all changes
 
   const fetchAttributes = async () => {
     try {
@@ -169,20 +171,30 @@ export function ProductVariantManager({ productId, onVariantChange }: ProductVar
 
       if (error) throw error;
 
+      // Fetch selected options for this product
+      const { data: selectedOptionsData, error: selectedOptionsError } = await supabase
+        .from('product_selected_options')
+        .select('attribute_id, option_id')
+        .eq('product_id', productId);
+
+      if (selectedOptionsError) throw selectedOptionsError;
+
+      // Group selected options by attribute_id
+      const selectedOptionsByAttribute: Record<string, string[]> = {};
+      (selectedOptionsData || []).forEach((item: any) => {
+        if (!selectedOptionsByAttribute[item.attribute_id]) {
+          selectedOptionsByAttribute[item.attribute_id] = [];
+        }
+        selectedOptionsByAttribute[item.attribute_id].push(item.option_id);
+      });
+
       // Fetch options for each mapped attribute
       const variantsWithOptions = await Promise.all(
         (mappings || []).map(async (mapping: any) => {
           const attr = attributes.find(a => a.id === mapping.attribute_id);
           
-          // Get options for this attribute
-          const { data: options } = await supabase
-            .from('product_attribute_options')
-            .select('id')
-            .eq('attribute_id', mapping.attribute_id)
-            .eq('is_available', true);
-          
-          // Select all available options by default
-          const selectedOptionIds = options?.map(opt => opt.id) || [];
+          // Get only the saved selected options for this attribute, or empty array if none saved
+          const selectedOptionIds = selectedOptionsByAttribute[mapping.attribute_id] || [];
 
           return {
             attribute_id: mapping.attribute_id,
@@ -208,13 +220,13 @@ export function ProductVariantManager({ productId, onVariantChange }: ProductVar
 
     if (variant) {
       // Remove attribute
-      setProductVariants(productVariants.filter(v => v.attribute_id !== attributeId));
+      setProductVariants(prevVariants => prevVariants.filter(v => v.attribute_id !== attributeId));
     } else {
       // Add attribute
       if (!attr) return;
 
-      setProductVariants([
-        ...productVariants,
+      setProductVariants(prevVariants => [
+        ...prevVariants,
         {
           attribute_id: attributeId,
           attribute_name: attr.name,
@@ -222,23 +234,25 @@ export function ProductVariantManager({ productId, onVariantChange }: ProductVar
           is_required: attr.is_required,
         },
       ]);
-      setExpandedAttributes([...expandedAttributes, attributeId]);
+      setExpandedAttributes(prev => [...prev, attributeId]);
     }
   };
 
   const toggleOption = (attributeId: string, optionId: string) => {
-    setProductVariants(productVariants.map(variant => {
-      if (variant.attribute_id === attributeId) {
-        const hasOption = variant.selected_options.includes(optionId);
-        return {
-          ...variant,
-          selected_options: hasOption
-            ? variant.selected_options.filter(id => id !== optionId)
-            : [...variant.selected_options, optionId],
-        };
-      }
-      return variant;
-    }));
+    setProductVariants(prevVariants => {
+      return prevVariants.map(variant => {
+        if (variant.attribute_id === attributeId) {
+          const hasOption = variant.selected_options.includes(optionId);
+          return {
+            ...variant,
+            selected_options: hasOption
+              ? variant.selected_options.filter(id => id !== optionId)
+              : [...variant.selected_options, optionId],
+          };
+        }
+        return variant;
+      });
+    });
   };
 
   const updateOptionPriceModifier = (attributeId: string, optionId: string, priceModifier: number) => {
@@ -331,6 +345,85 @@ export function ProductVariantManager({ productId, onVariantChange }: ProductVar
     }
   };
 
+  const updateOptionPrice = async (optionId: string, newPrice: number) => {
+    try {
+      const { error } = await supabase
+        .from('product_attribute_options')
+        .update({ price_modifier: newPrice })
+        .eq('id', optionId);
+
+      if (error) throw error;
+
+      toast.success('Price updated!');
+      setEditingPrice(null);
+      await fetchAttributes();
+    } catch (error: any) {
+      console.error('Error updating price:', error);
+      toast.error(error.message || 'Failed to update price');
+    }
+  };
+
+  const deleteOption = async (optionId: string, optionLabel: string) => {
+    if (!confirm(`Are you sure you want to delete "${optionLabel}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      setDeletingOption(optionId);
+      
+      // First, check if this option is used in any product mappings
+      const { data: mappings, error: checkError } = await supabase
+        .from('product_attribute_mappings')
+        .select('id')
+        .limit(1);
+
+      if (checkError) throw checkError;
+
+      // Delete the option
+      const { error } = await supabase
+        .from('product_attribute_options')
+        .delete()
+        .eq('id', optionId);
+
+      if (error) throw error;
+
+      toast.success('Option deleted!');
+      
+      // Remove from selected options if it was selected
+      setProductVariants(productVariants.map(variant => ({
+        ...variant,
+        selected_options: variant.selected_options.filter(id => id !== optionId)
+      })));
+      
+      await fetchAttributes();
+    } catch (error: any) {
+      console.error('Error deleting option:', error);
+      toast.error(error.message || 'Failed to delete option');
+    } finally {
+      setDeletingOption(null);
+    }
+  };
+
+  const handlePriceEdit = (optionId: string, currentPrice: number) => {
+    setEditingPrice({ optionId, value: currentPrice.toString() });
+  };
+
+  const handlePriceSave = (optionId: string) => {
+    if (!editingPrice) return;
+    
+    const newPrice = parseFloat(editingPrice.value);
+    if (isNaN(newPrice)) {
+      toast.error('Please enter a valid number');
+      return;
+    }
+
+    updateOptionPrice(optionId, newPrice);
+  };
+
+  const handlePriceCancel = () => {
+    setEditingPrice(null);
+  };
+
   if (loading) {
     return <div className="text-center py-4">Loading attributes...</div>;
   }
@@ -409,17 +502,98 @@ export function ProductVariantManager({ productId, onVariantChange }: ProductVar
                                 </div>
                               </div>
                               <div className="flex items-center gap-3">
-                                <div className="text-right">
-                                  <p className="text-sm font-semibold text-[#1A1A1A]">
-                                    {option.price_modifier > 0 
-                                      ? `+${formatCurrency(option.price_modifier)}`
-                                      : option.price_modifier < 0
-                                      ? formatCurrency(option.price_modifier)
-                                      : 'No change'
-                                    }
-                                  </p>
-                                  <p className="text-xs text-[#3A3A3A]">Price adjustment</p>
-                                </div>
+                                {editingPrice?.optionId === option.id ? (
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={editingPrice.value}
+                                      onChange={(e) => setEditingPrice({ optionId: option.id, value: e.target.value })}
+                                      className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
+                                      autoFocus
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          handlePriceSave(option.id);
+                                        } else if (e.key === 'Escape') {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          handlePriceCancel();
+                                        }
+                                      }}
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        handlePriceSave(option.id);
+                                      }}
+                                      className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors"
+                                      title="Save"
+                                    >
+                                      <Check size={16} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        handlePriceCancel();
+                                      }}
+                                      className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                      title="Cancel"
+                                    >
+                                      <X size={16} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div className="text-right">
+                                      <p className="text-sm font-semibold text-[#1A1A1A]">
+                                        {option.price_modifier > 0 
+                                          ? `+${formatCurrency(option.price_modifier)}`
+                                          : option.price_modifier < 0
+                                          ? formatCurrency(option.price_modifier)
+                                          : 'No change'
+                                        }
+                                      </p>
+                                      <p className="text-xs text-[#3A3A3A]">Price adjustment</p>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          handlePriceEdit(option.id, option.price_modifier);
+                                        }}
+                                        className="p-1.5 text-[#FF7A19] hover:bg-orange-50 rounded transition-colors"
+                                        title="Edit price"
+                                      >
+                                        <Edit2 size={14} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          deleteOption(option.id, option.label);
+                                        }}
+                                        disabled={deletingOption === option.id}
+                                        className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        title="Delete option"
+                                      >
+                                        {deletingOption === option.id ? (
+                                          <Loader2 size={14} className="animate-spin" />
+                                        ) : (
+                                          <Trash2 size={14} />
+                                        )}
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
                               </div>
                             </div>
                           </div>

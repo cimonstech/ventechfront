@@ -30,6 +30,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
     ? calculateDiscountPercentage(product.original_price, product.discount_price!)
     : 0;
 
+  const isPreOrder = (product as any).is_pre_order === true;
+
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -39,6 +41,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
       quantity: 1,
       selected_variants: {},
       subtotal: product.discount_price || product.original_price,
+      is_pre_order: isPreOrder,
     };
 
     dispatch(
@@ -48,7 +51,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
       })
     );
 
-    toast.success(`${product.name} added to cart!`);
+    toast.success(isPreOrder ? `${product.name} added to pre-order cart!` : `${product.name} added to cart!`);
   };
 
   const handleWishlist = async (e: React.MouseEvent) => {
@@ -67,6 +70,77 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
       toast.error('Failed to update wishlist');
     }
   };
+
+  // Extract and format key specs for display
+  const getSpecTags = () => {
+    if (!product.specs || typeof product.specs !== 'object') {
+      return [];
+    }
+
+    const tags: Array<{ label: string; color: string }> = [];
+    const specs = product.specs;
+
+    // Priority order: RAM, Storage, Processor, Screen Size
+    // 1. RAM
+    if (specs.ram) {
+      const ramValue = String(specs.ram).toUpperCase();
+      tags.push({
+        label: ramValue.includes('RAM') ? ramValue : `${ramValue} RAM`,
+        color: 'bg-purple-600' // Purple for RAM
+      });
+    }
+
+    // 2. Storage
+    if (specs.storage) {
+      const storageValue = String(specs.storage).toUpperCase();
+      tags.push({
+        label: storageValue.includes('SSD') || storageValue.includes('HDD') 
+          ? storageValue 
+          : `${storageValue} SSD`,
+        color: 'bg-blue-600' // Blue for Storage
+      });
+    }
+
+    // 3. Processor
+    if (specs.processor) {
+      const processorValue = String(specs.processor).toUpperCase();
+      // Format processor (e.g., "INTEL I7", "AMD RYZEN 5")
+      let formattedProcessor = processorValue;
+      if (processorValue.includes('INTEL') || processorValue.includes('I7') || processorValue.includes('I5') || processorValue.includes('I3')) {
+        formattedProcessor = processorValue.replace(/INTEL\s*/i, 'INTEL ');
+      }
+      tags.push({
+        label: formattedProcessor,
+        color: 'bg-cyan-600' // Teal/Cyan for Processor
+      });
+    }
+
+    // 4. Screen Size
+    if (specs.screen_size || specs.screen) {
+      const screenValue = String(specs.screen_size || specs.screen).toUpperCase();
+      // Format screen (e.g., "13 TOUCH 360", "15.6 INCH")
+      let formattedScreen = screenValue;
+      if (screenValue.includes('TOUCH') || screenValue.includes('360')) {
+        formattedScreen = screenValue;
+      } else if (screenValue.match(/\d+/)) {
+        formattedScreen = `${screenValue} INCH`;
+      }
+      tags.push({
+        label: formattedScreen,
+        color: 'bg-green-600' // Green for Screen Size
+      });
+    }
+
+    return tags.slice(0, 4); // Return at most 4 tags
+  };
+
+  const specTags = getSpecTags();
+
+  // Safely get rating value, defaulting to 0 if undefined/null/NaN
+  const rating = typeof product.rating === 'number' && !isNaN(product.rating) 
+    ? product.rating 
+    : 0;
+  const displayRating = rating.toFixed(1);
 
   return (
     <Link href={`/product/${product.slug}`}>
@@ -89,12 +163,17 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
                 -{discountPercentage}%
               </Badge>
             )}
-            {product.featured && (
+            {isPreOrder && (
+              <Badge size="sm" className="!bg-black !text-white font-semibold">
+                PREORDER
+              </Badge>
+            )}
+            {product.featured && !isPreOrder && (
               <Badge variant="warning" size="sm">
                 Featured
               </Badge>
             )}
-            {!product.in_stock && (
+            {!product.in_stock && !isPreOrder && (
               <Badge variant="default" size="sm">
                 Out of Stock
               </Badge>
@@ -104,20 +183,20 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
           {/* Rating - Fixed position on bottom left corner */}
           <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm rounded-lg px-2 py-1 flex items-center gap-1">
             <Star size={10} className="fill-yellow-400 text-yellow-400" />
-            <span className="text-xs font-medium text-[#1A1A1A]">{product.rating.toFixed(1)}</span>
+            <span className="text-xs font-medium text-[#1A1A1A]">{displayRating}</span>
           </div>
 
           {/* Cart Icon - Top right (opposite of rating), mobile only */}
           <div className="absolute top-3 right-3 z-10 md:hidden">
             <button
               onClick={handleAddToCart}
-              disabled={!product.in_stock}
+              disabled={!isPreOrder && !product.in_stock}
               className={`p-2 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-md ${
                 isInCart 
                   ? 'bg-orange-600 hover:bg-orange-700' 
                   : 'bg-[#FF7A19] hover:bg-orange-500'
               }`}
-              title={!product.in_stock ? 'Out of Stock' : isInCart ? 'In Cart' : 'Add to Cart'}
+              title={!isPreOrder && !product.in_stock ? 'Out of Stock' : isInCart ? (isPreOrder ? 'In Pre-Order Cart' : 'In Cart') : (isPreOrder ? 'Pre-Order' : 'Add to Cart')}
             >
               <ShoppingCart 
                 size={16} 
@@ -215,15 +294,29 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
             )}
           </div>
 
-          {/* Desktop: Add to Cart Button */}
+          {/* Spec Tags */}
+          {specTags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {specTags.map((tag, index) => (
+                <span
+                  key={index}
+                  className={`${tag.color} text-white text-[9px] sm:text-[10px] font-semibold px-2 py-1 rounded-md whitespace-nowrap`}
+                >
+                  {tag.label}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Desktop: Add to Cart / Pre-Order Button */}
           <button
             onClick={handleAddToCart}
-            disabled={!product.in_stock}
+            disabled={!isPreOrder && !product.in_stock}
             className="hidden md:flex w-full items-center justify-center gap-2 px-4 py-2.5 bg-[#FF7A19] hover:bg-orange-600 text-white font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-            title={!product.in_stock ? 'Out of Stock' : isInCart ? 'In Cart' : 'Add to Cart'}
+            title={!isPreOrder && !product.in_stock ? 'Out of Stock' : isInCart ? (isPreOrder ? 'In Pre-Order Cart' : 'In Cart') : (isPreOrder ? 'Pre-Order' : 'Add to Cart')}
           >
             <ShoppingCart size={16} />
-            {!product.in_stock ? 'Out of Stock' : isInCart ? 'In Cart' : 'Add to Cart'}
+            {!isPreOrder && !product.in_stock ? 'Out of Stock' : isInCart ? (isPreOrder ? 'In Pre-Order Cart' : 'In Cart') : (isPreOrder ? 'Pre-Order' : 'Add to Cart')}
           </button>
         </div>
       </div>

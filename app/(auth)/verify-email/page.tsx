@@ -74,7 +74,7 @@ export default function VerifyEmailPage() {
     } catch (error: any) {
       console.error('Resend error:', error);
       // Handle rate limiting (429 error)
-      if (error.status === 429 || error.message?.includes('429') || error.message?.toLowerCase().includes('rate limit')) {
+      if ((error?.status === 429) || error.message?.includes('429') || error.message?.toLowerCase().includes('rate limit')) {
         toast.error('Too many requests. Please wait a few minutes before requesting another email.', {
           duration: 5000,
         });

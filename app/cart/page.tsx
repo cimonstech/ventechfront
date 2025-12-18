@@ -21,6 +21,12 @@ export default function CartPage() {
   const [taxAmount, setTaxAmount] = useState(0);
   const [discountAmount, setDiscountAmount] = useState(0);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // Track when component has mounted to avoid hydration mismatch
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleRemoveItem = (productId: string) => {
     dispatch(removeFromCart(productId));
@@ -73,6 +79,20 @@ export default function CartPage() {
 
     calculateTaxesAndDiscounts();
   }, [total]);
+
+  // Prevent hydration mismatch by showing consistent content until mounted
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="container mx-auto px-4">
+          <div className="mb-6">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Shopping Cart</h1>
+            <p className="text-xs sm:text-sm text-gray-600">Loading...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (items.length === 0) {
     return (

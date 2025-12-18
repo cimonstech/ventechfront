@@ -65,11 +65,11 @@ export default function SalesAnalyticsPage() {
         if (response.ok) {
           const result = await response.json();
           if (result.success && result.data) {
-            // Filter by date range and payment status (include both paid and pending)
+            // Filter by date range and payment status (only paid orders - actual purchases)
             const filteredOrders = (result.data || []).filter((order: any) => {
               const orderDate = new Date(order.created_at);
               return orderDate >= startDate && 
-                     (order.payment_status === 'paid' || order.payment_status === 'pending');
+                     order.payment_status === 'paid';
             });
 
             orders = filteredOrders.map((order: any) => ({
@@ -97,7 +97,7 @@ export default function SalesAnalyticsPage() {
           const { data: ordersData, error: ordersError } = await supabase
             .from('orders')
             .select('id, total, payment_status, created_at')
-            .in('payment_status', ['paid', 'pending'])
+            .eq('payment_status', 'paid') // Only count paid orders (actual purchases)
             .gte('created_at', startDate.toISOString());
 
           if (ordersError) {

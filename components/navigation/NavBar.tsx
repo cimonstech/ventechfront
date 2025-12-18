@@ -31,6 +31,19 @@ export const NavBar = () => {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  const [isNoticeVisible, setIsNoticeVisible] = useState(false);
+
+  // Check if notice was dismissed
+  useEffect(() => {
+    const dismissed = localStorage.getItem('customer-service-notice-dismissed');
+    setIsNoticeVisible(!dismissed);
+  }, []);
+
+  const handleDismissNotice = () => {
+    setIsNoticeVisible(false);
+    localStorage.setItem('customer-service-notice-dismissed', 'true');
+  };
 
   // Prevent body scroll when mobile menu is open
   useEffect(() => {
@@ -48,6 +61,21 @@ export const NavBar = () => {
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [pathname]);
+
+  // Close mobile search when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (isMobileSearchOpen && !target.closest('.mobile-search-container')) {
+        setIsMobileSearchOpen(false);
+      }
+    };
+
+    if (isMobileSearchOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isMobileSearchOpen]);
   
   const { itemCount } = useAppSelector((state) => state.cart);
   const { count: wishlistCount } = useAppSelector((state) => state.wishlist);
@@ -56,7 +84,9 @@ export const NavBar = () => {
   const navLinks = [
     { href: '/', label: 'Home' },
     { href: '/shop', label: 'Shop' },
-    { href: '/deals', label: 'Deals' },
+    // { href: '/deals', label: 'Deals' }, // Disabled for now
+    { href: '/pre-order', label: 'Pre-Order' },
+    { href: '/bulk-order', label: 'Bulk Order' },
     { href: '/about', label: 'About' },
     { href: '/contact', label: 'Contact' },
     { href: '/laptop-banking', label: '💰 Laptop Banking', highlight: true },
@@ -79,6 +109,30 @@ export const NavBar = () => {
   };
 
   return (
+    <>
+      {/* Customer Service Notice */}
+      {isNoticeVisible && (
+        <div className="bg-black/80 backdrop-blur-sm border-b border-gray-700 px-4 py-3 w-full relative">
+          <div className="container mx-auto px-3 sm:px-4">
+            <div className="text-center">
+              <a 
+                href="tel:+233551344310" 
+                className="text-sm sm:text-base text-white hover:underline block"
+              >
+                Need advice or assistance to place an order? Contact us at +233 55 134 4310
+              </a>
+            </div>
+            <button
+              onClick={handleDismissNotice}
+              className="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:bg-white/20 rounded-full transition-colors"
+              aria-label="Close notice"
+            >
+              <X size={18} className="text-white" />
+            </button>
+          </div>
+        </div>
+      )}
+
     <nav className="bg-white shadow-md sticky top-0 z-50">
       <div className="container mx-auto px-3 sm:px-4">
         {/* Top Bar */}
@@ -86,14 +140,14 @@ export const NavBar = () => {
           {/* Logo */}
           <Link href="/" className="flex items-center flex-shrink-0">
             <Image
-              src="/logo/ventech_logo_1.png"
-              alt="VENTECH"
-              width={120}
-              height={50}
-              className="object-contain h-8 sm:h-10 md:h-12 w-auto"
-              style={{ width: "auto", height: "auto" }}
-              priority
-            />
+  src="https://files.ventechgadgets.com/ventech-logomain.png"
+  alt="VENTECH"
+  width={100}
+  height={40}
+  className="object-contain"
+  priority
+/>
+
           </Link>
 
           {/* Desktop Search Bar */}
@@ -220,10 +274,21 @@ export const NavBar = () => {
             )}
           </div>
 
-          {/* Mobile Actions - Cart & Menu */}
+          {/* Mobile Actions - Search, Cart & Menu */}
           <div className="md:hidden flex items-center gap-2">
+            {/* Mobile Search Icon */}
+            <button
+              onClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)}
+              className={`p-2 flex items-center justify-center transition-colors ${
+                isMobileSearchOpen ? 'text-[#FF7A19]' : 'text-[#3A3A3A]'
+              }`}
+              aria-label="Search"
+            >
+              <Search size={22} />
+            </button>
+
             {/* Mobile Cart Icon */}
-            <Link href="/cart" className="relative p-2 -mr-1">
+            <Link href="/cart" className="relative p-2">
               <ShoppingCart size={22} className="text-[#3A3A3A]" />
               {itemCount > 0 && (
                 <span className="absolute top-0 right-0 bg-[#FF7A19] text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
@@ -242,6 +307,31 @@ export const NavBar = () => {
             </button>
           </div>
         </div>
+
+        {/* Mobile Search Dropdown */}
+        {isMobileSearchOpen && (
+          <>
+            {/* Backdrop overlay */}
+            <div 
+              className="fixed inset-0 bg-black/20 z-40 md:hidden"
+              onClick={() => setIsMobileSearchOpen(false)}
+            />
+            {/* Search dropdown */}
+            <div className="mobile-search-container fixed top-[56px] sm:top-[64px] left-0 right-0 bg-white shadow-xl border-b border-gray-200 z-50 md:hidden">
+              <div className="container mx-auto px-3 sm:px-4 py-4">
+                <SearchBar
+                  placeholder="Search products, brands..."
+                  className="w-full"
+                  showSuggestions={true}
+                  onSearch={(query) => {
+                    setIsMobileSearchOpen(false);
+                    router.push(`/search?q=${encodeURIComponent(query)}`);
+                  }}
+                />
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Desktop Navigation with Mega Menu */}
         <div className="hidden lg:flex items-center justify-between py-3 border-t border-gray-100">
@@ -482,5 +572,6 @@ export const NavBar = () => {
         </div>
       </>
     </nav>
+    </>
   );
 };

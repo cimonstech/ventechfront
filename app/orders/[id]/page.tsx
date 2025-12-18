@@ -152,7 +152,7 @@ export default function OrderDetailPage() {
                     </div>
                     <div className="text-right">
                       <p className="font-bold text-gray-900">
-                        {formatCurrency(item.total_price || item.subtotal || (item.unit_price * item.quantity))}
+                        {formatCurrency(item.subtotal || (item.unit_price * item.quantity))}
                       </p>
                       <p className="text-sm text-gray-600">{formatCurrency(item.unit_price)} each</p>
                     </div>
@@ -162,36 +162,36 @@ export default function OrderDetailPage() {
             </div>
 
             {/* Delivery Address */}
-            {(order.delivery_address || order.shipping_address) && (
+            {order.delivery_address && (
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
                   <MapPin size={20} />
                   Delivery Address
                 </h2>
                 <div className="text-gray-600">
-                  {(order.delivery_address || order.shipping_address)?.full_name && (
+                  {order.delivery_address?.full_name && (
                     <p className="font-semibold text-gray-900 mb-1">
-                      {(order.delivery_address || order.shipping_address).full_name}
+                      {order.delivery_address.full_name}
                     </p>
                   )}
-                  {(order.delivery_address || order.shipping_address)?.phone && (
-                    <p>{(order.delivery_address || order.shipping_address).phone}</p>
+                  {order.delivery_address?.phone && (
+                    <p>{order.delivery_address.phone}</p>
                   )}
-                  {(order.delivery_address || order.shipping_address)?.street_address && (
-                    <p>{(order.delivery_address || order.shipping_address).street_address}</p>
+                  {order.delivery_address?.street_address && (
+                    <p>{order.delivery_address.street_address}</p>
                   )}
-                  {(order.delivery_address || order.shipping_address)?.city && (
+                  {order.delivery_address?.city && (
                     <p>
-                      {(order.delivery_address || order.shipping_address).city}
-                      {(order.delivery_address || order.shipping_address)?.region && 
-                        `, ${(order.delivery_address || order.shipping_address).region}`}
+                      {order.delivery_address.city}
+                      {order.delivery_address?.region && 
+                        `, ${order.delivery_address.region}`}
                     </p>
                   )}
-                  {(order.delivery_address || order.shipping_address)?.postal_code && (
-                    <p>{(order.delivery_address || order.shipping_address).postal_code}</p>
+                  {order.delivery_address?.postal_code && (
+                    <p>{order.delivery_address.postal_code}</p>
                   )}
-                  {(order.delivery_address || order.shipping_address)?.country && (
-                    <p>{(order.delivery_address || order.shipping_address).country}</p>
+                  {order.delivery_address?.country && (
+                    <p>{order.delivery_address.country}</p>
                   )}
                 </div>
               </div>
@@ -218,19 +218,19 @@ export default function OrderDetailPage() {
                   <Package size={18} />
                   Delivery Option
                 </h3>
-                {order.delivery_option || (order.shipping_address?.delivery_option || order.delivery_address?.delivery_option) ? (
+                {order.delivery_option ? (
                   <>
                     <p className="text-gray-900 font-medium">
-                      {(order.delivery_option || order.shipping_address?.delivery_option || order.delivery_address?.delivery_option)?.name || 'Standard Delivery'}
+                      {order.delivery_option?.name || 'Standard Delivery'}
                     </p>
-                    {(order.delivery_option || order.shipping_address?.delivery_option || order.delivery_address?.delivery_option)?.description && (
+                    {order.delivery_option?.description && (
                       <p className="text-sm text-gray-600">
-                        {(order.delivery_option || order.shipping_address?.delivery_option || order.delivery_address?.delivery_option).description}
+                        {order.delivery_option.description}
                       </p>
                     )}
-                    {(order.shipping_fee || order.delivery_fee) && (
+                    {order.delivery_fee && (
                       <p className="text-sm text-gray-600 mt-1">
-                        Fee: {formatCurrency(order.shipping_fee || order.delivery_fee || 0)}
+                        Fee: {formatCurrency(order.delivery_fee)}
                       </p>
                     )}
                   </>

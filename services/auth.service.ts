@@ -29,7 +29,11 @@ export interface AuthResponse {
 }
 
 // Sign up with email and password
-export const signUp = async (data: SignUpData): Promise<AuthResponse> => {
+// Includes retry logic for rate limit errors
+export const signUp = async (data: SignUpData, retryCount = 0): Promise<AuthResponse> => {
+  const MAX_RETRIES = 2;
+  const RETRY_DELAY = 2000; // 2 seconds
+
   try {
     const { data: authData, error } = await supabase.auth.signUp({
       email: data.email,
@@ -44,7 +48,32 @@ export const signUp = async (data: SignUpData): Promise<AuthResponse> => {
       },
     });
 
-    if (error) throw error;
+    if (error) {
+      // Log error details for debugging
+      console.error('Supabase signup error:', {
+        message: error.message,
+        status: (error as any).status,
+        code: (error as any).code,
+        error,
+      });
+
+      // Retry logic for rate limit errors (with exponential backoff)
+      const errorCode = (error as any).code || '';
+      const isRateLimit = 
+        (error as any).status === 429 ||
+        errorCode === 'over_email_send_rate_limit' ||
+        error.message?.toLowerCase().includes('rate limit');
+
+      if (isRateLimit && retryCount < MAX_RETRIES) {
+        const delay = RETRY_DELAY * Math.pow(2, retryCount); // Exponential backoff
+        console.log(`Rate limit hit, retrying in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+        
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return signUp(data, retryCount + 1);
+      }
+
+      throw error;
+    }
 
     return {
       user: authData.user,
@@ -52,6 +81,7 @@ export const signUp = async (data: SignUpData): Promise<AuthResponse> => {
       error: null,
     };
   } catch (error: any) {
+    // Preserve error details for better handling
     return {
       user: null,
       session: null,
@@ -248,7 +278,43 @@ export const getUserProfile = async (userId?: string) => {
                   .single();
 
                 if (createError2) {
-                  console.error('Error creating user profile (with name field):', createError2);
+                  // Log detailed error information
+                  console.error('Error creating user profile (with name field):', {
+                    message: createError2?.message || 'Unknown error',
+                    code: createError2?.code,
+                    details: createError2?.details,
+                    hint: createError2?.hint,
+                    error: createError2,
+                  });
+                  
+                  // If it's a duplicate key error, the trigger already created it - try to fetch it
+                  if (createError2?.code === '23505' || createError2?.message?.includes('duplicate')) {
+                    console.warn('Profile already exists (duplicate key). Fetching existing profile...');
+                    const { data: existingProfile } = await supabase
+                      .from('users')
+                      .select('*')
+                      .eq('id', userId)
+                      .maybeSingle();
+                    
+                    if (existingProfile) {
+                      const firstName = existingProfile.first_name || '';
+                      const lastName = existingProfile.last_name || '';
+                      const fullName = `${firstName} ${lastName}`.trim() || existingProfile.full_name || existingProfile.name || user.email?.split('@')[0] || 'User';
+                      
+                      return {
+                        ...existingProfile,
+                        full_name: fullName,
+                        first_name: firstName,
+                        last_name: lastName,
+                      };
+                    }
+                  }
+                  
+                  // If it's an RLS policy error, the trigger should handle it
+                  if (createError2?.code === '42501' || createError2?.message?.includes('permission denied')) {
+                    console.warn('Profile creation blocked by RLS policy. Database trigger should handle this.');
+                  }
+                  
                   return null;
                 }
                 // Format the response to match User type
@@ -259,7 +325,43 @@ export const getUserProfile = async (userId?: string) => {
                   last_name: lastName,
                 };
               } else {
-                console.error('Error creating user profile:', createError);
+                // Log detailed error information
+                console.error('Error creating user profile:', {
+                  message: createError?.message || 'Unknown error',
+                  code: createError?.code,
+                  details: createError?.details,
+                  hint: createError?.hint,
+                  error: createError,
+                });
+                
+                // If it's a duplicate key error, the trigger already created it - try to fetch it
+                if (createError?.code === '23505' || createError?.message?.includes('duplicate')) {
+                  console.warn('Profile already exists (duplicate key). Fetching existing profile...');
+                  const { data: existingProfile } = await supabase
+                    .from('users')
+                    .select('*')
+                    .eq('id', userId)
+                    .maybeSingle();
+                  
+                  if (existingProfile) {
+                    const firstName = existingProfile.first_name || '';
+                    const lastName = existingProfile.last_name || '';
+                    const fullName = `${firstName} ${lastName}`.trim() || existingProfile.full_name || existingProfile.name || user.email?.split('@')[0] || 'User';
+                    
+                    return {
+                      ...existingProfile,
+                      full_name: fullName,
+                      first_name: firstName,
+                      last_name: lastName,
+                    };
+                  }
+                }
+                
+                // If it's an RLS policy error, the trigger should handle it
+                if (createError?.code === '42501' || createError?.message?.includes('permission denied')) {
+                  console.warn('Profile creation blocked by RLS policy. Database trigger should handle this.');
+                }
+                
                 return null;
               }
             }
@@ -272,12 +374,66 @@ export const getUserProfile = async (userId?: string) => {
               last_name: lastName,
             };
           } catch (insertError: any) {
-            console.error('Error inserting user profile:', insertError);
+            // Log detailed error information - handle both Supabase errors and generic errors
+            const errorMessage = insertError?.message || insertError?.toString() || 'Unknown error';
+            const errorCode = insertError?.code || insertError?.status || insertError?.statusCode;
+            
+            console.error('Error inserting user profile:', {
+              message: errorMessage,
+              code: errorCode,
+              details: insertError?.details,
+              hint: insertError?.hint,
+              fullError: insertError,
+              userId,
+            });
+            
+            // If it's an RLS policy error, the trigger should handle it
+            // This is just a fallback, so we can safely return null
+            if (errorCode === '42501' || errorMessage.includes('permission denied') || errorMessage.includes('row-level security')) {
+              console.warn('Profile creation blocked by RLS policy. Database trigger should handle this.');
+            } else if (errorCode === '23505' || errorMessage.includes('duplicate') || errorMessage.includes('unique constraint')) {
+              console.warn('Profile already exists (duplicate key). This is normal if trigger already created it.');
+              // Try to fetch the existing profile
+              try {
+                const { data: existingProfile } = await supabase
+                  .from('users')
+                  .select('*')
+                  .eq('id', userId)
+                  .maybeSingle();
+                
+                if (existingProfile) {
+                  const firstName = existingProfile.first_name || '';
+                  const lastName = existingProfile.last_name || '';
+                  const fullName = `${firstName} ${lastName}`.trim() || existingProfile.full_name || existingProfile.name || '';
+                  
+                  return {
+                    ...existingProfile,
+                    full_name: fullName,
+                    first_name: firstName,
+                    last_name: lastName,
+                  };
+                }
+              } catch (fetchError) {
+                console.error('Error fetching existing profile:', fetchError);
+              }
+            }
+            
             return null;
           }
         }
       } catch (error: any) {
-        console.error('Error creating user profile:', error);
+        // Log detailed error information - handle both Supabase errors and generic errors
+        const errorMessage = error?.message || error?.toString() || 'Unknown error';
+        const errorCode = error?.code || error?.status || error?.statusCode;
+        
+        console.error('Error creating user profile (outer catch):', {
+          message: errorMessage,
+          code: errorCode,
+          details: error?.details,
+          hint: error?.hint,
+          fullError: error,
+          userId,
+        });
       }
       
       return null;

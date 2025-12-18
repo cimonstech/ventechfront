@@ -159,7 +159,7 @@ export default function UserOrdersPage() {
   const getStatusBadge = (status: string) => {
     const colors = getOrderStatusColor(status);
     return (
-      <Badge className={colors.bg} size="sm">
+      <Badge className={colors} size="sm">
         {status.charAt(0).toUpperCase() + status.slice(1)}
       </Badge>
     );

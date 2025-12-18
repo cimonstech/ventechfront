@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, ShoppingBag, Heart, Tag, User } from 'lucide-react';
+import { Home, ShoppingBag, Heart, Tag, User, Package } from 'lucide-react';
 import { useAppSelector } from '@/store';
 
 export const MobileBottomNav = () => {
@@ -25,17 +25,17 @@ export const MobileBottomNav = () => {
       exact: false,
     },
     {
+      href: '/pre-order',
+      label: 'Pre-Order',
+      icon: Package,
+      exact: false,
+    },
+    {
       href: '/wishlist',
       label: 'Wishlist',
       icon: Heart,
       exact: false,
       badge: wishlistCount > 0 ? wishlistCount : undefined,
-    },
-    {
-      href: '/deals',
-      label: 'Deals',
-      icon: Tag,
-      exact: false,
     },
     {
       href: isAuthenticated ? '/profile' : '/login',

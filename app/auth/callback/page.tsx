@@ -118,8 +118,10 @@ export default function AuthCallbackPage() {
 
           if (session && session.user) {
             // If it's a password reset, redirect to reset password page
+            // Note: Session is already set, so reset-password page will detect it
             if (type === 'recovery') {
-              router.push('/reset-password');
+              // Use window.location to preserve any hash fragments
+              window.location.href = '/reset-password';
               return;
             }
 
@@ -148,8 +150,10 @@ export default function AuthCallbackPage() {
 
           if (data.session && data.user) {
             // If it's a password reset, redirect to reset password page
+            // Note: Session is already set, so reset-password page will detect it
             if (type === 'recovery') {
-              router.push('/reset-password');
+              // Use window.location to ensure proper redirect
+              window.location.href = '/reset-password';
               return;
             }
 

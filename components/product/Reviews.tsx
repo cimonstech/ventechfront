@@ -9,9 +9,10 @@ import { useAppSelector } from '@/store';
 
 interface ReviewsProps {
   productId: string;
+  onReviewUpdate?: () => void;
 }
 
-export const Reviews: React.FC<ReviewsProps> = ({ productId }) => {
+export const Reviews: React.FC<ReviewsProps> = ({ productId, onReviewUpdate }) => {
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [stats, setStats] = useState<ReviewStats | null>(null);
@@ -61,6 +62,11 @@ export const Reviews: React.FC<ReviewsProps> = ({ productId }) => {
 
       // Refresh reviews
       await fetchReviews();
+      
+      // Notify parent component to update rating/review count
+      if (onReviewUpdate) {
+        onReviewUpdate();
+      }
       
       // Reset form
       setNewReview({ rating: 5, title: '', comment: '' });

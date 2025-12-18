@@ -93,10 +93,10 @@ export const calculatePriceRangesForProducts = async (
   }
 
   try {
-    // Get all attribute mappings for these products
+    // Get all attribute mappings for these products (include is_required)
     const { data: mappings } = await supabase
       .from('product_attribute_mappings')
-      .select('product_id, attribute_id')
+      .select('product_id, attribute_id, is_required')
       .in('product_id', productIds);
 
     if (!mappings || mappings.length === 0) {
@@ -111,10 +111,16 @@ export const calculatePriceRangesForProducts = async (
     // Get all attribute IDs
     const attributeIds = [...new Set(mappings.map((m: any) => m.attribute_id))];
 
-    // Get all options for these attributes
+    // Get selected options for all products (from product_selected_options table)
+    const { data: selectedOptions } = await supabase
+      .from('product_selected_options')
+      .select('product_id, attribute_id, option_id')
+      .in('product_id', productIds);
+
+    // Get all options for these attributes (only selected ones for each product)
     const { data: allOptions } = await supabase
       .from('product_attribute_options')
-      .select('attribute_id, price_modifier')
+      .select('id, attribute_id, price_modifier')
       .in('attribute_id', attributeIds)
       .eq('is_available', true);
 
@@ -126,22 +132,34 @@ export const calculatePriceRangesForProducts = async (
       return ranges;
     }
 
-    // Group mappings by product_id
-    const mappingsByProduct: { [key: string]: string[] } = {};
+    // Group mappings by product_id (with is_required info)
+    const mappingsByProduct: { [key: string]: Array<{ attributeId: string; isRequired: boolean }> } = {};
     mappings.forEach((m: any) => {
       if (!mappingsByProduct[m.product_id]) {
         mappingsByProduct[m.product_id] = [];
       }
-      mappingsByProduct[m.product_id].push(m.attribute_id);
+      mappingsByProduct[m.product_id].push({
+        attributeId: m.attribute_id,
+        isRequired: m.is_required || false,
+      });
     });
 
-    // Group options by attribute_id
-    const optionsByAttribute: { [key: string]: number[] } = {};
-    allOptions.forEach((option: any) => {
-      if (!optionsByAttribute[option.attribute_id]) {
-        optionsByAttribute[option.attribute_id] = [];
+    // Group selected options by product_id and attribute_id
+    const selectedOptionsByProduct: { [key: string]: { [key: string]: string[] } } = {};
+    (selectedOptions || []).forEach((item: any) => {
+      if (!selectedOptionsByProduct[item.product_id]) {
+        selectedOptionsByProduct[item.product_id] = {};
       }
-      optionsByAttribute[option.attribute_id].push(option.price_modifier || 0);
+      if (!selectedOptionsByProduct[item.product_id][item.attribute_id]) {
+        selectedOptionsByProduct[item.product_id][item.attribute_id] = [];
+      }
+      selectedOptionsByProduct[item.product_id][item.attribute_id].push(item.option_id);
+    });
+
+    // Create a map of option_id to price_modifier
+    const optionPriceMap: { [key: string]: number } = {};
+    allOptions.forEach((option: any) => {
+      optionPriceMap[option.id] = option.price_modifier || 0;
     });
 
     // Calculate range for each product
@@ -156,16 +174,49 @@ export const calculatePriceRangesForProducts = async (
 
       let minAdjustment = 0;
       let maxAdjustment = 0;
+      let hasAnyVariants = false;
 
-      productAttributes.forEach((attributeId: string) => {
-        const priceModifiers = optionsByAttribute[attributeId] || [];
+      productAttributes.forEach(({ attributeId, isRequired }) => {
+        // Get selected options for this product and attribute
+        const selectedOptionIds = selectedOptionsByProduct[product.id]?.[attributeId] || [];
+        
+        if (selectedOptionIds.length === 0) {
+          // No selected options for this attribute - skip it
+          return;
+        }
+
+        hasAnyVariants = true;
+        
+        // Get price modifiers for selected options only
+        const priceModifiers = selectedOptionIds
+          .map((optionId: string) => optionPriceMap[optionId])
+          .filter((modifier: number) => modifier !== undefined);
+
         if (priceModifiers.length > 0) {
           const min = Math.min(...priceModifiers);
           const max = Math.max(...priceModifiers);
-          minAdjustment += min;
-          maxAdjustment += max;
+          
+          // For price range display: minimum should be base price (0 adjustment) if:
+          // 1. Attribute is optional (can skip selection)
+          // 2. Minimum modifier is 0 or positive (no discount)
+          // Otherwise, use the minimum modifier
+          if (!isRequired || min >= 0) {
+            // Optional attribute or all modifiers are positive/zero
+            // Minimum can be base price (0 adjustment) if no variant selected
+            minAdjustment += 0; // Start from base price
+          } else {
+            // Required attribute with negative modifiers (discounts)
+            minAdjustment += min; // Use minimum modifier
+          }
+          maxAdjustment += max; // Always use maximum modifier
         }
       });
+
+      // If no variants are selected for this product, use base price
+      if (!hasAnyVariants) {
+        ranges.set(product.id, { min: basePrice, max: basePrice, hasRange: false });
+        return;
+      }
 
       const minPrice = basePrice + minAdjustment;
       const maxPrice = basePrice + maxAdjustment;
@@ -173,7 +224,7 @@ export const calculatePriceRangesForProducts = async (
       ranges.set(product.id, {
         min: minPrice,
         max: maxPrice,
-        hasRange: minPrice !== maxPrice && maxAdjustment !== 0,
+        hasRange: minPrice !== maxPrice, // Show range if min and max differ
       });
     });
 

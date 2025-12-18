@@ -35,6 +35,8 @@ interface Order {
   created_at: string;
   items_count: number;
   notes?: string | null;
+  is_pre_order?: boolean;
+  shipping_address?: any;
 }
 
 export default function AdminOrdersPage() {
@@ -86,6 +88,62 @@ export default function AdminOrdersPage() {
   const fetchOrders = async () => {
     try {
       setIsLoading(true);
+      
+      // Try backend API first (better access to all fields including is_pre_order)
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      try {
+        const response = await fetch(`${API_URL}/api/orders`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.data) {
+            let formattedOrders = result.data.map((order: any) => {
+              // Backend already extracts is_pre_order, but we'll use it directly
+              const isPreOrder = order.is_pre_order || false;
+              
+              return {
+                id: order.id,
+                order_number: order.order_number,
+                user_name: order.user 
+                  ? `${order.user.first_name || ''} ${order.user.last_name || ''}`.trim() || 'Unknown'
+                  : (order.shipping_address?.full_name || 'Guest Customer'),
+                user_email: order.user?.email || order.shipping_address?.email || 'No email',
+                total_amount: order.total,
+                status: order.status,
+                payment_status: order.payment_status,
+                created_at: order.created_at,
+                items_count: order.order_items?.length || 0,
+                notes: order.notes || null,
+                is_pre_order: isPreOrder,
+                shipping_address: order.shipping_address,
+              };
+            });
+
+            // Apply search filter client-side
+            if (searchQuery) {
+              const searchLower = searchQuery.toLowerCase();
+              formattedOrders = formattedOrders.filter((order: Order) =>
+                order.order_number.toLowerCase().includes(searchLower) ||
+                order.id.toLowerCase().includes(searchLower) ||
+                order.user_name.toLowerCase().includes(searchLower) ||
+                order.user_email.toLowerCase().includes(searchLower)
+              );
+            }
+
+            setOrders(formattedOrders);
+            return;
+          }
+        }
+      } catch (apiError) {
+        console.warn('Backend API failed, trying Supabase:', apiError);
+      }
+
+      // Fallback: Use Supabase directly
       let query = supabase
         .from('orders')
         .select(`
@@ -103,18 +161,34 @@ export default function AdminOrdersPage() {
 
       if (error) throw error;
 
-      let formattedOrders = data?.map(order => ({
-        id: order.id,
-        order_number: order.order_number,
-        user_name: `${order.user?.first_name || ''} ${order.user?.last_name || ''}`.trim() || 'Unknown',
-        user_email: order.user?.email || 'No email',
-        total_amount: order.total,
-        status: order.status,
-        payment_status: order.payment_status,
-        created_at: order.created_at,
-        items_count: order.order_items?.length || 0,
-        notes: order.notes || null,
-      })) || [];
+      let formattedOrders = data?.map(order => {
+        // Extract is_pre_order from shipping_address if it exists there
+        const isPreOrder = order.is_pre_order || order.shipping_address?.is_pre_order || false;
+        
+        // Debug logging
+        if (isPreOrder) {
+          console.log('Pre-order detected:', {
+            order_number: order.order_number,
+            is_pre_order: order.is_pre_order,
+            shipping_address_is_pre_order: order.shipping_address?.is_pre_order,
+          });
+        }
+        
+        return {
+          id: order.id,
+          order_number: order.order_number,
+          user_name: `${order.user?.first_name || ''} ${order.user?.last_name || ''}`.trim() || 'Unknown',
+          user_email: order.user?.email || 'No email',
+          total_amount: order.total,
+          status: order.status,
+          payment_status: order.payment_status,
+          created_at: order.created_at,
+          items_count: order.order_items?.length || 0,
+          notes: order.notes || null,
+          is_pre_order: isPreOrder,
+          shipping_address: order.shipping_address,
+        };
+      }) || [];
 
       // Apply search filter client-side
       if (searchQuery) {
@@ -509,9 +583,16 @@ export default function AdminOrdersPage() {
                         </td>
                       )}
                       <td className="px-6 py-4">
-                        <span className="font-mono text-sm text-[#FF7A19] font-semibold">
-                          {order.order_number}
-                        </span>
+                        <div className="flex flex-col gap-1">
+                          <span className="font-mono text-sm text-[#FF7A19] font-semibold">
+                            {order.order_number}
+                          </span>
+                          {order.is_pre_order && (
+                            <span className="px-2 py-0.5 bg-black text-white text-xs font-semibold rounded w-fit">
+                              PRE-ORDER
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <div>
