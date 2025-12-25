@@ -120,6 +120,11 @@ export function Footer() {
                   Shipping Info
                 </Link>
               </li>
+              <li>
+                <Link href="/affiliate" className="hover:text-[#FF7A19] transition-colors">
+                  Affiliate Program
+                </Link>
+              </li>
             </ul>
             
             {/* Order Tracking */}
@@ -191,6 +196,37 @@ export function Footer() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Payment & Shipping Systems */}
+        <div className="border-t border-gray-800 pt-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+            {/* Payment Systems */}
+            <div>
+              <h4 className="font-semibold text-sm mb-3 text-white">Payment Systems</h4>
+              <div className="flex items-center justify-start">
+                <img 
+                  src="/payment-store-2.webp" 
+                  alt="Payment Methods" 
+                  className="max-w-full h-auto object-contain opacity-90 hover:opacity-100 transition-opacity"
+                  loading="lazy"
+                />
+              </div>
+            </div>
+
+            {/* Shipping Systems */}
+            <div>
+              <h4 className="font-semibold text-sm mb-3 text-white">Shipping Systems</h4>
+              <div className="flex items-center justify-start">
+                <img 
+                  src="/shipping.webp" 
+                  alt="Shipping Partners" 
+                  className="max-w-full h-auto object-contain opacity-90 hover:opacity-100 transition-opacity"
+                  loading="lazy"
+                />
+              </div>
+            </div>
           </div>
         </div>
 

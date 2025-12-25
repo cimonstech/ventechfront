@@ -87,6 +87,7 @@ export const NavBar = () => {
     // { href: '/deals', label: 'Deals' }, // Disabled for now
     { href: '/pre-order', label: 'Pre-Order' },
     { href: '/bulk-order', label: 'Bulk Order' },
+    { href: '/affiliate', label: 'Affiliate' },
     { href: '/about', label: 'About' },
     { href: '/contact', label: 'Contact' },
     { href: '/laptop-banking', label: '💰 Laptop Banking', highlight: true },
