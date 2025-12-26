@@ -88,41 +88,69 @@ export const paymentService = {
           try {
             const PaystackPop = await loadPaystack();
             
-            // PaystackPop is not a constructor - it's an object with methods
-            // Check if resumeTransaction exists (Paystack Popup V2 method)
-            if (PaystackPop && typeof PaystackPop.resumeTransaction === 'function') {
-              // Use resumeTransaction with access_code (Paystack Popup V2)
+            // Use authorization_url redirect method (most reliable)
+            // This ensures Paystack redirects to callback_url after payment
+            if (authorization_url) {
+              // Redirect directly to Paystack payment page
+              // Paystack will redirect back to callback_url after payment
+              window.location.href = authorization_url;
+            } else if (PaystackPop && typeof PaystackPop.resumeTransaction === 'function') {
+              // Fallback: Use resumeTransaction with access_code (Paystack Popup V2)
               PaystackPop.resumeTransaction(access_code);
+              
+              // Monitor for redirect - if popup closes, redirect to callback
+              const callbackUrl = data.callback_url || `${window.location.origin}/payment/callback`;
+              
+              // Check periodically if we've been redirected
+              const redirectCheck = setInterval(() => {
+                if (window.location.pathname.includes('/payment/callback') || 
+                    window.location.pathname.includes('/orders/')) {
+                  clearInterval(redirectCheck);
+                }
+              }, 500);
+              
+              // Fallback redirect after 3 seconds if still on checkout
+              setTimeout(() => {
+                clearInterval(redirectCheck);
+                if (!window.location.pathname.includes('/payment/callback') && 
+                    !window.location.pathname.includes('/orders/')) {
+                  window.location.href = `${callbackUrl}?reference=${data.reference}`;
+                }
+              }, 3000);
             } else if (PaystackPop && typeof PaystackPop.setup === 'function') {
               // Fallback: Use setup method with payment details
               const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
               if (publicKey) {
+                const callbackUrl = data.callback_url || `${window.location.origin}/payment/callback`;
+                
                 const handler = PaystackPop.setup({
                   key: publicKey,
                   email: data.email,
                   amount: data.amount,
                   ref: data.reference,
                   currency: 'GHS',
+                  callback_url: callbackUrl,
                   callback: (response: any) => {
-                    // Handle callback - payment will be verified via callback page
                     console.log('Payment callback:', response);
+                    // Redirect to callback page for verification
+                    const ref = response.reference || data.reference;
+                    window.location.href = `${callbackUrl}?reference=${ref}`;
                   },
                   onClose: () => {
                     console.log('Payment popup closed');
+                    // Redirect to callback to check payment status
+                    setTimeout(() => {
+                      if (!window.location.pathname.includes('/payment/callback') && 
+                          !window.location.pathname.includes('/orders/')) {
+                        window.location.href = `${callbackUrl}?reference=${data.reference}`;
+                      }
+                    }, 1000);
                   },
                 });
                 handler.openIframe();
               } else {
-                // If no public key, redirect to authorization_url
-                if (authorization_url) {
-                  window.location.href = authorization_url;
-                } else {
-                  throw new Error('Paystack public key is not configured');
-                }
+                throw new Error('Paystack public key is not configured');
               }
-            } else if (authorization_url) {
-              // Fallback: Redirect to authorization URL if PaystackPop methods don't work
-              window.location.href = authorization_url;
             } else {
               throw new Error('Paystack is not properly configured. Please check your Paystack public key.');
             }

@@ -11,7 +11,7 @@ export interface Notification {
   read_at?: string;
 }
 
-const LOW_STOCK_THRESHOLD = 10; // Products with stock < 10 are considered low
+const LOW_STOCK_THRESHOLD = 5; // Products with stock < 5 are considered low
 
 export const notificationService = {
   // Create a notification

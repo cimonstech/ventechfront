@@ -8,6 +8,7 @@ import { paymentService } from '@/services/payment.service';
 import { orderService } from '@/services/order.service';
 import { useAppDispatch } from '@/store';
 import { clearCart } from '@/store/cartSlice';
+import { PRE_ORDER_SHIPPING_OPTIONS } from '@/services/preOrder.service';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 
@@ -40,54 +41,76 @@ export default function PaymentCallbackPage() {
         hasProcessedRef.current = true;
 
         // Verify payment with backend
-        console.log('Verifying payment with reference:', reference);
         const verifyResult = await paymentService.verifyPayment(reference);
-        
-        console.log('Payment verification result:', {
-          success: verifyResult.success,
-          status: verifyResult.data?.status,
-          hasMetadata: !!verifyResult.data?.metadata,
-          metadata: verifyResult.data?.metadata,
-        });
 
         if (verifyResult.success && verifyResult.data?.status === 'success') {
           // Payment verified successfully
-          // Get checkout data from sessionStorage or metadata
+          // ✅ CRITICAL: NEVER use prices from Paystack metadata
+          // Paystack metadata may contain prices in pesewas, not GHS
+          // ALWAYS use sessionStorage checkout data (prices in GHS)
           const checkoutDataStr = sessionStorage.getItem('pending_checkout_data');
           const metadata = verifyResult.data?.metadata || {};
           
-          console.log('Payment verified, retrieving checkout data...', {
-            hasCheckoutDataStr: !!checkoutDataStr,
-            hasMetadataCheckoutData: !!metadata.checkout_data,
-            metadata,
-          });
+          // Retrieve checkout data (only log errors, not verbose success)
           
-          // Get checkout data - prefer metadata, fallback to sessionStorage
+          // ✅ Get checkout data - ONLY from sessionStorage (prices in GHS)
+          // NEVER use metadata.checkout_data for prices - it may be in pesewas
           let checkoutData: any = null;
-          if (metadata.checkout_data) {
-            // Checkout data is in Paystack metadata
-            checkoutData = metadata.checkout_data;
-            console.log('Using checkout data from metadata:', checkoutData);
-          } else if (checkoutDataStr) {
+          
+          if (checkoutDataStr) {
             try {
               const parsed = JSON.parse(checkoutDataStr);
-              // Checkout data is stored directly in sessionStorage (spread from checkoutData object)
-              // It should have items, delivery_address, delivery_option, payment_method, etc.
-              checkoutData = parsed;
               
               // If it has checkout_data nested, use that instead
               if (parsed.checkout_data) {
                 checkoutData = parsed.checkout_data;
+              } else {
+                checkoutData = parsed;
               }
-              
-              console.log('Using checkout data from sessionStorage:', checkoutData);
             } catch (e) {
-              console.error('Error parsing checkout data:', e);
+              console.error('❌ Error parsing checkout data from sessionStorage:', e);
+              console.error('Raw checkout data string:', checkoutDataStr?.substring(0, 200));
             }
           }
           
-          if (!checkoutData || !checkoutData.items || !Array.isArray(checkoutData.items) || checkoutData.items.length === 0) {
+          // ⚠️ If no sessionStorage data, metadata is last resort (but recalculate all prices)
+          if (!checkoutData && metadata.checkout_data) {
+            // ⚠️ WARNING: Using Paystack metadata as fallback - prices may be in pesewas!
+            // This should only happen if sessionStorage was cleared
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('⚠️ Using Paystack metadata as fallback - recalculating prices');
+            }
+            
+            // Use metadata but recalculate all prices from items (don't trust metadata prices)
+            checkoutData = {
+              ...metadata.checkout_data,
+              // Recalculate subtotal from items (prices should be in GHS from database)
+              subtotal: undefined, // Force recalculation
+              total: undefined, // Force recalculation
+              // Keep non-price data from metadata
+              user_id: metadata.user_id || metadata.checkout_data.user_id,
+              payment_reference: metadata.payment_reference || reference,
+            };
+          }
+          
+          // Validate checkout data exists
+          if (!checkoutData) {
+            console.error('❌ No checkout data found in metadata or sessionStorage');
+          }
+          
+          // Validate checkout data - check for items, regularItems, or preOrderItems
+          const hasItems = checkoutData.items && Array.isArray(checkoutData.items) && checkoutData.items.length > 0;
+          const hasRegularItems = checkoutData.regularItems && Array.isArray(checkoutData.regularItems) && checkoutData.regularItems.length > 0;
+          const hasPreOrderItems = checkoutData.preOrderItems && Array.isArray(checkoutData.preOrderItems) && checkoutData.preOrderItems.length > 0;
+          
+          if (!checkoutData || (!hasItems && !hasRegularItems && !hasPreOrderItems)) {
             console.error('Invalid checkout data:', checkoutData);
+            console.error('Checkout data validation:', {
+              hasItems,
+              hasRegularItems,
+              hasPreOrderItems,
+              checkoutDataKeys: checkoutData ? Object.keys(checkoutData) : [],
+            });
             setStatus('error');
             setMessage('Payment verified but checkout data is missing or invalid. Please contact support.');
             return;
@@ -115,36 +138,182 @@ export default function PaymentCallbackPage() {
             }
           }
           
-          console.log('Creating order with data:', {
-            userId,
-            itemsCount: checkoutData.items?.length || 0,
-            hasDeliveryAddress: !!checkoutData.delivery_address,
-            hasDeliveryOption: !!checkoutData.delivery_option,
-            paymentMethod: checkoutData.payment_method,
-            paymentReference: checkoutData.payment_reference,
-          });
+          // Create order(s) after successful payment verification
           
-          // Create order after successful payment verification
+          // Create order(s) after successful payment verification
           try {
-            console.log('Calling orderService.createOrder with:', {
-              userId,
-              itemsCount: checkoutData.items?.length,
-              hasDeliveryAddress: !!checkoutData.delivery_address,
-              hasDeliveryOption: !!checkoutData.delivery_option,
-            });
+            const orders: any[] = [];
+            const errors: string[] = [];
+
+            // Check if we have mixed cart (regular + pre-order items)
+            const hasRegularItems = checkoutData.hasRegularItems && checkoutData.regularItems && checkoutData.regularItems.length > 0;
+            const hasPreOrderItems = checkoutData.hasPreOrderItems && checkoutData.preOrderItems && checkoutData.preOrderItems.length > 0;
+            const hasMixedCart = hasRegularItems && hasPreOrderItems;
+
+            // Create order(s) based on cart type
+
+            // Create regular order if we have regular items
+            if (hasRegularItems) {
+              try {
+                // ✅ CRITICAL: Recalculate subtotal from items (prices in GHS from database)
+                // NEVER trust checkoutData.subtotal or checkoutData.total - they may be from Paystack metadata (pesewas)
+                const regularSubtotal = checkoutData.regularItems.reduce((sum: number, item: any) => {
+                  // Use item prices directly from database (already in GHS)
+                  // discount_price and original_price are from database, not Paystack metadata
+                  const itemPrice = item.discount_price || item.original_price || 0;
+                  const itemQuantity = item.quantity || 1;
+                  const itemSubtotal = itemPrice * itemQuantity;
+                  return sum + (Number(itemSubtotal) || 0);
+                }, 0);
+                // ✅ Use delivery fee, discount, and tax from checkoutData
+                // These should be in GHS (from sessionStorage), not from Paystack metadata
+                // Backend will validate total < 100,000 to catch any pesewas conversion errors
+                const regularDeliveryFee = checkoutData.delivery_option?.price || 0;
+                const discount = checkoutData.discount || 0;
+                const tax = checkoutData.tax || 0;
+                const regularTotal = regularSubtotal + regularDeliveryFee + tax - discount;
+                
+                const regularCheckoutData = {
+                  items: checkoutData.regularItems.map((item: any) => ({
+                    ...item,
+                    id: item.product_id || item.id, // Ensure id is set
+                    product_id: item.product_id || item.id, // Ensure product_id is set
+                    is_pre_order: false,
+                  })),
+                  delivery_address: checkoutData.delivery_address,
+                  delivery_option: checkoutData.delivery_option,
+                  payment_method: checkoutData.payment_method || 'paystack',
+                  payment_reference: checkoutData.payment_reference || reference,
+                  notes: hasMixedCart ? `${checkoutData.notes || ''}\n\n[Regular Items Order]`.trim() : checkoutData.notes,
+                  is_pre_order: false,
+                  subtotal: regularSubtotal,
+                  discount: discount,
+                  coupon_id: checkoutData.coupon_id || null,
+                  delivery_fee: regularDeliveryFee,
+                  tax: checkoutData.tax || 0,
+                  total: regularTotal, // Already includes discount subtraction
+                };
+
+                const regularOrder = await orderService.createOrder(regularCheckoutData, userId);
+                orders.push({ type: 'regular', order: regularOrder });
+              } catch (error: any) {
+                console.error('❌ Regular order failed:', error);
+                let errorMessage = error?.message || error?.response?.data?.message || 'Failed to create regular order';
+                
+                // Provide user-friendly error messages
+                if (errorMessage.includes('Products not found') || errorMessage.includes('product_id')) {
+                  errorMessage = 'Some products in your order are no longer available. Please remove them from your cart and try again.';
+                } else if (errorMessage.includes('foreign key constraint')) {
+                  errorMessage = 'Some products in your order are no longer available. Please update your cart and try again.';
+                }
+                
+                errors.push(`Regular order: ${errorMessage}`);
+              }
+            }
+
+            // Create pre-order if we have pre-order items
+            if (hasPreOrderItems) {
+              try {
+                // ✅ CRITICAL: Recalculate subtotal from items (prices in GHS from database)
+                // NEVER trust checkoutData.subtotal or checkoutData.total - they may be from Paystack metadata (pesewas)
+                const preOrderSubtotal = checkoutData.preOrderItems.reduce((sum: number, item: any) => {
+                  // Use item prices directly from database (already in GHS)
+                  // discount_price and original_price are from database, not Paystack metadata
+                  const itemPrice = item.discount_price || item.original_price || 0;
+                  const itemQuantity = item.quantity || 1;
+                  const itemSubtotal = itemPrice * itemQuantity;
+                  return sum + (Number(itemSubtotal) || 0);
+                }, 0);
+                // ✅ CRITICAL: Get pre-order shipping fee
+                // Priority: 1) checkoutData.delivery_fee (already calculated in checkout), 2) delivery_option.price, 3) lookup from PRE_ORDER_SHIPPING_OPTIONS
+                let preOrderDeliveryFee = checkoutData.delivery_fee || 0;
+                
+                if (!preOrderDeliveryFee && checkoutData.delivery_option?.price) {
+                  // Use delivery_option price if delivery_fee not set
+                  preOrderDeliveryFee = checkoutData.delivery_option.price;
+                } else if (!preOrderDeliveryFee && checkoutData.pre_order_shipping_option) {
+                  // Fallback: Look up from PRE_ORDER_SHIPPING_OPTIONS by ID
+                  const shippingOption = PRE_ORDER_SHIPPING_OPTIONS.find(
+                    opt => opt.id === checkoutData.pre_order_shipping_option
+                  );
+                  preOrderDeliveryFee = shippingOption?.price || 0;
+                }
+                
+                // ✅ Use discount and tax from checkoutData (already in GHS)
+                const discount = checkoutData.discount || 0;
+                const tax = checkoutData.tax || 0;
+                const preOrderTotal = preOrderSubtotal + preOrderDeliveryFee + tax - discount;
+                
+                const preOrderCheckoutData = {
+                  items: checkoutData.preOrderItems.map((item: any) => ({
+                    ...item,
+                    id: item.product_id || item.id, // Ensure id is set
+                    product_id: item.product_id || item.id, // Ensure product_id is set
+                    is_pre_order: true,
+                  })),
+                  delivery_address: checkoutData.delivery_address,
+                  delivery_option: checkoutData.delivery_option,
+                  payment_method: checkoutData.payment_method || 'paystack',
+                  payment_reference: checkoutData.payment_reference || reference,
+                  notes: hasMixedCart ? `${checkoutData.notes || ''}\n\n[Pre-Order Items]`.trim() : checkoutData.notes,
+                  is_pre_order: true,
+                  pre_order_shipping_option: checkoutData.pre_order_shipping_option,
+                  estimated_arrival_date: checkoutData.estimated_arrival_date,
+                  subtotal: preOrderSubtotal,
+                  discount: discount,
+                  coupon_id: checkoutData.coupon_id || null,
+                  delivery_fee: preOrderDeliveryFee,
+                  tax: checkoutData.tax || 0,
+                  total: preOrderTotal, // Already includes discount subtraction
+                };
+
+                const preOrder = await orderService.createOrder(preOrderCheckoutData, userId);
+                orders.push({ type: 'pre-order', order: preOrder });
+              } catch (error: any) {
+                console.error('❌ Pre-order failed:', error);
+                let errorMessage = error?.message || error?.response?.data?.message || 'Failed to create pre-order';
+                
+                // Provide user-friendly error messages
+                if (errorMessage.includes('Products not found') || errorMessage.includes('product_id')) {
+                  errorMessage = 'Some products in your order are no longer available. Please remove them from your cart and try again.';
+                } else if (errorMessage.includes('foreign key constraint')) {
+                  errorMessage = 'Some products in your order are no longer available. Please update your cart and try again.';
+                }
+                
+                errors.push(`Pre-order: ${errorMessage}`);
+              }
+            }
+
+            // If no separate items, try creating single order with all items (fallback for old format)
+            if (!hasRegularItems && !hasPreOrderItems && checkoutData.items && Array.isArray(checkoutData.items) && checkoutData.items.length > 0) {
+              const singleOrder = await orderService.createOrder(checkoutData, userId);
+              orders.push({ type: 'single', order: singleOrder });
+            }
+
+            // Handle results
+            if (errors.length > 0 && orders.length === 0) {
+              // All orders failed
+              throw new Error(`Failed to create orders: ${errors.join('; ')}`);
+            } else if (errors.length > 0) {
+              // Some orders succeeded, some failed
+              if (process.env.NODE_ENV === 'development') {
+                console.warn('Some orders were created successfully, but some failed:', errors);
+              }
+            }
+
+            if (orders.length === 0) {
+              throw new Error('No orders were created');
+            }
+
+            const firstOrder = orders[0].order;
             
-            const order = await orderService.createOrder(checkoutData, userId);
-            
-            if (!order || !order.id) {
+            if (!firstOrder || !firstOrder.id) {
               throw new Error('Order creation returned invalid response');
             }
             
-            console.log('Order created successfully:', {
-              id: order.id,
-              order_number: order.order_number,
-            });
+            // Order(s) created successfully
               
-              // Update transaction with order_id after order is created
+              // Update transaction with order_id after order is created (link to first order)
               try {
                 const API_URL = typeof window !== 'undefined' 
                   ? (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000')
@@ -154,7 +323,7 @@ export default function PaymentCallbackPage() {
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
                     transaction_reference: reference,
-                    order_id: order.id,
+                    order_id: firstOrder.id,
                   }),
                 });
               } catch (linkError) {
@@ -169,14 +338,20 @@ export default function PaymentCallbackPage() {
               sessionStorage.removeItem('pending_checkout_data');
               sessionStorage.removeItem('pending_payment_reference');
               sessionStorage.removeItem('clear_cart_after_payment');
+              sessionStorage.removeItem('applied_coupon'); // Clear coupon after successful order
               
               setStatus('success');
-              setMessage('Payment successful! Your order has been created.');
-              toast.success(`Order ${order.order_number || order.id} created successfully!`);
+              if (orders.length > 1) {
+                setMessage(`Payment successful! ${orders.length} orders have been created.`);
+                toast.success(`${orders.length} orders created successfully!`);
+              } else {
+                setMessage('Payment successful! Your order has been created.');
+                toast.success(`Order ${firstOrder.order_number || firstOrder.id} created successfully!`);
+              }
               
               // Redirect to order detail page
               setTimeout(() => {
-                router.push(`/orders/${order.id}`);
+                router.push(`/orders/${firstOrder.id}`);
               }, 2000);
             } catch (orderError: any) {
               console.error('Error creating order:', {
@@ -211,8 +386,8 @@ export default function PaymentCallbackPage() {
       <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8">
         {status === 'loading' && (
           <div className="text-center">
-            <div className="bg-blue-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Loader className="w-10 h-10 text-blue-600 animate-spin" />
+            <div className="bg-orange-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Loader className="w-10 h-10 text-[#FF7A19] animate-spin" />
             </div>
             <h1 className="text-2xl font-bold text-[#1A1A1A] mb-3">Processing Payment</h1>
             <p className="text-[#3A3A3A]">{message}</p>

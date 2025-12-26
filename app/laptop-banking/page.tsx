@@ -75,7 +75,9 @@ export default function LaptopBankingPage() {
       // Extract plan type (VTS or Exclusive)
       const plan = formData.tier.includes('VTS') ? 'VTS Banking' : 'Exclusive Banking';
 
-      const response = await fetch('http://localhost:5000/api/investment', {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      
+      const response = await fetch(`${API_URL}/api/investment`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

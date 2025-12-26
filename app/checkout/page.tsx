@@ -12,7 +12,7 @@ import { Check, Banknote, ChevronLeft, Package, Clock } from 'lucide-react';
 import { formatCurrency } from '@/lib/helpers';
 import { orderService } from '@/services/order.service';
 import { deliveryOptionsService } from '@/services/deliveryOptions.service';
-// import { paymentService } from '@/services/payment.service'; // Disabled - only Cash on Delivery
+import { paymentService } from '@/services/payment.service';
 import { DeliveryOption } from '@/types/order';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
@@ -32,6 +32,23 @@ export default function CheckoutPage() {
   const [step, setStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  
+  // Get applied coupon from sessionStorage (set by cart page)
+  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
+  
+  useEffect(() => {
+    // Load coupon from sessionStorage on mount
+    if (typeof window !== 'undefined') {
+      const storedCoupon = sessionStorage.getItem('applied_coupon');
+      if (storedCoupon) {
+        try {
+          setAppliedCoupon(JSON.parse(storedCoupon));
+        } catch (e) {
+          console.error('Error parsing stored coupon:', e);
+        }
+      }
+    }
+  }, []);
 
   // Delivery Information - Auto-fill from user if logged in
   const [deliveryInfo, setDeliveryInfo] = useState({
@@ -105,7 +122,7 @@ export default function CheckoutPage() {
   
   // Selected Options
   const [selectedDelivery, setSelectedDelivery] = useState<DeliveryOption | null>(null);
-  const [paymentMethod] = useState<'cash_on_delivery'>('cash_on_delivery'); // Only Cash on Delivery enabled
+  const [paymentMethod, setPaymentMethod] = useState<'cash_on_delivery' | 'paystack'>('paystack'); // Paystack as default
   const [notes, setNotes] = useState('');
 
   // Fetch delivery options function
@@ -207,6 +224,136 @@ export default function CheckoutPage() {
     setStep(step + 1);
   };
 
+  // Handle Paystack payment initialization
+  const handlePaystackPayment = async () => {
+    const userId = user?.id || null;
+    
+    if (!userId) {
+      // For guest checkout, we still need to validate address
+      if (!validateDeliveryInfo()) {
+        return;
+      }
+    }
+
+    setIsProcessing(true);
+
+    try {
+      // Calculate totals
+      const regularDeliveryFee = hasRegularItems
+        ? (regularSubtotal >= 20000 ? 0 : (selectedDelivery?.price || deliveryOptions[0]?.price || 0))
+        : 0;
+      const preOrderDeliveryFee = hasPreOrderItems
+        ? (selectedPreOrderShipping?.price || PRE_ORDER_SHIPPING_OPTIONS[0].price)
+        : 0;
+      const totalDeliveryFee = regularDeliveryFee + preOrderDeliveryFee;
+      const tax = 0;
+      const amountToPay = grandTotal; // Total in GHS
+
+      // Generate unique payment reference
+      const paymentReference = `VENTECH_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+      // Prepare checkout data for order creation after payment
+      const checkoutData: any = {
+        delivery_address: {
+          ...deliveryInfo,
+          email: deliveryInfo.email || user?.email,
+          country: 'Ghana',
+          is_default: false,
+        },
+        subtotal: total, // Cart subtotal (sum of all items) - MUST be in GHS
+        discount: couponDiscount, // Coupon discount - MUST be in GHS
+        coupon_id: appliedCoupon?.coupon_id || null,
+        applied_coupon: appliedCoupon, // Store full coupon validation for reference
+        tax, // Tax - MUST be in GHS
+        delivery_fee: totalDeliveryFee, // Delivery fee - MUST be in GHS
+        total: amountToPay, // Final total after discount: subtotal + delivery + tax - discount - MUST be in GHS
+        payment_method: 'paystack',
+        notes,
+        hasRegularItems,
+        hasPreOrderItems,
+        regularItems: hasRegularItems ? regularItems.map(item => ({
+          id: item.id,
+          product_id: item.id, // Explicitly set product_id for backend
+          name: item.name,
+          thumbnail: item.thumbnail,
+          image_url: item.thumbnail,
+          quantity: item.quantity,
+          discount_price: item.discount_price,
+          original_price: item.original_price,
+          subtotal: item.subtotal,
+          is_pre_order: false,
+          selected_variants: item.selected_variants || {},
+        })) : [],
+        preOrderItems: hasPreOrderItems ? preOrderItems.map(item => ({
+          id: item.id,
+          product_id: item.id, // Explicitly set product_id for backend
+          name: item.name,
+          thumbnail: item.thumbnail,
+          image_url: item.thumbnail,
+          quantity: item.quantity,
+          discount_price: item.discount_price,
+          original_price: item.original_price,
+          subtotal: item.subtotal,
+          is_pre_order: true,
+          pre_order_shipping_option: selectedPreOrderShipping?.id,
+          selected_variants: item.selected_variants || {},
+        })) : [],
+      };
+
+      // Add delivery options
+      if (hasRegularItems && selectedDelivery) {
+        checkoutData.delivery_option = selectedDelivery;
+      }
+
+      if (hasPreOrderItems && selectedPreOrderShipping) {
+        const estimatedArrival = calculateEstimatedArrival(selectedPreOrderShipping);
+        checkoutData.pre_order_shipping_option = selectedPreOrderShipping.id;
+        checkoutData.estimated_arrival_date = estimatedArrival.date.toISOString();
+      }
+
+      // Store checkout data in sessionStorage for order creation after payment
+      sessionStorage.setItem('pending_checkout_data', JSON.stringify(checkoutData));
+      sessionStorage.setItem('pending_payment_reference', paymentReference);
+      sessionStorage.setItem('clear_cart_after_payment', 'true');
+
+      // ✅ CRITICAL: Log all values before payment to ensure they're in GHS
+      console.log('💰 Payment initialization (all values in GHS):', {
+        subtotal: total,
+        discount: couponDiscount,
+        deliveryFee: totalDeliveryFee,
+        tax,
+        grandTotal: amountToPay,
+        amountInPesewas: Math.round(amountToPay * 100),
+      });
+
+      // Initialize Paystack payment
+      const paymentResult = await paymentService.initializePayment({
+        email: deliveryInfo.email || user?.email || '',
+        amount: Math.round(amountToPay * 100), // ✅ Convert to pesewas ONLY for Paystack
+        reference: paymentReference,
+        callback_url: `${typeof window !== 'undefined' ? window.location.origin : ''}/payment/callback`,
+        metadata: {
+          user_id: userId || 'guest',
+          checkout_data: checkoutData,
+          payment_reference: paymentReference,
+        },
+      });
+
+      if (!paymentResult.success) {
+        throw new Error(paymentResult.message || 'Failed to initialize payment');
+      }
+
+      // Payment popup/redirect will be handled by paymentService
+      // Order will be created after payment verification in callback page
+      // Don't set isProcessing to false here - let the redirect/callback handle it
+      // The loading state will be cleared when user is redirected to callback page
+    } catch (error: any) {
+      console.error('Paystack payment error:', error);
+      toast.error(error.message || 'Failed to initialize payment. Please try again.');
+      setIsProcessing(false);
+    }
+  };
+
   const handlePlaceOrder = async () => {
     // User can proceed without login - they provide address as billing address
     // If not logged in, create order as guest (user_id will be null or handled by backend)
@@ -219,6 +366,13 @@ export default function CheckoutPage() {
       }
     }
 
+    // If Paystack payment, initialize payment first
+    if (paymentMethod === 'paystack') {
+      await handlePaystackPayment();
+      return;
+    }
+
+    // For cash on delivery, proceed with order creation
     setIsProcessing(true);
 
     try {
@@ -248,6 +402,12 @@ export default function CheckoutPage() {
             payment_method: paymentMethod,
             notes: hasMixedCart ? `${notes || ''}\n\n[Regular Items Order]`.trim() : notes,
             is_pre_order: false,
+            subtotal: regularSubtotal,
+            discount: couponDiscount,
+            coupon_id: appliedCoupon?.coupon_id || null,
+            delivery_fee: regularDeliveryFee,
+            tax: 0,
+            total: regularSubtotal + regularDeliveryFee - couponDiscount,
           };
 
           const regularOrder = await orderService.createOrder(regularCheckoutData, userId);
@@ -295,6 +455,12 @@ export default function CheckoutPage() {
             is_pre_order: true,
             pre_order_shipping_option: selectedPreOrderShipping.id,
             estimated_arrival_date: estimatedArrival.date.toISOString(),
+            subtotal: preOrderSubtotal,
+            discount: couponDiscount,
+            coupon_id: appliedCoupon?.coupon_id || null,
+            delivery_fee: preOrderDeliveryFee, // ✅ Include pre-order shipping fee
+            tax: 0,
+            total: preOrderSubtotal + preOrderDeliveryFee - couponDiscount, // ✅ Include shipping in total
           };
 
           const preOrder = await orderService.createOrder(preOrderCheckoutData, userId);
@@ -328,6 +494,8 @@ export default function CheckoutPage() {
       // Clear cart only if at least one order succeeded
       if (orders.length > 0) {
         dispatch(clearCart());
+        // Clear coupon after successful order
+        sessionStorage.removeItem('applied_coupon');
         // Redirect to the first order (or could show a summary page)
         router.push(`/orders/${orders[0].order.id}`);
       } else {
@@ -383,7 +551,8 @@ export default function CheckoutPage() {
   const totalDeliveryFee = regularDeliveryFee + preOrderDeliveryFee;
   
   const tax = 0;
-  const grandTotal = total + totalDeliveryFee + tax;
+  const couponDiscount = appliedCoupon?.discount_amount || 0;
+  const grandTotal = total + totalDeliveryFee + tax - couponDiscount;
   
   // Calculate estimated arrival for pre-orders
   const estimatedArrival = hasPreOrderItems && selectedPreOrderShipping
@@ -662,29 +831,82 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            {/* Step 2: Payment Method - Cash on Delivery Only */}
+            {/* Step 2: Payment Method */}
             {step === 2 && (
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">Payment Method</h2>
 
                 <div className="space-y-3 mb-6">
-                  {/* Cash on Delivery - Only Option */}
-                  <div className="w-full p-4 rounded-lg border-2 border-[#FF7A19] bg-orange-50">
+                  {/* Paystack Payment */}
+                  <button
+                    onClick={() => setPaymentMethod('paystack')}
+                    className={`w-full p-4 rounded-lg border-2 transition-all text-left ${
+                      paymentMethod === 'paystack'
+                        ? 'border-[#FF7A19] bg-orange-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
                     <div className="flex items-center gap-3">
-                      <Banknote className="text-[#FF7A19]" size={24} />
-                      <div>
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        paymentMethod === 'paystack'
+                          ? 'border-[#FF7A19] bg-[#FF7A19]'
+                          : 'border-gray-300'
+                      }`}>
+                        {paymentMethod === 'paystack' && (
+                          <div className="w-2 h-2 rounded-full bg-white"></div>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold text-gray-900">Pay with Paystack</p>
+                        <p className="text-sm text-gray-600">Pay securely with card, mobile money, or bank transfer</p>
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Cash on Delivery */}
+                  <button
+                    onClick={() => setPaymentMethod('cash_on_delivery')}
+                    className={`w-full p-4 rounded-lg border-2 transition-all text-left ${
+                      paymentMethod === 'cash_on_delivery'
+                        ? 'border-[#FF7A19] bg-orange-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        paymentMethod === 'cash_on_delivery'
+                          ? 'border-[#FF7A19] bg-[#FF7A19]'
+                          : 'border-gray-300'
+                      }`}>
+                        {paymentMethod === 'cash_on_delivery' && (
+                          <div className="w-2 h-2 rounded-full bg-white"></div>
+                        )}
+                      </div>
+                      <div className="flex-1">
                         <p className="font-semibold text-gray-900">Cash on Delivery</p>
                         <p className="text-sm text-gray-600">Pay when you receive your order</p>
                       </div>
                     </div>
-                  </div>
+                  </button>
 
                   {/* Payment method info */}
                   <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-sm text-blue-800">
-                      <strong>Note:</strong> Payment will be collected when your order is delivered. 
-                      You'll receive a confirmation email once your order is placed.
-                    </p>
+                    {paymentMethod === 'paystack' ? (
+                      <p className="text-sm text-blue-800">
+                        <strong>Secure Payment:</strong> Your payment will be processed securely through Paystack. 
+                        You can pay with card, mobile money, or bank transfer. Order will be created after successful payment.
+                      </p>
+                    ) : (
+                      <p className="text-sm text-blue-800">
+                        <strong>Note:</strong> Payment will be collected when your order is delivered. 
+                        You'll receive a confirmation email once your order is placed.
+                      </p>
+                    )}
+                    {hasPreOrderItems && (
+                      <p className="text-sm text-orange-600 mt-2 font-semibold">
+                        ⚠️ Full payment required for pre-orders
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -860,7 +1082,9 @@ export default function CheckoutPage() {
                 {/* Payment Method */}
                 <div className="bg-white rounded-xl shadow-sm p-6">
                   <h3 className="font-bold text-gray-900 mb-2">Payment Method</h3>
-                  <p className="text-gray-600 capitalize">Cash on Delivery</p>
+                  <p className="text-gray-600 capitalize">
+                    {paymentMethod === 'paystack' ? 'Paystack (Card/Mobile Money/Bank Transfer)' : 'Cash on Delivery'}
+                  </p>
                   {hasPreOrderItems && (
                     <p className="text-sm text-orange-600 mt-2 font-semibold">
                       ⚠️ Full payment required for pre-orders
@@ -943,6 +1167,13 @@ export default function CheckoutPage() {
                   <div className="flex justify-between text-gray-600">
                     <span>Tax</span>
                     <span>{formatCurrency(tax)}</span>
+                  </div>
+                )}
+                
+                {couponDiscount > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Coupon Discount</span>
+                    <span>-{formatCurrency(couponDiscount)}</span>
                   </div>
                 )}
               </div>

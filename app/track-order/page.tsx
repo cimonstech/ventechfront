@@ -319,7 +319,7 @@ export default function TrackOrderPage() {
                           </p>
                         </div>
                         <p className="font-semibold text-gray-900">
-                          {formatCurrency(item.subtotal)}
+                          {formatCurrency(item.total_price ?? item.subtotal ?? (item.unit_price * item.quantity))}
                         </p>
                       </div>
                     ))}

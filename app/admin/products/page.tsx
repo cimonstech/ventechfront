@@ -365,7 +365,14 @@ export default function AdminProductsPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm text-gray-900">{product.stock_quantity}</span>
+                          {product.stock_quantity < 5 && product.stock_quantity > 0 ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold text-red-600">{product.stock_quantity}</span>
+                              <span className="text-xs font-medium text-red-600 bg-red-50 px-2 py-1 rounded">Low Stock</span>
+                            </div>
+                          ) : (
+                            <span className="text-sm text-gray-900">{product.stock_quantity}</span>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <Badge

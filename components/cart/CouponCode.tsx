@@ -12,13 +12,15 @@ interface CouponCodeProps {
   onCouponRemoved: () => void;
   cartTotal: number;
   appliedCoupon?: CouponValidation | null;
+  userId?: string | null;
 }
 
 export const CouponCode: React.FC<CouponCodeProps> = ({
   onCouponApplied,
   onCouponRemoved,
   cartTotal,
-  appliedCoupon
+  appliedCoupon,
+  userId
 }) => {
   const [code, setCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -32,7 +34,7 @@ export const CouponCode: React.FC<CouponCodeProps> = ({
     setError('');
 
     try {
-      const validation = await couponService.validateCoupon(code.trim().toUpperCase(), cartTotal);
+      const validation = await couponService.validateCoupon(code.trim().toUpperCase(), cartTotal, userId);
       
       if (validation.is_valid) {
         onCouponApplied(validation);

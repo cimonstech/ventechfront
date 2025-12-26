@@ -353,7 +353,8 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
         thumbnail: formData.thumbnail,
         // Pre-order products cannot be featured
         is_featured: formData.is_pre_order ? false : formData.is_featured,
-        in_stock: formData.in_stock,
+        // ✅ Auto-sync in_stock with stock_quantity (backend also does this, but frontend ensures consistency)
+        in_stock: (formData.stock_quantity ? parseInt(formData.stock_quantity) : 0) > 0,
         is_pre_order: formData.is_pre_order,
         pre_order_available: formData.is_pre_order, // Auto-set to true if is_pre_order is true
         estimated_arrival_date: formData.estimated_arrival_date ? new Date(formData.estimated_arrival_date).toISOString() : null,
@@ -675,7 +676,15 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
               <input
                 type="number"
                 value={formData.stock_quantity}
-                onChange={(e) => setFormData({ ...formData, stock_quantity: e.target.value })}
+                onChange={(e) => {
+                  const stockQty = parseInt(e.target.value) || 0;
+                  setFormData({ 
+                    ...formData, 
+                    stock_quantity: e.target.value,
+                    // ✅ Auto-sync in_stock: true if stock > 0, false if stock === 0
+                    in_stock: stockQty > 0
+                  });
+                }}
                 placeholder="Enter stock quantity (required)"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
                 min="0"

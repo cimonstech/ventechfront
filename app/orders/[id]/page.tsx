@@ -22,6 +22,7 @@ export default function OrderDetailPage() {
 
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   useEffect(() => {
     // Check for payment success callback
@@ -44,10 +45,10 @@ export default function OrderDetailPage() {
       toast.success('Payment successful! Order created.');
     }
     
-    if (user) {
-      fetchOrder();
-    }
-  }, [user, orderId, dispatch]);
+    // Fetch order regardless of user authentication status
+    // The backend API can handle both authenticated and guest orders
+    fetchOrder();
+  }, [orderId, dispatch]);
 
   const fetchOrder = async () => {
     try {
@@ -77,6 +78,46 @@ export default function OrderDetailPage() {
       toast.error('Failed to load order details');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleCancelOrder = async () => {
+    if (!order) return;
+
+    // Confirm cancellation
+    const confirmed = window.confirm(
+      'Are you sure you want to cancel this order? This action cannot be undone.'
+    );
+    
+    if (!confirmed) return;
+
+    setIsCancelling(true);
+
+    try {
+      // For anonymous users, get email from order delivery address
+      // Note: delivery_address may contain email for guest orders (stored as JSONB in backend)
+      const email = user?.email || (order.delivery_address as any)?.email || null;
+      
+      if (!email && !user) {
+        toast.error('Unable to cancel order: Email verification required. Please contact support.');
+        setIsCancelling(false);
+        return;
+      }
+
+      const cancelledOrder = await orderService.cancelOrder(order.id, email || undefined);
+      
+      // Update local state
+      setOrder({
+        ...order,
+        status: 'cancelled',
+      });
+
+      toast.success('Order cancelled successfully');
+    } catch (error: any) {
+      console.error('Error cancelling order:', error);
+      toast.error(error?.message || 'Failed to cancel order. Please contact support.');
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -134,8 +175,21 @@ export default function OrderDetailPage() {
               <div className="space-y-4">
                 {order.items.map((item, index) => (
                   <div key={index} className="flex gap-4 py-4 border-b border-gray-100 last:border-b-0">
-                    <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <Package className="text-gray-400" size={32} />
+                    <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
+                      {item.product_image ? (
+                        <img 
+                          src={item.product_image} 
+                          alt={item.product_name || 'Product'} 
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            // Fallback to icon if image fails to load
+                            e.currentTarget.style.display = 'none';
+                            e.currentTarget.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center"><svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg></div>';
+                          }}
+                        />
+                      ) : (
+                        <Package className="text-gray-400" size={32} />
+                      )}
                     </div>
                     <div className="flex-1">
                       <p className="font-semibold text-gray-900 mb-1">{item.product_name}</p>
@@ -152,9 +206,13 @@ export default function OrderDetailPage() {
                     </div>
                     <div className="text-right">
                       <p className="font-bold text-gray-900">
-                        {formatCurrency(item.subtotal || (item.unit_price * item.quantity))}
+                        {/* ✅ Use backend's total_price directly - already in GHS, NO calculation */}
+                        {formatCurrency(item.total_price ?? item.subtotal ?? 0)}
                       </p>
-                      <p className="text-sm text-gray-600">{formatCurrency(item.unit_price)} each</p>
+                      <p className="text-sm text-gray-600">
+                        {/* ✅ Use backend's unit_price directly - already in GHS */}
+                        {formatCurrency(item.unit_price ?? 0)} each
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -305,7 +363,14 @@ export default function OrderDetailPage() {
               {/* Action Buttons */}
               <div className="space-y-3">
                 {order.status === 'pending' && (
-                  <Button variant="danger" size="md" className="w-full">
+                  <Button 
+                    variant="danger" 
+                    size="md" 
+                    className="w-full"
+                    onClick={handleCancelOrder}
+                    isLoading={isCancelling}
+                    disabled={isCancelling}
+                  >
                     Cancel Order
                   </Button>
                 )}

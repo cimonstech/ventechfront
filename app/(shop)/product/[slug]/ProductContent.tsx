@@ -26,7 +26,8 @@ import {
   CreditCard,
   Headphones,
   ShoppingCart,
-  ChevronLeft
+  ChevronLeft,
+  Zap
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Product, ProductVariant } from '@/types/product';
@@ -172,6 +173,45 @@ export function ProductContent({ product }: ProductContentProps) {
     );
 
     toast.success(`${product.name} added to cart!`);
+  };
+
+  const handleOrderNow = () => {
+    // Add to cart first
+    const cartVariants: { [key: string]: ProductVariant } = {};
+    
+    selectedVariants.forEach((selectedVariant: any) => {
+      if (selectedVariant && selectedVariant.option) {
+        cartVariants[selectedVariant.attributeId] = {
+          id: selectedVariant.option.id,
+          product_id: product.id,
+          type: 'ram' as any,
+          name: selectedVariant.option.label,
+          value: selectedVariant.option.value,
+          price_adjustment: selectedVariant.option.price_modifier,
+          stock_quantity: selectedVariant.option.stock_quantity,
+          sku: `${product.id}-${selectedVariant.option.sku_suffix || selectedVariant.option.value}`,
+        };
+      }
+    });
+
+    const cartItem = {
+      ...product,
+      quantity,
+      selected_variants: cartVariants,
+      subtotal: finalPrice * quantity,
+    };
+
+    dispatch(
+      addToCart({
+        product: cartItem,
+        quantity,
+        variants: cartVariants,
+      })
+    );
+
+    // Redirect to cart page
+    router.push('/cart');
+    toast.success(`${product.name} added to cart! Redirecting to checkout...`);
   };
 
   const handleWishlist = async () => {
@@ -377,6 +417,16 @@ export function ProductContent({ product }: ProductContentProps) {
                 className="flex-1"
               >
                 {isInCart ? 'In Cart' : 'Add to Cart'}
+              </Button>
+              <Button
+                variant="primary"
+                size="lg"
+                icon={<Zap size={20} />}
+                onClick={handleOrderNow}
+                disabled={!product.in_stock || product.stock_quantity === 0}
+                className="flex-1 bg-[#FF7A19] hover:bg-[#FF8A29]"
+              >
+                Order Now
               </Button>
             </div>
 

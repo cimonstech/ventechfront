@@ -382,10 +382,10 @@ export default function AffiliatePage() {
       {/* CTA Section */}
       <section className="py-12 md:py-16 bg-gradient-to-br from-[#1A1A1A] to-[#2D2D2D] text-white">
         <div className="container mx-auto px-4 sm:px-6 text-center">
-          <h2 className="text-2xl md:text-3xl font-bold mb-6 text-white">
+          <h2 className="affiliate-cta-heading text-2xl md:text-3xl font-bold mb-6 text-white" style={{ color: '#ffffff' }}>
             Start Earning with Ventech
           </h2>
-          <p className="text-lg text-gray-300 mb-8 max-w-2xl mx-auto">
+          <p className="affiliate-cta-text text-lg mb-8 max-w-2xl mx-auto" style={{ color: '#ffffff' }}>
             Join thousands of affiliates promoting the latest tech gadgets and earning competitive commissions.
           </p>
           <a

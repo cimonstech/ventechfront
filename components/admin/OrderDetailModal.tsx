@@ -14,7 +14,8 @@ interface OrderItem {
   product_image: string;
   quantity: number;
   unit_price: number;
-  subtotal: number;
+  subtotal?: number; // Legacy field, prefer total_price
+  total_price?: number; // ✅ Backend stores this - use this directly, already in GHS
   selected_variants?: any;
   is_pre_order?: boolean;
 }
@@ -255,28 +256,63 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
 
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${API_URL}/api/orders/${orderId}/pdf`, {
+      const pdfUrl = `${API_URL}/api/orders/${orderId}/pdf`;
+      
+      console.log('Downloading PDF from:', pdfUrl);
+      console.log('API URL configured:', API_URL);
+      
+      const response = await fetch(pdfUrl, {
         method: 'GET',
+        headers: {
+          'Accept': 'application/pdf',
+        },
+      }).catch((fetchError) => {
+        // Network error (connection refused, CORS, etc.)
+        console.error('Network error fetching PDF:', fetchError);
+        throw new Error(
+          `Cannot connect to backend API. Please ensure:\n` +
+          `1. Backend server is running\n` +
+          `2. API URL is correct: ${API_URL}\n` +
+          `3. CORS is configured on the backend`
+        );
       });
 
       if (!response.ok) {
-        throw new Error('Failed to generate PDF');
+        const errorText = await response.text();
+        let errorMessage = 'Failed to generate PDF';
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.message || errorMessage;
+        } catch {
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(`Server error (${response.status}): ${errorMessage}`);
       }
 
       const blob = await response.blob();
+      
+      if (!blob || blob.size === 0) {
+        throw new Error('PDF file is empty');
+      }
+      
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `order-${order.order_number}.pdf`;
       document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      
+      // Clean up
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }, 100);
 
       toast.success('PDF downloaded successfully');
     } catch (error: any) {
       console.error('Error downloading PDF:', error);
-      toast.error(error.message || 'Failed to download PDF');
+      const errorMessage = error?.message || 'Failed to download PDF. Please check your connection and try again.';
+      toast.error(errorMessage);
     }
   };
 
@@ -505,7 +541,8 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
                               GHS {(item.unit_price || 0).toFixed(2)}
                             </td>
                             <td className="px-4 py-3 text-sm text-right font-semibold text-[#1A1A1A]">
-                              GHS {(item.subtotal || (item.unit_price || 0) * (item.quantity || 0)).toFixed(2)}
+                              {/* ✅ Use backend's total_price directly - already in GHS, NO calculation */}
+                              GHS {(item.total_price ?? item.subtotal ?? 0).toFixed(2)}
                             </td>
                           </tr>
                         ))

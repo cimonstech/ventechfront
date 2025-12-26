@@ -448,7 +448,7 @@ export default function AdminDashboard() {
         const { count, error: lowStockError } = await supabase
         .from('products')
         .select('*', { count: 'exact', head: true })
-        .lt('stock_quantity', 10)
+        .lt('stock_quantity', 5)
         .eq('in_stock', true);
 
         if (!lowStockError) {

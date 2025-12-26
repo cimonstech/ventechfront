@@ -341,26 +341,64 @@ export default function AdminOrdersPage() {
 
   const downloadOrderPDF = async (orderId: string, orderNumber: string) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders/${orderId}/pdf`);
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const pdfUrl = `${API_URL}/api/orders/${orderId}/pdf`;
+      
+      console.log('Downloading PDF from:', pdfUrl);
+      console.log('API URL configured:', API_URL);
+      
+      const response = await fetch(pdfUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/pdf',
+        },
+      }).catch((fetchError) => {
+        // Network error (connection refused, CORS, etc.)
+        console.error('Network error fetching PDF:', fetchError);
+        throw new Error(
+          `Cannot connect to backend API. Please ensure:\n` +
+          `1. Backend server is running\n` +
+          `2. API URL is correct: ${API_URL}\n` +
+          `3. CORS is configured on the backend`
+        );
+      });
       
       if (!response.ok) {
-        throw new Error('Failed to generate PDF');
+        const errorText = await response.text();
+        let errorMessage = 'Failed to generate PDF';
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.message || errorMessage;
+        } catch {
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(`Server error (${response.status}): ${errorMessage}`);
       }
 
       const blob = await response.blob();
+      
+      if (!blob || blob.size === 0) {
+        throw new Error('PDF file is empty');
+      }
+      
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `order-${orderNumber}.pdf`;
       document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      
+      // Clean up
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }, 100);
       
       toast.success('PDF downloaded successfully!');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error downloading PDF:', error);
-      toast.error('Failed to download PDF');
+      const errorMessage = error?.message || 'Failed to download PDF. Please check your connection and try again.';
+      toast.error(errorMessage);
     }
   };
 

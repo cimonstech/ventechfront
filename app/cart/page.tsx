@@ -8,25 +8,47 @@ import { useAppSelector, useAppDispatch } from '@/store';
 import { removeFromCart, updateQuantity } from '@/store/cartSlice';
 import { Trash2, Minus, Plus, ShoppingBag, ArrowRight } from 'lucide-react';
 import { formatCurrency } from '@/lib/helpers';
-import { CouponCode } from '@/components/cart/CouponCode';
-import { CouponValidation } from '@/types/coupon';
 import { taxService } from '@/services/tax.service';
 import { discountService } from '@/services/discount.service';
+import { CouponCode } from '@/components/cart/CouponCode';
+import { CouponValidation } from '@/types/coupon';
 import toast from 'react-hot-toast';
 
 export default function CartPage() {
   const dispatch = useAppDispatch();
   const { items, total, itemCount } = useAppSelector((state) => state.cart);
-  const [appliedCoupon, setAppliedCoupon] = useState<CouponValidation | null>(null);
+  const { user } = useAppSelector((state) => state.auth);
   const [taxAmount, setTaxAmount] = useState(0);
   const [discountAmount, setDiscountAmount] = useState(0);
+  const [appliedCoupon, setAppliedCoupon] = useState<CouponValidation | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   // Track when component has mounted to avoid hydration mismatch
   React.useEffect(() => {
     setMounted(true);
+    // Load coupon from sessionStorage on mount
+    if (typeof window !== 'undefined') {
+      const storedCoupon = sessionStorage.getItem('applied_coupon');
+      if (storedCoupon) {
+        try {
+          setAppliedCoupon(JSON.parse(storedCoupon));
+        } catch (e) {
+          console.error('Error parsing stored coupon:', e);
+        }
+      }
+    }
   }, []);
+
+  // Clear coupon when cart becomes empty (after order completion)
+  React.useEffect(() => {
+    if (items.length === 0 && appliedCoupon) {
+      setAppliedCoupon(null);
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('applied_coupon');
+      }
+    }
+  }, [items.length, appliedCoupon]);
 
   const handleRemoveItem = (productId: string) => {
     dispatch(removeFromCart(productId));
@@ -46,10 +68,18 @@ export default function CartPage() {
 
   const handleCouponApplied = (validation: CouponValidation) => {
     setAppliedCoupon(validation);
+    // Store coupon in sessionStorage so checkout can access it
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('applied_coupon', JSON.stringify(validation));
+    }
   };
 
   const handleCouponRemoved = () => {
     setAppliedCoupon(null);
+    // Remove coupon from sessionStorage
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('applied_coupon');
+    }
   };
 
   // Calculate taxes and discounts when cart changes
@@ -221,6 +251,7 @@ export default function CartPage() {
               onCouponRemoved={handleCouponRemoved}
               cartTotal={total}
               appliedCoupon={appliedCoupon}
+              userId={user?.id || null}
             />
 
             <div className="bg-white rounded-xl shadow-sm p-6 sticky top-4">

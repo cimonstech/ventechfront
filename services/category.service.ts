@@ -4,7 +4,7 @@ import { Category } from '@/types/product';
 // Fetch all categories with accurate product counts
 export const getCategories = async (): Promise<Category[]> => {
   try {
-    console.log('Fetching categories...');
+    // Fetching categories
     
     // First, fetch all categories
     const { data: categories, error: categoriesError } = await supabase
@@ -18,7 +18,7 @@ export const getCategories = async (): Promise<Category[]> => {
     }
     
     if (!categories || categories.length === 0) {
-      console.log('Categories fetched successfully: (empty)');
+      // Categories fetched (empty)
       return [];
     }
     
@@ -51,7 +51,7 @@ export const getCategories = async (): Promise<Category[]> => {
       thumbnail: (category as any).image_url || (category as any).thumbnail_url || category.thumbnail || '',
     }));
     
-    console.log('Categories fetched successfully:', categoriesWithCounts);
+    // Categories fetched successfully
     return categoriesWithCounts;
   } catch (error) {
     console.error('Error fetching categories:', error);

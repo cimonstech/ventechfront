@@ -141,13 +141,14 @@ export const NavBar = () => {
           {/* Logo */}
           <Link href="/" className="flex items-center flex-shrink-0">
             <Image
-  src="https://files.ventechgadgets.com/ventech-logomain.png"
-  alt="VENTECH"
-  width={100}
-  height={40}
-  className="object-contain"
-  priority
-/>
+              src="https://files.ventechgadgets.com/ventech_logo_1.webp"
+              alt="VENTECH"
+              width={100}
+              height={40}
+              className="object-contain"
+              priority
+              style={{ width: 'auto', height: 'auto' }}
+            />
 
           </Link>
 

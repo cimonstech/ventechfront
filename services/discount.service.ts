@@ -108,13 +108,96 @@ export const discountService = {
   // Calculate discount for an amount
   async calculateDiscount(amount: number, type: string = 'all'): Promise<number> {
     try {
+      // Try RPC function first (if it exists)
       const { data, error } = await supabase
         .rpc('calculate_discount', { amount, discount_type: type });
 
-      if (error) throw error;
-      return data || 0;
-    } catch (error) {
-      console.error('Error calculating discount:', error);
+      if (!error && data !== null && data !== undefined) {
+        return data || 0;
+      }
+
+      // If RPC doesn't exist or fails, fallback to direct query
+      if (error && error.code !== 'PGRST202') {
+        // Only log non-404 errors (function not found is expected)
+        console.debug('RPC calculate_discount failed, using fallback:', {
+          message: error.message,
+          code: error.code,
+        });
+      }
+
+      // Fallback: Direct query to get active discounts and calculate manually
+      const now = new Date().toISOString();
+      const { data: discounts, error: queryError } = await supabase
+        .from('discounts')
+        .select('*')
+        .eq('is_active', true)
+        .lte('valid_from', now)
+        .gte('valid_until', now)
+        .or(`applies_to.eq.${type},applies_to.eq.all`);
+
+      if (queryError) {
+        // If discounts table doesn't exist, just return 0
+        if (queryError.code === '42P01' || queryError.message?.includes('does not exist')) {
+          return 0;
+        }
+        console.debug('Error fetching discounts for calculation:', {
+          message: queryError.message,
+          code: queryError.code,
+        });
+        return 0;
+      }
+
+      if (!discounts || discounts.length === 0) {
+        return 0;
+      }
+
+      // Calculate discount from active discounts
+      let totalDiscount = 0;
+      for (const discount of discounts) {
+        if (amount < discount.minimum_amount) {
+          continue; // Skip if minimum amount not met
+        }
+
+        if (discount.usage_limit && discount.used_count >= discount.usage_limit) {
+          continue; // Skip if usage limit reached
+        }
+
+        let discountAmount = 0;
+        if (discount.type === 'percentage') {
+          discountAmount = (amount * discount.value) / 100;
+          if (discount.maximum_discount && discountAmount > discount.maximum_discount) {
+            discountAmount = discount.maximum_discount;
+          }
+        } else if (discount.type === 'fixed_amount') {
+          discountAmount = discount.value;
+          if (discountAmount > amount) {
+            discountAmount = amount;
+          }
+        } else if (discount.type === 'free_shipping') {
+          // Free shipping doesn't affect cart total, handled at checkout
+          discountAmount = 0;
+        }
+
+        totalDiscount += discountAmount;
+      }
+
+      // Don't exceed the cart amount
+      return totalDiscount > amount ? amount : totalDiscount;
+    } catch (error: any) {
+      // Extract error information properly
+      const errorMessage = error?.message || error?.toString() || 'Unknown error';
+      const errorCode = error?.code || error?.status || 'UNKNOWN';
+      
+      // Only log if it's not a "function not found" error
+      if (errorCode !== 'PGRST202' && !errorMessage.includes('function') && !errorMessage.includes('not found')) {
+        console.error('Error calculating discount:', {
+          message: errorMessage,
+          code: errorCode,
+          errorType: error?.constructor?.name || typeof error,
+        });
+      }
+      
+      // Return 0 on any error (graceful degradation)
       return 0;
     }
   },
