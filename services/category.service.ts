@@ -78,7 +78,7 @@ export const getCategoryBySlug = async (slug: string): Promise<Category | null> 
   try {
     const { data, error } = await supabase
       .from('categories')
-      .select('id, name, slug, description, thumbnail, image_url, thumbnail_url, icon, parent_id, product_count, order, created_at')
+      .select('id, name, slug, description, image_url, thumbnail_url, icon, parent_id, product_count, order, created_at')
       .eq('slug', slug)
       .maybeSingle();
 
