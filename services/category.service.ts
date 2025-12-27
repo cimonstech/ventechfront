@@ -89,11 +89,11 @@ export const getCategoryBySlug = async (slug: string): Promise<Category | null> 
       }
       return null;
     }
-    // Map image fields: prioritize image_url, then thumbnail_url, then thumbnail
+    // Map image fields: prioritize image_url, then thumbnail_url
     if (data) {
       return {
         ...data,
-        thumbnail: (data as any).image_url || (data as any).thumbnail_url || data.thumbnail || '',
+        thumbnail: (data as any).image_url || (data as any).thumbnail_url || '',
       };
     }
     return data;

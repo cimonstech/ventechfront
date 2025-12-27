@@ -389,8 +389,8 @@ export function ProductContent({ product }: ProductContentProps) {
             </div>
 
             {/* Quantity & Actions */}
-            <div className="flex flex-col sm:flex-row gap-4 mb-6">
-              <div className="flex items-center gap-3 border border-gray-300 rounded-lg p-2">
+            <div className="flex flex-col gap-4 mb-6">
+              <div className="flex items-center gap-3 border border-gray-300 rounded-lg p-2 w-fit">
                 <button
                   onClick={() => handleQuantityChange(-1)}
                   disabled={quantity <= 1}
@@ -408,26 +408,29 @@ export function ProductContent({ product }: ProductContentProps) {
                 </button>
               </div>
 
-              <Button
-                variant="primary"
-                size="lg"
-                icon={<ShoppingCart size={20} />}
-                onClick={handleAddToCart}
-                disabled={!product.in_stock || product.stock_quantity === 0}
-                className="flex-1"
-              >
-                {isInCart ? 'In Cart' : 'Add to Cart'}
-              </Button>
-              <Button
-                variant="primary"
-                size="lg"
-                icon={<Zap size={20} />}
-                onClick={handleOrderNow}
-                disabled={!product.in_stock || product.stock_quantity === 0}
-                className="flex-1 bg-[#FF7A19] hover:bg-[#FF8A29]"
-              >
-                Order Now
-              </Button>
+              {/* Buttons side by side on mobile: Order Now first, then Add to Cart */}
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="primary"
+                  size="lg"
+                  icon={<Zap size={20} />}
+                  onClick={handleOrderNow}
+                  disabled={!product.in_stock || product.stock_quantity === 0}
+                  className="flex-1 bg-[#FF7A19] hover:bg-[#FF8A29]"
+                >
+                  Order Now
+                </Button>
+                <Button
+                  variant="primary"
+                  size="lg"
+                  icon={<ShoppingCart size={20} />}
+                  onClick={handleAddToCart}
+                  disabled={!product.in_stock || product.stock_quantity === 0}
+                  className="flex-1"
+                >
+                  {isInCart ? 'In Cart' : 'Add to Cart'}
+                </Button>
+              </div>
             </div>
 
             <div className="flex gap-3 mb-6">

@@ -144,7 +144,10 @@ export default function LaptopBankingPage() {
                 variant="ghost" 
                 size="lg" 
                 className="text-white border-white hover:bg-white/10"
-                onClick={() => scrollToSection('how-it-works')}
+                onClick={() => {
+                  const pdfUrl = 'https://files.ventechgadgets.com/laptopbanking.pdf';
+                  window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+                }}
               >
                 Learn More
               </Button>
