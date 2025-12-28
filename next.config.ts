@@ -25,12 +25,32 @@ if (typeof process !== 'undefined') {
   // Handle Windows-specific EPERM errors gracefully (Next.js process management)
   process.on('uncaughtException', (error: Error) => {
     // Ignore EPERM errors related to process killing (Windows-specific)
-    if (error.message && error.message.includes('kill EPERM')) {
-      // Silently ignore - this is a known Windows issue with Next.js hot reload
+    // Check multiple ways the error might be formatted
+    const errorMessage = error.message || String(error);
+    const errorCode = (error as any)?.code || (error as any)?.errno;
+    
+    if (
+      errorMessage.includes('kill EPERM') ||
+      errorMessage.includes('EPERM') ||
+      errorCode === 'EPERM' ||
+      (error as any)?.syscall === 'kill' && errorCode === -4048
+    ) {
+      // Silently ignore - this is a known Windows issue with Next.js hot reload/Turbopack
       return;
     }
     // Log other uncaught exceptions
     console.error('Uncaught Exception:', error);
+  });
+
+  // Also handle unhandled promise rejections that might contain EPERM
+  process.on('unhandledRejection', (reason: any) => {
+    const reasonStr = reason?.message || String(reason);
+    if (reasonStr.includes('kill EPERM') || reasonStr.includes('EPERM')) {
+      // Silently ignore EPERM errors in promise rejections
+      return;
+    }
+    // Log other unhandled rejections
+    console.error('Unhandled Rejection:', reason);
   });
 }
 

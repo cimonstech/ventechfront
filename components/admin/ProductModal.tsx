@@ -49,6 +49,8 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
     pre_order_available: false,
     estimated_arrival_date: '',
   });
+  
+  const [keySpecs, setKeySpecs] = useState<Array<{ label: string; color: string }>>([]);
 
   useEffect(() => {
     if (isOpen) {
@@ -108,6 +110,21 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
       fetchProductAttributes(product.id);
       // Reset productVariants when opening a product - ProductVariantManager will fetch them
       setProductVariants([]);
+      
+      // Load key_specs if they exist
+      if (product.key_specs) {
+        try {
+          const specs = typeof product.key_specs === 'string' 
+            ? JSON.parse(product.key_specs) 
+            : product.key_specs;
+          setKeySpecs(Array.isArray(specs) ? specs : []);
+        } catch (error) {
+          console.error('Error parsing key_specs:', error);
+          setKeySpecs([]);
+        }
+      } else {
+        setKeySpecs([]);
+      }
     } else {
       resetForm();
       setProductVariants([]);
@@ -139,6 +156,7 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
       estimated_arrival_date: '',
     });
     setSelectedAttributes([]);
+    setKeySpecs([]);
   };
 
   const fetchCategories = async () => {
@@ -295,6 +313,37 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
     );
   };
 
+  // Key Specs management functions
+  const addKeySpec = () => {
+    if (keySpecs.length >= 6) {
+      toast.error('Maximum 6 key specs allowed');
+      return;
+    }
+    setKeySpecs([...keySpecs, { label: '', color: '#9333ea' }]); // Default purple color
+  };
+
+  const removeKeySpec = (index: number) => {
+    setKeySpecs(keySpecs.filter((_, i) => i !== index));
+  };
+
+  const updateKeySpec = (index: number, field: 'label' | 'color', value: string) => {
+    const updated = [...keySpecs];
+    updated[index] = { ...updated[index], [field]: value };
+    setKeySpecs(updated);
+  };
+
+  // Predefined color options for quick selection
+  const colorOptions = [
+    { name: 'Purple', value: '#9333ea' },
+    { name: 'Blue', value: '#2563eb' },
+    { name: 'Green', value: '#16a34a' },
+    { name: 'Cyan', value: '#0891b2' },
+    { name: 'Orange', value: '#ea580c' },
+    { name: 'Red', value: '#dc2626' },
+    { name: 'Pink', value: '#db2777' },
+    { name: 'Indigo', value: '#4f46e5' },
+  ];
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -336,11 +385,17 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
         }
       }
 
+      // Validate key specs (filter out empty labels)
+      const validKeySpecs = keySpecs.filter(spec => spec.label.trim() !== '');
+
       const productData = {
         name: formData.name,
         slug: formData.slug,
         description: formData.description,
         key_features: keyFeatures,
+        // Supabase JSONB accepts objects directly, but we can also send as JSON string
+        // The service layer will parse it back to an array
+        key_specs: validKeySpecs.length > 0 ? validKeySpecs : null,
         specifications: specifications,
         category_id: formData.category_id,
         brand_id: formData.brand_id,
@@ -595,6 +650,81 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
             />
             <p className="text-xs text-gray-500 mt-1">Separate each feature with a comma</p>
+          </div>
+
+          {/* Key Specs Buttons */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-semibold text-[#1A1A1A]">
+                Key Specs Buttons (Max 6)
+              </label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addKeySpec}
+                disabled={keySpecs.length >= 6}
+                icon={<Plus size={16} />}
+              >
+                Add Spec
+              </Button>
+            </div>
+            <p className="text-xs text-gray-500 mb-3">
+              These will appear as colored buttons on product cards. Desktop: above "Add to Cart", Mobile: below prices.
+            </p>
+            
+            {keySpecs.length === 0 ? (
+              <div className="p-4 border-2 border-dashed border-gray-300 rounded-lg text-center text-gray-500 text-sm">
+                No key specs added. Click "Add Spec" to add one.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {keySpecs.map((spec, index) => (
+                  <div key={index} className="flex items-center gap-3 p-3 border border-gray-300 rounded-lg bg-gray-50">
+                    <div className="flex-1">
+                      <input
+                        type="text"
+                        value={spec.label}
+                        onChange={(e) => updateKeySpec(index, 'label', e.target.value)}
+                        placeholder="e.g., 8GB RAM, 512GB SSD, Intel i7"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19] text-sm"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {/* Color Picker */}
+                      <input
+                        type="color"
+                        value={spec.color}
+                        onChange={(e) => updateKeySpec(index, 'color', e.target.value)}
+                        className="w-12 h-10 border border-gray-300 rounded-lg cursor-pointer"
+                        title="Choose color"
+                      />
+                      {/* Quick Color Options */}
+                      <div className="flex gap-1">
+                        {colorOptions.slice(0, 4).map((color) => (
+                          <button
+                            key={color.value}
+                            type="button"
+                            onClick={() => updateKeySpec(index, 'color', color.value)}
+                            className="w-6 h-6 rounded border-2 border-gray-300 hover:border-gray-500 transition-colors"
+                            style={{ backgroundColor: color.value }}
+                            title={color.name}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeKeySpec(index)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Remove spec"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Specifications */}

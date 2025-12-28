@@ -155,6 +155,36 @@ export function CategoryContent({ category }: CategoryContentProps) {
             <div className="bg-white rounded-xl shadow-sm p-6 sticky top-4">
               <h3 className="font-bold text-[#1A1A1A] mb-4">Filters</h3>
 
+              {/* Category Filter - Show current category as selected */}
+              {categories.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="font-semibold text-sm text-[#1A1A1A] mb-3">Category</h4>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    <Link
+                      href="/shop"
+                      className={`flex items-center gap-2 p-2 rounded-lg transition-colors ${
+                        false ? 'bg-[#FF7A19] text-white' : 'hover:bg-gray-100 text-[#3A3A3A]'
+                      }`}
+                    >
+                      <span className="text-sm">All Products</span>
+                    </Link>
+                    {categories.map((cat) => (
+                      <Link
+                        key={cat.id}
+                        href={`/categories/${cat.slug}`}
+                        className={`flex items-center gap-2 p-2 rounded-lg transition-colors ${
+                          cat.id === category.id
+                            ? 'bg-[#FF7A19] text-white font-semibold'
+                            : 'hover:bg-gray-100 text-[#3A3A3A]'
+                        }`}
+                      >
+                        <span className="text-sm">{cat.name}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Brand Filter */}
               {brands.length > 0 && (
                 <div className="mb-6">
@@ -231,6 +261,36 @@ export function CategoryContent({ category }: CategoryContentProps) {
           {showFilters && (
             <div className="lg:hidden mb-6 bg-white rounded-xl shadow-sm p-4">
               <h3 className="font-bold text-[#1A1A1A] mb-4">Filters</h3>
+              
+              {/* Category Filter - Mobile */}
+              {categories.length > 0 && (
+                <div className="mb-4">
+                  <h4 className="font-semibold text-sm text-[#1A1A1A] mb-2">Category</h4>
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    <Link
+                      href="/shop"
+                      className={`flex items-center gap-2 p-2 rounded-lg transition-colors ${
+                        false ? 'bg-[#FF7A19] text-white' : 'hover:bg-gray-100 text-[#3A3A3A]'
+                      }`}
+                    >
+                      <span className="text-sm">All Products</span>
+                    </Link>
+                    {categories.map((cat) => (
+                      <Link
+                        key={cat.id}
+                        href={`/categories/${cat.slug}`}
+                        className={`flex items-center gap-2 p-2 rounded-lg transition-colors ${
+                          cat.id === category.id
+                            ? 'bg-[#FF7A19] text-white font-semibold'
+                            : 'hover:bg-gray-100 text-[#3A3A3A]'
+                        }`}
+                      >
+                        <span className="text-sm">{cat.name}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
               
               {/* Brand Filter */}
               {brands.length > 0 && (

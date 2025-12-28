@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Metadata } from 'next';
-import { Spinner } from '@/components/loaders/Spinner';
+import CheckmarkLoader from '@/components/loaders/CheckmarkLoader';
 import { PreOrderProductCard } from '@/components/cards/PreOrderProductCard';
 import { getPreOrderProducts, PreOrderProduct } from '@/services/preOrder.service';
 import { Package, Clock } from 'lucide-react';
@@ -29,14 +29,6 @@ export default function PreOrderPage() {
       setIsLoading(false);
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Spinner size="lg" />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -79,7 +71,11 @@ export default function PreOrderPage() {
           </div>
         )}
 
-        {products.length === 0 && !isLoading ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <CheckmarkLoader size={72} color="#FF7A19" speedMs={600} />
+          </div>
+        ) : products.length === 0 ? (
           <div className="text-center py-16">
             <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">

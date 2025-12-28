@@ -133,6 +133,21 @@ export const getProducts = async (params: GetProductsParams = {}): Promise<Produ
           category_name: null,
           brand: p.brand_name || '',
           featured: p.is_featured || false,
+          // Parse key_specs if it's a string (JSONB from Supabase)
+          key_specs: (() => {
+            if (!p.key_specs) return undefined;
+            if (Array.isArray(p.key_specs)) return p.key_specs;
+            if (typeof p.key_specs === 'string') {
+              try {
+                const parsed = JSON.parse(p.key_specs);
+                return Array.isArray(parsed) ? parsed : undefined;
+              } catch (e) {
+                console.warn('Failed to parse key_specs:', e);
+                return undefined;
+              }
+            }
+            return undefined;
+          })(),
           // Ensure rating and review_count are properly included and defaulted
           rating: (() => {
             const ratingValue = p.rating;
@@ -178,6 +193,21 @@ export const getProducts = async (params: GetProductsParams = {}): Promise<Produ
         category_slug: p.categories?.slug || p.category_slug || null,
         brand: p.brands?.name || p.brand || '',
         featured: p.is_featured || false,
+        // Parse key_specs if it's a string (JSONB from Supabase)
+        key_specs: (() => {
+          if (!p.key_specs) return undefined;
+          if (Array.isArray(p.key_specs)) return p.key_specs;
+          if (typeof p.key_specs === 'string') {
+            try {
+              const parsed = JSON.parse(p.key_specs);
+              return Array.isArray(parsed) ? parsed : undefined;
+            } catch (e) {
+              console.warn('Failed to parse key_specs:', e);
+              return undefined;
+            }
+          }
+          return undefined;
+        })(),
         // Ensure rating and review_count are properly included and defaulted
         rating: (() => {
           const ratingValue = p.rating;
@@ -226,6 +256,21 @@ export const getProducts = async (params: GetProductsParams = {}): Promise<Produ
       category_slug: product.categories?.slug || product.category_slug || null,
       brand: product.brands?.name || product.brand || '',
       featured: product.is_featured || false,
+      // Parse key_specs if it's a string (JSONB from Supabase)
+      key_specs: (() => {
+        if (!product.key_specs) return undefined;
+        if (Array.isArray(product.key_specs)) return product.key_specs;
+        if (typeof product.key_specs === 'string') {
+          try {
+            const parsed = JSON.parse(product.key_specs);
+            return Array.isArray(parsed) ? parsed : undefined;
+          } catch (e) {
+            console.warn('Failed to parse key_specs:', e);
+            return undefined;
+          }
+        }
+        return undefined;
+      })(),
       // Ensure rating and review_count are properly included and defaulted
       // Handle both number and string types, and parse if needed
       rating: (() => {
@@ -354,6 +399,21 @@ export const getProductBySlug = async (slug: string): Promise<Product | null> =>
       slug: data.slug,
       description: data.description || '',
       key_features: data.key_features || null,
+      // Parse key_specs if it's a string (JSONB from Supabase)
+      key_specs: (() => {
+        if (!data.key_specs) return undefined;
+        if (Array.isArray(data.key_specs)) return data.key_specs;
+        if (typeof data.key_specs === 'string') {
+          try {
+            const parsed = JSON.parse(data.key_specs);
+            return Array.isArray(parsed) ? parsed : undefined;
+          } catch (e) {
+            console.warn('Failed to parse key_specs:', e);
+            return undefined;
+          }
+        }
+        return undefined;
+      })(),
       specifications: data.specifications || null,
       category_id: data.category_id,
       brand: data.brands?.name || '',

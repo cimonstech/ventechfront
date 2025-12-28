@@ -76,31 +76,53 @@ export const getFilterCategories = async (): Promise<Category[]> => {
 // Fetch category by slug
 export const getCategoryBySlug = async (slug: string): Promise<Category | null> => {
   try {
+    if (!slug || typeof slug !== 'string' || slug.trim() === '') {
+      console.warn('Invalid slug provided to getCategoryBySlug:', slug);
+      return null;
+    }
+
+    // Use select('*') to get all columns, then map them correctly
     const { data, error } = await supabase
       .from('categories')
-      .select('id, name, slug, description, image_url, thumbnail_url, icon, parent_id, product_count, order, created_at')
-      .eq('slug', slug)
+      .select('*')
+      .eq('slug', slug.trim())
       .maybeSingle();
 
     if (error) {
-      // Only log non-404 errors
-      if ((error as any)?.code !== 'PGRST116' && (error as any)?.code !== '42P01') {
-        console.error('Error fetching category:', error);
+      // Only log non-404 errors (PGRST116 = not found, 42P01 = table doesn't exist)
+      const errorCode = (error as any)?.code;
+      const errorMessage = (error as any)?.message || String(error);
+      
+      if (errorCode !== 'PGRST116' && errorCode !== '42P01') {
+        console.error('Error fetching category:', {
+          code: errorCode,
+          message: errorMessage,
+          details: error,
+          slug: slug,
+        });
       }
       return null;
     }
-    // Map image fields: prioritize image_url, then thumbnail_url
-    if (data) {
-      return {
-        ...data,
-        thumbnail: (data as any).image_url || (data as any).thumbnail_url || '',
-      };
+
+    if (!data) {
+      return null;
     }
-    return data;
+
+    // Map image fields: prioritize image_url, then thumbnail_url, then thumbnail (actual column)
+    return {
+      ...data,
+      thumbnail: (data as any).image_url || (data as any).thumbnail_url || data.thumbnail || '',
+    };
   } catch (error) {
-    console.error('Error fetching category (exception):', error);
+    // Better error logging for exceptions
+    const errorDetails = error instanceof Error 
+      ? { message: error.message, stack: error.stack, name: error.name }
+      : { error: String(error), type: typeof error };
+    
+    console.error('Error fetching category (exception):', errorDetails);
     return null;
   }
 };
+
 
 

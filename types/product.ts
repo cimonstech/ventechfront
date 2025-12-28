@@ -1,9 +1,15 @@
+export interface KeySpec {
+  label: string;
+  color: string; // Hex color code
+}
+
 export interface Product {
   id: string;
   name: string;
   slug: string;
   description: string;
   key_features?: string | string[]; // Key features as JSON string or array
+  key_specs?: KeySpec[]; // Key specifications with labels and colors (max 6)
   specifications?: string | Record<string, any>; // Specifications as JSON string or object
   category_id: string;
   brand: string;

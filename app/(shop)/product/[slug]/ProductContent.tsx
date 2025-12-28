@@ -379,6 +379,78 @@ export function ProductContent({ product }: ProductContentProps) {
               )}
             </div>
 
+            {/* Key Specs - Mobile: Below prices, Desktop: Above buttons */}
+            {(() => {
+              // Get key specs - prioritize key_specs from admin, fallback to auto-generated from specs
+              let keySpecs: Array<{ label: string; color: string }> = [];
+              
+              // First, check if product has key_specs (admin-defined)
+              // Handle both array and string (JSONB from Supabase might be string)
+              let productKeySpecs = product.key_specs;
+              if (productKeySpecs && typeof productKeySpecs === 'string') {
+                try {
+                  productKeySpecs = JSON.parse(productKeySpecs);
+                } catch (e) {
+                  console.warn('Failed to parse key_specs string:', e);
+                  productKeySpecs = null;
+                }
+              }
+              
+              if (productKeySpecs && Array.isArray(productKeySpecs) && productKeySpecs.length > 0) {
+                keySpecs = productKeySpecs.slice(0, 6).map(spec => ({
+                  label: spec.label || '',
+                  color: spec.color || '#9333ea', // Default to purple if color missing
+                }));
+              } else if (product.specs && typeof product.specs === 'object') {
+                // Fallback: Auto-generate from specs
+                const specs = product.specs;
+                if (specs.ram) {
+                  const ramValue = String(specs.ram).toUpperCase();
+                  keySpecs.push({
+                    label: ramValue.includes('RAM') ? ramValue : `${ramValue} RAM`,
+                    color: '#9333ea'
+                  });
+                }
+                if (specs.storage) {
+                  const storageValue = String(specs.storage).toUpperCase();
+                  keySpecs.push({
+                    label: storageValue.includes('SSD') || storageValue.includes('HDD') 
+                      ? storageValue 
+                      : `${storageValue} SSD`,
+                    color: '#2563eb'
+                  });
+                }
+                if (specs.processor) {
+                  const processorValue = String(specs.processor).toUpperCase();
+                  keySpecs.push({
+                    label: processorValue,
+                    color: '#0891b2'
+                  });
+                }
+                if (specs.screen_size || specs.screen) {
+                  const screenValue = String(specs.screen_size || specs.screen).toUpperCase();
+                  keySpecs.push({
+                    label: screenValue,
+                    color: '#16a34a'
+                  });
+                }
+              }
+              
+              return keySpecs.length > 0 ? (
+                <div className="flex flex-wrap gap-2 mb-6 md:mb-6">
+                  {keySpecs.map((spec, index) => (
+                    <span
+                      key={index}
+                      className="text-white text-xs sm:text-sm font-semibold px-3 py-1.5 rounded-md whitespace-nowrap"
+                      style={{ backgroundColor: spec.color }}
+                    >
+                      {spec.label}
+                    </span>
+                  ))}
+                </div>
+              ) : null;
+            })()}
+
             {/* Variant Selector */}
             <div className="mb-6">
               <ProductVariantSelector

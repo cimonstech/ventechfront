@@ -71,8 +71,28 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
     }
   };
 
-  // Extract and format key specs for display
-  const getSpecTags = () => {
+  // Get key specs - prioritize key_specs from admin, fallback to auto-generated from specs
+  const getKeySpecs = () => {
+    // First, check if product has key_specs (admin-defined)
+    // Handle both array and string (JSONB from Supabase might be string)
+    let keySpecs = product.key_specs;
+    if (keySpecs && typeof keySpecs === 'string') {
+      try {
+        keySpecs = JSON.parse(keySpecs);
+      } catch (e) {
+        console.warn('Failed to parse key_specs string:', e);
+        keySpecs = null;
+      }
+    }
+    
+    if (keySpecs && Array.isArray(keySpecs) && keySpecs.length > 0) {
+      return keySpecs.slice(0, 6).map(spec => ({
+        label: spec.label || '',
+        color: spec.color || '#9333ea', // Default to purple if color missing
+      }));
+    }
+
+    // Fallback: Auto-generate from specs (for backward compatibility)
     if (!product.specs || typeof product.specs !== 'object') {
       return [];
     }
@@ -86,7 +106,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
       const ramValue = String(specs.ram).toUpperCase();
       tags.push({
         label: ramValue.includes('RAM') ? ramValue : `${ramValue} RAM`,
-        color: 'bg-purple-600' // Purple for RAM
+        color: '#9333ea' // Purple for RAM
       });
     }
 
@@ -97,7 +117,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
         label: storageValue.includes('SSD') || storageValue.includes('HDD') 
           ? storageValue 
           : `${storageValue} SSD`,
-        color: 'bg-blue-600' // Blue for Storage
+        color: '#2563eb' // Blue for Storage
       });
     }
 
@@ -111,7 +131,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
       }
       tags.push({
         label: formattedProcessor,
-        color: 'bg-cyan-600' // Teal/Cyan for Processor
+        color: '#0891b2' // Cyan for Processor
       });
     }
 
@@ -127,14 +147,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
       }
       tags.push({
         label: formattedScreen,
-        color: 'bg-green-600' // Green for Screen Size
+        color: '#16a34a' // Green for Screen Size
       });
     }
 
-    return tags.slice(0, 4); // Return at most 4 tags
+    return tags.slice(0, 6); // Return at most 6 tags
   };
 
-  const specTags = getSpecTags();
+  const keySpecs = getKeySpecs();
 
   // Safely get rating value, defaulting to 0 if undefined/null/NaN
   const rating = typeof product.rating === 'number' && !isNaN(product.rating) 
@@ -294,15 +314,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
             )}
           </div>
 
-          {/* Spec Tags */}
-          {specTags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-3">
-              {specTags.map((tag, index) => (
+          {/* Key Specs - Mobile: Below prices, Desktop: Above Add to Cart */}
+          {keySpecs.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-3 md:mb-3">
+              {keySpecs.map((spec, index) => (
                 <span
                   key={index}
-                  className={`${tag.color} text-white text-[9px] sm:text-[10px] font-semibold px-2 py-1 rounded-md whitespace-nowrap`}
+                  className="text-white text-[9px] sm:text-[10px] font-semibold px-2 py-1 rounded-md whitespace-nowrap"
+                  style={{ backgroundColor: spec.color }}
                 >
-                  {tag.label}
+                  {spec.label}
                 </span>
               ))}
             </div>
