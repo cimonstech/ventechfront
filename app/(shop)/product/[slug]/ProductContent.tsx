@@ -386,13 +386,14 @@ export function ProductContent({ product }: ProductContentProps) {
               
               // First, check if product has key_specs (admin-defined)
               // Handle both array and string (JSONB from Supabase might be string)
-              let productKeySpecs = product.key_specs;
+              let productKeySpecs: Array<{ label: string; color: string }> | undefined = product.key_specs;
               if (productKeySpecs && typeof productKeySpecs === 'string') {
                 try {
-                  productKeySpecs = JSON.parse(productKeySpecs);
+                  const parsed = JSON.parse(productKeySpecs);
+                  productKeySpecs = Array.isArray(parsed) ? parsed : undefined;
                 } catch (e) {
                   console.warn('Failed to parse key_specs string:', e);
-                  productKeySpecs = null;
+                  productKeySpecs = undefined;
                 }
               }
               

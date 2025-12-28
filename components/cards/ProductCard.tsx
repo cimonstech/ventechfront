@@ -75,13 +75,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
   const getKeySpecs = () => {
     // First, check if product has key_specs (admin-defined)
     // Handle both array and string (JSONB from Supabase might be string)
-    let keySpecs = product.key_specs;
+    let keySpecs: Array<{ label: string; color: string }> | undefined = product.key_specs;
     if (keySpecs && typeof keySpecs === 'string') {
       try {
-        keySpecs = JSON.parse(keySpecs);
+        const parsed = JSON.parse(keySpecs);
+        keySpecs = Array.isArray(parsed) ? parsed : undefined;
       } catch (e) {
         console.warn('Failed to parse key_specs string:', e);
-        keySpecs = null;
+        keySpecs = undefined;
       }
     }
     
