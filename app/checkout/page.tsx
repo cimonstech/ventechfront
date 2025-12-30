@@ -50,62 +50,78 @@ export default function CheckoutPage() {
     }
   }, []);
 
-  // Delivery Information - Auto-fill from user if logged in
-  const [deliveryInfo, setDeliveryInfo] = useState({
-    full_name: user?.full_name || '',
-    email: user?.email || '', // Add email field for guest checkout
+  // Customer Bio Information (for identification - guest and registered)
+  const [customerBio, setCustomerBio] = useState({
+    name: user?.full_name || '',
+    email: user?.email || '',
     phone: user?.phone || '',
-    street_address: '',
-    city: '',
-    region: '',
-    postal_code: '',
+  });
+
+  // Delivery Information - New structure
+  const [deliveryInfo, setDeliveryInfo] = useState({
+    gadget_name: '', // Will be auto-filled from cart items
+    recipient_name: user?.full_name || '',
+    recipient_number: user?.phone || '',
+    recipient_location: '',
+    recipient_region: '',
+    alternate_contact_number: '',
   });
 
   // Auto-fill delivery info when user logs in or component mounts
   useEffect(() => {
-    if (user && isAuthenticated) {
+    // Auto-fill gadget name from cart items
+    if (items.length > 0) {
+      const gadgetNames = items.map(item => item.name).join(', ');
       setDeliveryInfo(prev => ({
         ...prev,
-        full_name: user.full_name || prev.full_name,
-        email: user.email || prev.email,
-        phone: user.phone || prev.phone,
+        gadget_name: gadgetNames,
+      }));
+    }
+
+    if (user && isAuthenticated) {
+      // Auto-fill customer bio for registered users
+      setCustomerBio({
+        name: user.full_name || '',
+        email: user.email || '',
+        phone: user.phone || '',
+      });
+
+      setDeliveryInfo(prev => ({
+        ...prev,
+        recipient_name: user.full_name || prev.recipient_name,
+        recipient_number: user.phone || prev.recipient_number,
       }));
       
       // Try to fetch user's default address
-      // Note: addresses table might not exist - use users table instead
       const fetchUserAddress = async () => {
         try {
           const { data: { user: currentUser } } = await supabase.auth.getUser();
           if (currentUser) {
-            // Try to get address from users table (shipping_address field)
             const { data: userProfile } = await supabase
               .from('users')
-              .select('shipping_address, first_name, last_name, email, phone')
+              .select('shipping_address, first_name, last_name, phone')
               .eq('id', currentUser.id)
               .maybeSingle();
             
             if (userProfile && userProfile.shipping_address) {
               const shipping = userProfile.shipping_address as any;
-              setDeliveryInfo({
-                full_name: shipping.full_name || `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim() || user.full_name || '',
-                email: userProfile.email || user.email || '',
-                phone: shipping.phone || userProfile.phone || user.phone || '',
-                street_address: shipping.street_address || shipping.address_line1 || '',
-                city: shipping.city || '',
-                region: shipping.region || '',
-                postal_code: shipping.postal_code || '',
-              });
+              setDeliveryInfo(prev => ({
+                ...prev,
+                recipient_name: shipping.full_name || `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim() || user.full_name || prev.recipient_name,
+                recipient_number: shipping.phone || userProfile.phone || user.phone || prev.recipient_number,
+                recipient_location: shipping.street_address || shipping.address_line1 || prev.recipient_location,
+                recipient_region: shipping.region || prev.recipient_region,
+              }));
             }
           }
         } catch (error) {
-          // Silently fail - user can fill manually
           console.error('Error fetching user address:', error);
         }
       };
       
       fetchUserAddress();
     }
-  }, [user, isAuthenticated]);
+  }, [user, isAuthenticated, items]);
 
   // Delivery Options
   const [deliveryOptions, setDeliveryOptions] = useState<DeliveryOption[]>([]);
@@ -198,19 +214,51 @@ export default function CheckoutPage() {
     });
   };
 
+  const handleCustomerBioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCustomerBio({
+      ...customerBio,
+      [e.target.name]: e.target.value,
+    });
+  };
+
   const validateDeliveryInfo = () => {
-    const required = ['full_name', 'email', 'phone', 'street_address', 'city', 'region'];
+    // Validate customer bio (required for all customers)
+    if (!customerBio.name || !customerBio.email || !customerBio.phone) {
+      toast.error('Please fill in all customer identification fields (Name, Email, Phone)');
+      return false;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(customerBio.email)) {
+      toast.error('Please provide a valid email address');
+      return false;
+    }
+
+    // Validate phone number format (basic validation)
+    const phoneRegex = /^[0-9+\s()-]+$/;
+    if (!phoneRegex.test(customerBio.phone)) {
+      toast.error('Please provide a valid customer phone number');
+      return false;
+    }
+
+    // Validate delivery info
+    const required = ['gadget_name', 'recipient_name', 'recipient_number', 'recipient_location', 'recipient_region'];
     for (const field of required) {
       if (!deliveryInfo[field as keyof typeof deliveryInfo]) {
-        toast.error(`${field.replace('_', ' ')} is required`);
+        const fieldName = field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        toast.error(`${fieldName} is required`);
         return false;
       }
     }
     
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(deliveryInfo.email)) {
-      toast.error('Please provide a valid email address');
+    if (!phoneRegex.test(deliveryInfo.recipient_number)) {
+      toast.error('Please provide a valid recipient phone number');
+      return false;
+    }
+    
+    if (deliveryInfo.alternate_contact_number && !phoneRegex.test(deliveryInfo.alternate_contact_number)) {
+      toast.error('Please provide a valid alternate contact number');
       return false;
     }
     
@@ -255,8 +303,12 @@ export default function CheckoutPage() {
       // Prepare checkout data for order creation after payment
       const checkoutData: any = {
         delivery_address: {
-          ...deliveryInfo,
-          email: deliveryInfo.email || user?.email,
+          gadget_name: deliveryInfo.gadget_name,
+          recipient_name: deliveryInfo.recipient_name,
+          recipient_number: deliveryInfo.recipient_number,
+          recipient_location: deliveryInfo.recipient_location,
+          recipient_region: deliveryInfo.recipient_region,
+          alternate_contact_number: deliveryInfo.alternate_contact_number || '',
           country: 'Ghana',
           is_default: false,
         },
@@ -327,8 +379,10 @@ export default function CheckoutPage() {
       });
 
       // Initialize Paystack payment
+      // Use user email if logged in, otherwise use a placeholder (Paystack requires email)
+      const paymentEmail = user?.email || 'customer@ventechgadgets.com';
       const paymentResult = await paymentService.initializePayment({
-        email: deliveryInfo.email || user?.email || '',
+        email: paymentEmail,
         amount: Math.round(amountToPay * 100), // ✅ Convert to pesewas ONLY for Paystack
         reference: paymentReference,
         callback_url: `${typeof window !== 'undefined' ? window.location.origin : ''}/payment/callback`,
@@ -393,8 +447,12 @@ export default function CheckoutPage() {
               is_pre_order: false,
             })),
             delivery_address: {
-              ...deliveryInfo,
-              email: deliveryInfo.email || user?.email,
+              gadget_name: deliveryInfo.gadget_name,
+              recipient_name: deliveryInfo.recipient_name,
+              recipient_number: deliveryInfo.recipient_number,
+              recipient_location: deliveryInfo.recipient_location,
+              recipient_region: deliveryInfo.recipient_region,
+              alternate_contact_number: deliveryInfo.alternate_contact_number || '',
               country: 'Ghana',
               is_default: false,
             },
@@ -444,8 +502,12 @@ export default function CheckoutPage() {
               pre_order_shipping_option: selectedPreOrderShipping.id,
             })),
             delivery_address: {
-              ...deliveryInfo,
-              email: deliveryInfo.email || user?.email,
+              gadget_name: deliveryInfo.gadget_name,
+              recipient_name: deliveryInfo.recipient_name,
+              recipient_number: deliveryInfo.recipient_number,
+              recipient_location: deliveryInfo.recipient_location,
+              recipient_region: deliveryInfo.recipient_region,
+              alternate_contact_number: deliveryInfo.alternate_contact_number || '',
               country: 'Ghana',
               is_default: false,
             },
@@ -642,65 +704,121 @@ export default function CheckoutPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2">
-            {/* Step 1: Delivery Information */}
+            {/* Step 1: Delivery Details */}
             {step === 1 && (
               <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">Delivery Information</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">DELIVERY DETAILS</h2>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input
-                    label="Full Name"
-                    name="full_name"
-                    value={deliveryInfo.full_name}
-                    onChange={handleDeliveryInfoChange}
-                    required
-                  />
-                  <Input
-                    label="Email Address"
-                    name="email"
-                    type="email"
-                    value={deliveryInfo.email}
-                    onChange={handleDeliveryInfoChange}
-                    required
-                    placeholder="your@email.com"
-                  />
-                  <Input
-                    label="Phone Number"
-                    name="phone"
-                    type="tel"
-                    value={deliveryInfo.phone}
-                    onChange={handleDeliveryInfoChange}
-                    required
-                  />
-                  <div className="md:col-span-2">
+                {/* Customer Bio Information */}
+                <div className="mb-8 p-4 bg-gray-50 rounded-lg">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Customer Information (For Identification)</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Input
-                      label="Street Address"
-                      name="street_address"
-                      value={deliveryInfo.street_address}
-                      onChange={handleDeliveryInfoChange}
+                      label="Your Name *"
+                      name="name"
+                      value={customerBio.name}
+                      onChange={handleCustomerBioChange}
                       required
+                      disabled={isAuthenticated && !!user?.full_name}
+                    />
+                    <Input
+                      label="Your Email *"
+                      name="email"
+                      type="email"
+                      value={customerBio.email}
+                      onChange={handleCustomerBioChange}
+                      required
+                      disabled={isAuthenticated && !!user?.email}
+                      placeholder="your@email.com"
+                    />
+                    <Input
+                      label="Your Phone Number *"
+                      name="phone"
+                      type="tel"
+                      value={customerBio.phone}
+                      onChange={handleCustomerBioChange}
+                      required
+                      disabled={isAuthenticated && !!user?.phone}
+                      placeholder="+233 XX XXX XXXX"
                     />
                   </div>
+                </div>
+                
+                <div className="space-y-4 mb-6">
                   <Input
-                    label="City"
-                    name="city"
-                    value={deliveryInfo.city}
+                    label="GADGET NAME"
+                    name="gadget_name"
+                    value={deliveryInfo.gadget_name}
+                    onChange={handleDeliveryInfoChange}
+                    required
+                    placeholder="Product name(s) from your cart"
+                  />
+                  <Input
+                    label="RECIPIENT'S NAME"
+                    name="recipient_name"
+                    value={deliveryInfo.recipient_name}
                     onChange={handleDeliveryInfoChange}
                     required
                   />
                   <Input
-                    label="Region"
-                    name="region"
-                    value={deliveryInfo.region}
+                    label="RECIPIENT'S NUMBER"
+                    name="recipient_number"
+                    type="tel"
+                    value={deliveryInfo.recipient_number}
                     onChange={handleDeliveryInfoChange}
                     required
+                    placeholder="+233 XX XXX XXXX"
                   />
                   <Input
-                    label="Postal Code"
-                    name="postal_code"
-                    value={deliveryInfo.postal_code}
+                    label="RECIPIENT'S LOCATION"
+                    name="recipient_location"
+                    value={deliveryInfo.recipient_location}
                     onChange={handleDeliveryInfoChange}
+                    required
+                    placeholder="Street address, area, landmark"
                   />
+                  <Input
+                    label="RECIPIENT'S REGION"
+                    name="recipient_region"
+                    value={deliveryInfo.recipient_region}
+                    onChange={handleDeliveryInfoChange}
+                    required
+                    placeholder="e.g., Greater Accra, Ashanti"
+                  />
+                  <Input
+                    label="ALTERNATE CONTACT NUMBER"
+                    name="alternate_contact_number"
+                    type="tel"
+                    value={deliveryInfo.alternate_contact_number}
+                    onChange={handleDeliveryInfoChange}
+                    placeholder="Optional: +233 XX XXX XXXX"
+                  />
+                </div>
+
+                {/* Thank you message */}
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                  <p className="text-[#3A3A3A] text-sm">
+                    Thank you for choosing Ventech Gadgets as your trusted tech partner.
+                  </p>
+                </div>
+
+                {/* Important Notice */}
+                <div className="mb-6 p-4 bg-orange-50 border-l-4 border-[#FF7A19] rounded-lg">
+                  <h3 className="font-bold text-[#1A1A1A] mb-3 text-lg">IMPORTANT NOTICE:</h3>
+                  <ul className="space-y-2 text-sm text-[#3A3A3A] list-disc list-inside">
+                    <li>Payment is required via Cash or Momo upon delivery or before delivery.</li>
+                    <li>Ensure you&apos;re ready to make payment before providing your details.</li>
+                    <li>Failure to make payment upon delivery will result in restricted access to our catalogue.</li>
+                    <li>Declined orders at delivery still incur delivery payment.</li>
+                    <li>Don&apos;t stress vendors, Thank you.</li>
+                  </ul>
+                </div>
+
+                {/* Contact Information */}
+                <div className="p-4 bg-blue-50 rounded-lg">
+                  <p className="text-sm text-[#3A3A3A]">
+                    For more information, call or WhatsApp: <a href="tel:0257140078" className="text-[#FF7A19] font-semibold hover:underline">0257140078</a>
+                  </p>
                 </div>
 
                 {/* Delivery Notice for Outside Accra */}
@@ -1021,14 +1139,31 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
-                {/* Delivery Info */}
+                {/* Customer Information */}
                 <div className="bg-white rounded-xl shadow-sm p-6">
-                  <h3 className="font-bold text-gray-900 mb-2">Delivery Address</h3>
+                  <h3 className="font-bold text-gray-900 mb-2">Customer Information</h3>
                   <p className="text-gray-600">
-                    {deliveryInfo.full_name}<br />
-                    {deliveryInfo.phone}<br />
-                    {deliveryInfo.street_address}<br />
-                    {deliveryInfo.city}, {deliveryInfo.region}
+                    <strong>Name:</strong> {customerBio.name}<br />
+                    <strong>Email:</strong> {customerBio.email}<br />
+                    <strong>Phone:</strong> {customerBio.phone}
+                  </p>
+                </div>
+
+                {/* Delivery Details */}
+                <div className="bg-white rounded-xl shadow-sm p-6">
+                  <h3 className="font-bold text-gray-900 mb-2">Delivery Details</h3>
+                  <p className="text-gray-600">
+                    <strong>Gadget:</strong> {deliveryInfo.gadget_name}<br />
+                    <strong>Recipient:</strong> {deliveryInfo.recipient_name}<br />
+                    <strong>Phone:</strong> {deliveryInfo.recipient_number}<br />
+                    <strong>Location:</strong> {deliveryInfo.recipient_location}<br />
+                    <strong>Region:</strong> {deliveryInfo.recipient_region}
+                    {deliveryInfo.alternate_contact_number && (
+                      <>
+                        <br />
+                        <strong>Alternate Contact:</strong> {deliveryInfo.alternate_contact_number}
+                      </>
+                    )}
                   </p>
                 </div>
 

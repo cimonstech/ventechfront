@@ -294,28 +294,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
             {product.name}
           </p>
 
+          {/* Description - Show when no key specs (to fill empty space) */}
+          {keySpecs.length === 0 && product.description && (
+            <p className="text-[9px] sm:text-[10px] text-gray-600 mb-2 line-clamp-2 leading-tight">
+              {product.description.length > 60 
+                ? `${product.description.substring(0, 60)}...` 
+                : product.description}
+            </p>
+          )}
 
-          {/* Price - Using p tag, smaller size */}
-          <div className="flex items-baseline gap-2 mb-3 mt-auto flex-wrap">
-            {product.price_range?.hasRange ? (
-              <span className="text-xs sm:text-sm text-[#FF7A19]">
-                {formatCurrency(product.price_range.min)} - {formatCurrency(product.price_range.max)}
-              </span>
-            ) : (
-              <>
-                <span className="text-xs sm:text-sm text-[#FF7A19]">
-                  {formatCurrency(product.discount_price || product.original_price)}
-                </span>
-                {hasDiscount && (
-                  <span className="text-[10px] sm:text-xs text-[#3A3A3A] line-through">
-                    {formatCurrency(product.original_price)}
-                  </span>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Key Specs - Mobile: Below prices, Desktop: Above Add to Cart */}
+          {/* Key Specs - Displayed before price on both mobile and desktop */}
           {keySpecs.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-3 md:mb-3">
               {keySpecs.map((spec, index) => (
@@ -329,6 +317,26 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
               ))}
             </div>
           )}
+
+          {/* Price - Displayed after key specs on both mobile and desktop */}
+          <div className="flex items-baseline gap-2 mb-3 mt-auto flex-wrap">
+            {product.price_range?.hasRange ? (
+              <span className="text-[#FF7A19] product-card-price-mobile">
+                {formatCurrency(product.price_range.min)} - {formatCurrency(product.price_range.max)}
+              </span>
+            ) : (
+              <>
+                <span className="text-[#FF7A19] product-card-price-mobile">
+                  {formatCurrency(product.discount_price || product.original_price)}
+                </span>
+                {hasDiscount && (
+                  <span className="text-[10px] sm:text-xs text-[#3A3A3A] line-through">
+                    {formatCurrency(product.original_price)}
+                  </span>
+                )}
+              </>
+            )}
+          </div>
 
           {/* Desktop: Add to Cart / Pre-Order Button */}
           <button

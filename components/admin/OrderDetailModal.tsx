@@ -33,6 +33,11 @@ interface Order {
   total: number;
   shipping_address: any;
   billing_address?: any;
+  customer_bio?: {
+    name: string;
+    email: string;
+    phone: string;
+  };
   notes?: string;
   created_at: string;
   updated_at: string;
@@ -93,8 +98,13 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
               items: orderItems,
               customer_name: orderData.user 
                 ? `${orderData.user.first_name || ''} ${orderData.user.last_name || ''}`.trim() || 'Customer'
-                : (orderData.shipping_address?.full_name || 'Guest Customer'),
-              customer_email: orderData.user?.email || orderData.shipping_address?.email || 'No email',
+                : (orderData.customer_bio?.name || orderData.shipping_address?.full_name || 'Guest Customer'),
+              customer_email: orderData.user?.email || orderData.customer_bio?.email || orderData.shipping_address?.email || 'No email',
+              customer_bio: orderData.customer_bio || (orderData.user ? {
+                name: `${orderData.user.first_name || ''} ${orderData.user.last_name || ''}`.trim() || 'Customer',
+                email: orderData.user.email || '',
+                phone: (orderData.user as any).phone || '',
+              } : null),
               is_pre_order: isPreOrder,
               pre_order_shipping_option: preOrderShippingOption,
               estimated_arrival_date: estimatedArrivalDate,
@@ -185,8 +195,13 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
         items: orderItems,
         customer_name: orderData.user 
           ? `${orderData.user.first_name || ''} ${orderData.user.last_name || ''}`.trim() || 'Customer'
-          : (orderData.shipping_address?.full_name || 'Guest Customer'),
-        customer_email: orderData.user?.email || orderData.shipping_address?.email || 'No email',
+          : (orderData.customer_bio?.name || orderData.shipping_address?.full_name || 'Guest Customer'),
+        customer_email: orderData.user?.email || orderData.customer_bio?.email || orderData.shipping_address?.email || 'No email',
+        customer_bio: orderData.customer_bio || (orderData.user ? {
+          name: `${orderData.user.first_name || ''} ${orderData.user.last_name || ''}`.trim() || 'Customer',
+          email: orderData.user.email || '',
+          phone: orderData.user.phone || '',
+        } : null),
         is_pre_order: isPreOrder,
         pre_order_shipping_option: preOrderShippingOption,
         estimated_arrival_date: estimatedArrivalDate,
@@ -383,10 +398,19 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
                 <div className="bg-gray-50 rounded-lg p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <User size={18} className="text-[#FF7A19]" />
-                    <h3 className="font-semibold text-[#1A1A1A]">Customer</h3>
+                    <h3 className="font-semibold text-[#1A1A1A]">Customer Information</h3>
                   </div>
-                  <p className="text-sm text-[#1A1A1A] font-medium">{order.customer_name}</p>
-                  <p className="text-xs text-[#3A3A3A] mt-1">{order.customer_email}</p>
+                  <div className="text-sm text-[#1A1A1A] space-y-1">
+                    {(order.customer_bio?.name || order.customer_name) && (
+                      <p className="font-medium">Name: {order.customer_bio?.name || order.customer_name}</p>
+                    )}
+                    {(order.customer_bio?.email || order.customer_email) && (
+                      <p className="text-[#3A3A3A]">Email: {order.customer_bio?.email || order.customer_email}</p>
+                    )}
+                    {order.customer_bio?.phone && (
+                      <p className="text-[#3A3A3A]">Phone: {order.customer_bio.phone}</p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="bg-gray-50 rounded-lg p-4">
@@ -470,19 +494,42 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
                 </div>
               )}
 
-              {/* Shipping Address */}
+              {/* Delivery Details */}
               {order.shipping_address && (
                 <div className="bg-gray-50 rounded-lg p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <MapPin size={18} className="text-[#FF7A19]" />
-                    <h3 className="font-semibold text-[#1A1A1A]">
-                      {order.is_pre_order ? 'Delivery Address' : 'Shipping Address'}
-                    </h3>
+                    <h3 className="font-semibold text-[#1A1A1A]">Delivery Details</h3>
                   </div>
-                  <div className="text-sm text-[#1A1A1A]">
-                    {order.shipping_address.full_name && <p>{order.shipping_address.full_name}</p>}
-                    {order.shipping_address.street_address && <p>{order.shipping_address.street_address}</p>}
-                    {order.shipping_address.city && (
+                  <div className="text-sm text-[#1A1A1A] space-y-2">
+                    {/* New delivery structure */}
+                    {order.shipping_address.gadget_name && (
+                      <p><strong>Gadget Name:</strong> {order.shipping_address.gadget_name}</p>
+                    )}
+                    {order.shipping_address.recipient_name && (
+                      <p><strong>Recipient Name:</strong> {order.shipping_address.recipient_name}</p>
+                    )}
+                    {order.shipping_address.recipient_number && (
+                      <p><strong>Recipient Number:</strong> {order.shipping_address.recipient_number}</p>
+                    )}
+                    {order.shipping_address.recipient_location && (
+                      <p><strong>Recipient Location:</strong> {order.shipping_address.recipient_location}</p>
+                    )}
+                    {order.shipping_address.recipient_region && (
+                      <p><strong>Recipient Region:</strong> {order.shipping_address.recipient_region}</p>
+                    )}
+                    {order.shipping_address.alternate_contact_number && (
+                      <p><strong>Alternate Contact:</strong> {order.shipping_address.alternate_contact_number}</p>
+                    )}
+                    
+                    {/* Legacy structure (fallback) */}
+                    {!order.shipping_address.gadget_name && order.shipping_address.full_name && (
+                      <p>{order.shipping_address.full_name}</p>
+                    )}
+                    {!order.shipping_address.recipient_location && order.shipping_address.street_address && (
+                      <p>{order.shipping_address.street_address}</p>
+                    )}
+                    {!order.shipping_address.recipient_region && order.shipping_address.city && (
                       <p>
                         {order.shipping_address.city}
                         {order.shipping_address.region && `, ${order.shipping_address.region}`}
@@ -490,7 +537,9 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
                       </p>
                     )}
                     {order.shipping_address.country && <p>{order.shipping_address.country}</p>}
-                    {order.shipping_address.phone && <p className="mt-2">Phone: {order.shipping_address.phone}</p>}
+                    {!order.shipping_address.recipient_number && order.shipping_address.phone && (
+                      <p className="mt-2">Phone: {order.shipping_address.phone}</p>
+                    )}
                   </div>
                 </div>
               )}

@@ -350,36 +350,7 @@ export function ProductContent({ product }: ProductContentProps) {
               </div>
             </div>
 
-            <div className="flex items-center gap-3 mb-6">
-              {/* Always show the calculated final price when variants are available */}
-              {/* Price range is only shown when no variants are selected and product has variants */}
-              {(product as any).price_range?.hasRange && Object.keys(selectedVariants).length === 0 ? (
-                <>
-                  <span className="text-2xl font-bold text-[#FF7A19]">
-                    {formatCurrency((product as any).price_range.min)} - {formatCurrency((product as any).price_range.max)}
-                  </span>
-                  {hasDiscount && (
-                    <Badge variant="error">-{discountPercentage}%</Badge>
-                  )}
-                </>
-              ) : (
-                <>
-                  <span className="text-2xl font-bold text-[#FF7A19]">
-                    {formatCurrency(finalPrice)}
-                  </span>
-                  {hasDiscount && (
-                    <>
-                      <span className="text-xl text-gray-400 line-through">
-                        {formatCurrency(product.original_price)}
-                      </span>
-                      <Badge variant="error">-{discountPercentage}%</Badge>
-                    </>
-                  )}
-                </>
-              )}
-            </div>
-
-            {/* Key Specs - Mobile: Below prices, Desktop: Above buttons */}
+            {/* Key Specs - Displayed before price */}
             {(() => {
               // Get key specs - prioritize key_specs from admin, fallback to auto-generated from specs
               let keySpecs: Array<{ label: string; color: string }> = [];
@@ -451,6 +422,36 @@ export function ProductContent({ product }: ProductContentProps) {
                 </div>
               ) : null;
             })()}
+
+            {/* Price - Displayed after key specs */}
+            <div className="flex items-center gap-3 mb-6">
+              {/* Always show the calculated final price when variants are available */}
+              {/* Price range is only shown when no variants are selected and product has variants */}
+              {(product as any).price_range?.hasRange && Object.keys(selectedVariants).length === 0 ? (
+                <>
+                  <span className="text-2xl font-bold text-[#FF7A19]">
+                    {formatCurrency((product as any).price_range.min)} - {formatCurrency((product as any).price_range.max)}
+                  </span>
+                  {hasDiscount && (
+                    <Badge variant="error">-{discountPercentage}%</Badge>
+                  )}
+                </>
+              ) : (
+                <>
+                  <span className="text-2xl font-bold text-[#FF7A19]">
+                    {formatCurrency(finalPrice)}
+                  </span>
+                  {hasDiscount && (
+                    <>
+                      <span className="text-xl text-gray-400 line-through">
+                        {formatCurrency(product.original_price)}
+                      </span>
+                      <Badge variant="error">-{discountPercentage}%</Badge>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
 
             {/* Variant Selector */}
             <div className="mb-6">

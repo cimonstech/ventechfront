@@ -1,23 +1,23 @@
 'use client';
 
 import React, { useState } from 'react';
-import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/Button';
 import { 
   TrendingUp, 
   Shield, 
-  DollarSign, 
   Users, 
   Calendar,
   Award,
   Phone,
   Mail,
   MapPin,
-  CheckCircle,
   ArrowRight,
-  Gift,
   Percent,
-  Laptop
+  Laptop,
+  Handshake,
+  RefreshCw,
+  Headphones
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -113,148 +113,267 @@ export default function LaptopBankingPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-[#FF7A19] via-[#FF8C3A] to-[#FFA05C] text-white py-20">
-        <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 mb-6">
-              <Laptop size={20} />
-              <span className="text-sm font-semibold">INVESTMENT OPPORTUNITY</span>
+      <section className="relative text-white py-12 md:py-20 lg:py-24 overflow-hidden">
+        {/* Background Image with Orange Overlay */}
+        <div className="absolute inset-0 pointer-events-none">
+          {/* Orange Background - hidden on mobile, visible on desktop */}
+          <div className="hidden md:block absolute inset-0 bg-[#FF7A19] z-0"></div>
+          
+          {/* Image - full width on mobile, starts from middle on desktop */}
+          <div className="absolute inset-0 md:left-1/2 md:right-0 top-0 bottom-0 z-0">
+            <div className="relative w-full h-full">
+              <Image
+                src="/laptopbanking.webp"
+                alt="VENTECH Laptop Banking"
+                fill
+                sizes="(max-width: 768px) 100vw, 50vw"
+                className="object-cover"
+                priority
+              />
+              {/* Orange Overlay - full on mobile, partial on desktop */}
+              <div className="absolute inset-0 bg-[#FF7A19]/80 md:bg-[#FF7A19]/60"></div>
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold mb-6">
+          </div>
+        </div>
+        
+        <div className="container mx-auto px-4 relative z-20">
+          <div className="max-w-2xl md:max-w-3xl">
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-3 md:px-4 py-2 mb-4 md:mb-6">
+              <Laptop className="w-4 h-4 md:w-[18px] md:h-[18px]" />
+              <span className="text-xs md:text-sm font-semibold">Private Investment Opportunity</span>
+            </div>
+            
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 leading-tight text-white md:text-white">
               VENTECH Laptop Banking
             </h1>
-            <p className="text-xl md:text-2xl mb-4 text-white">
-              Your Smart, Hands-Free Way to Grow Money Through Tech
+            
+            <p className="text-lg sm:text-xl md:text-2xl mb-3 md:mb-4 text-white font-medium">
+              Earn Consistent Monthly Returns from Ghana's Growing Tech Market
             </p>
-            <p className="text-lg text-white mb-8 max-w-3xl mx-auto">
-              Why struggle to invest alone when you can earn more by partnering with experts? 
-              We handle the bulk laptop trade, market sales, and risk — you enjoy monthly returns, 
-              flexible terms, and full control.
+            
+            <p className="text-base sm:text-lg text-white mb-6 md:mb-8 leading-relaxed">
+              Partner with VENTECH to finance high-demand laptop inventory. We manage sourcing, sales, and operations — you earn predictable monthly returns from real tech trade.
             </p>
-            <div className="flex flex-wrap gap-4 justify-center">
+            
+            <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
               <Button 
                 variant="secondary" 
                 size="lg" 
-                icon={<ArrowRight size={20} />}
+                icon={<ArrowRight className="w-[18px] h-[18px] md:w-5 md:h-5" />}
                 onClick={() => scrollToSection('investment-form')}
+                className="bg-black hover:bg-gray-800 text-white border-none text-sm md:text-base"
               >
                 Start Investing
               </Button>
               <Button 
                 variant="ghost" 
                 size="lg" 
-                className="text-white border-white hover:bg-white/10"
-                onClick={() => {
-                  const pdfUrl = 'https://files.ventechgadgets.com/laptopbanking.pdf';
-                  window.open(pdfUrl, '_blank', 'noopener,noreferrer');
-                }}
+                className="text-white border-2 border-white hover:bg-white/10 bg-transparent text-sm md:text-base"
+                onClick={() => scrollToSection('how-it-works')}
               >
-                Learn More
+                View How It Works
               </Button>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Key Benefits */}
-      <section className="py-16 bg-gray-50">
+      {/* Why Laptop Banking Works */}
+      <section className="py-12 md:py-16 bg-white">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 max-w-6xl mx-auto">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Percent className="text-[#FF7A19]" size={28} />
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#1A1A1A] text-center mb-8 md:mb-12">
+            Why Laptop Banking Works
+          </h2>
+          
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 md:gap-8 max-w-6xl mx-auto mb-8 md:mb-12">
+            {/* Real Market Demand */}
+            <div className="bg-white rounded-xl p-6 md:p-8 shadow-lg border border-gray-100">
+              <div className="w-12 h-12 md:w-16 md:h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4 md:mb-6">
+                <TrendingUp className="text-[#FF7A19] w-6 h-6 md:w-8 md:h-8" />
               </div>
-              <h3 className="font-bold text-lg text-[#1A1A1A] mb-2">8-9% Returns</h3>
-              <p className="text-sm text-[#3A3A3A]">Fixed monthly returns</p>
+              <h3 className="text-lg md:text-xl font-bold text-[#1A1A1A] mb-3 md:mb-4">Real Market Demand</h3>
+              <p className="text-sm md:text-base text-[#3A3A3A] leading-relaxed">
+                Laptops are essential tools in Ghana, with consistent and growing demand from students, professionals, and businesses.
+              </p>
             </div>
-            <div className="text-center">
-              <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Shield className="text-[#FF7A19]" size={28} />
+            
+            {/* Trade-Backed Returns */}
+            <div className="bg-white rounded-xl p-6 md:p-8 shadow-lg border border-gray-100">
+              <div className="w-12 h-12 md:w-16 md:h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4 md:mb-6">
+                <RefreshCw className="text-[#FF7A19] w-6 h-6 md:w-8 md:h-8" />
               </div>
-              <h3 className="font-bold text-lg text-[#1A1A1A] mb-2">Low Risk</h3>
-              <p className="text-sm text-[#3A3A3A]">Backed by real inventory</p>
+              <h3 className="text-lg md:text-xl font-bold text-[#1A1A1A] mb-3 md:mb-4">Trade-Backed Returns</h3>
+              <p className="text-sm md:text-base text-[#3A3A3A] leading-relaxed">
+                Returns are generated from actual laptop sales, not speculation or high-risk instruments.
+              </p>
             </div>
-            <div className="text-center">
-              <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Calendar className="text-[#FF7A19]" size={28} />
+            
+            {/* Expert-Led Operations */}
+            <div className="bg-white rounded-xl p-6 md:p-8 shadow-lg border border-gray-100 sm:col-span-2 md:col-span-1">
+              <div className="w-12 h-12 md:w-16 md:h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4 md:mb-6">
+                <Handshake className="text-[#FF7A19] w-6 h-6 md:w-8 md:h-8" />
               </div>
-              <h3 className="font-bold text-lg text-[#1A1A1A] mb-2">6 Months</h3>
-              <p className="text-sm text-[#3A3A3A]">Flexible investment terms</p>
+              <h3 className="text-lg md:text-xl font-bold text-[#1A1A1A] mb-3 md:mb-4">Expert-Led Operations</h3>
+              <p className="text-sm md:text-base text-[#3A3A3A] leading-relaxed">
+                VENTECH handles import, pricing, distribution, and sales, making it hands-free for investors.
+              </p>
             </div>
-            <div className="text-center">
-              <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Gift className="text-[#FF7A19]" size={28} />
-              </div>
-              <h3 className="font-bold text-lg text-[#1A1A1A] mb-2">Premium Stars</h3>
-              <p className="text-sm text-[#3A3A3A]">Buy gadgets at supplier pricing</p>
-            </div>
+          </div>
+
+          {/* PDF Buttons */}
+          <div className="grid grid-cols-2 sm:flex sm:flex-row gap-3 sm:gap-4 justify-center max-w-2xl mx-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open('https://files.ventechgadgets.com/laptopbanking.pdf', '_blank', 'noopener,noreferrer')}
+              className="w-full px-3 py-2 sm:px-4 sm:py-2 text-sm border-2 border-[#FF7A19] text-[#FF7A19] hover:!bg-[#FF7A19] hover:!text-white transition-colors"
+            >
+              Learn More
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open('https://files.ventechgadgets.com/VENTECH%20LAPTOP%20BANKING%20INVESTMENT%20AGREEMENT.pdf', '_blank', 'noopener,noreferrer')}
+              className="w-full px-3 py-2 sm:px-4 sm:py-2 text-sm border-2 border-[#FF7A19] text-[#FF7A19] hover:!bg-[#FF7A19] hover:!text-white transition-colors"
+            >
+              Agreement
+            </Button>
           </div>
         </div>
       </section>
 
-      {/* How It Works */}
-      <section id="how-it-works" className="py-16">
+      {/* How Laptop Banking Works */}
+      <section id="how-it-works" className="py-12 md:py-16 bg-gray-50">
         <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto text-center mb-12">
-            <h2 className="text-3xl font-bold text-[#1A1A1A] mb-4">How It Works</h2>
-            <p className="text-[#3A3A3A]">VENTECH Laptop Banking is a 6-month investment program powered by real laptop trade</p>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto mb-12">
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-8">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-[#FF7A19] text-white rounded-full flex items-center justify-center font-bold text-xl">
-                  1
-                </div>
-                <div>
-                  <h3 className="font-bold text-lg text-[#1A1A1A]">Term 1 (3 months)</h3>
-                  <p className="text-sm text-[#3A3A3A]">Earn 8% monthly</p>
-                </div>
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#1A1A1A] text-center mb-8 md:mb-12">
+            How Laptop Banking Works
+          </h2>
+          
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-6 md:gap-8 max-w-5xl mx-auto mb-8 md:mb-12">
+            {/* Step 1 */}
+            <div className="text-center">
+              <div className="w-16 h-16 md:w-20 md:h-20 bg-[#FF7A19] text-white rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6 font-bold text-xl md:text-2xl">
+                1
               </div>
-              <p className="text-sm text-[#3A3A3A] leading-relaxed">
-                Full principal returned at the end of the term
+              <h3 className="text-lg md:text-xl font-bold text-[#1A1A1A] mb-2 md:mb-3">You Invest</h3>
+              <p className="text-sm md:text-base text-[#3A3A3A] leading-relaxed">
+                Choose an investment tier and fund laptop inventory.
               </p>
             </div>
-
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-8">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-[#FF7A19] text-white rounded-full flex items-center justify-center font-bold text-xl">
-                  2
-                </div>
-                <div>
-                  <h3 className="font-bold text-lg text-[#1A1A1A]">Term 2 (3 months)</h3>
-                  <p className="text-sm text-[#3A3A3A]">Earn 9% monthly</p>
-                </div>
+            
+            {/* Step 2 */}
+            <div className="text-center">
+              <div className="w-16 h-16 md:w-20 md:h-20 bg-[#FF7A19] text-white rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6 font-bold text-xl md:text-2xl">
+                2
               </div>
-              <p className="text-sm text-[#3A3A3A] leading-relaxed">
-                Exit available after Term 1 with 28-day notice
+              <h3 className="text-lg md:text-xl font-bold text-[#1A1A1A] mb-2 md:mb-3">We Trade</h3>
+              <p className="text-sm md:text-base text-[#3A3A3A] leading-relaxed">
+                VENTECH imports and sells laptops through our nationwide distribution network.
+              </p>
+            </div>
+            
+            {/* Step 3 */}
+            <div className="text-center col-span-2 md:col-span-1">
+              <div className="w-16 h-16 md:w-20 md:h-20 bg-[#FF7A19] text-white rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6 font-bold text-xl md:text-2xl">
+                3
+              </div>
+              <h3 className="text-lg md:text-xl font-bold text-[#1A1A1A] mb-2 md:mb-3">You Earn</h3>
+              <p className="text-sm md:text-base text-[#3A3A3A] leading-relaxed">
+                You receive monthly returns while your capital works in real trade.
               </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-6xl mx-auto">
-            {[
-              { step: '1', title: 'You Invest', desc: 'Choose your tier and sign agreement' },
-              { step: '2', title: 'We Purchase', desc: 'Import laptops from trusted suppliers' },
-              { step: '3', title: 'We Sell', desc: 'Sell through retail outlets nationwide' },
-              { step: '4', title: 'You Earn', desc: 'Monthly returns via MoMo or bank' },
-            ].map((item, i) => (
-              <div key={i} className="text-center">
-                <div className="w-12 h-12 bg-[#FF7A19] text-white rounded-full flex items-center justify-center mx-auto mb-3 font-bold">
-                  {item.step}
+          {/* Investment Structure Card */}
+          <div className="max-w-2xl mx-auto bg-white rounded-xl p-6 md:p-8 shadow-lg border border-gray-100">
+            <h3 className="text-xl md:text-2xl font-bold text-[#1A1A1A] mb-4 md:mb-6 text-center">Investment Structure</h3>
+            
+            <div className="space-y-3 md:space-y-4">
+              <div className="flex items-center gap-3 md:gap-4 p-3 md:p-4 bg-gray-50 rounded-lg">
+                <Calendar className="text-[#FF7A19] flex-shrink-0 w-5 h-5 md:w-6 md:h-6" />
+                <div>
+                  <p className="font-semibold text-sm md:text-base text-[#1A1A1A]">3 Months per Term</p>
                 </div>
-                <h4 className="font-bold text-sm text-[#1A1A1A] mb-2">{item.title}</h4>
-                <p className="text-xs text-[#3A3A3A]">{item.desc}</p>
               </div>
-            ))}
+              
+              <div className="flex items-center gap-3 md:gap-4 p-3 md:p-4 bg-gray-50 rounded-lg">
+                <Percent className="text-[#FF7A19] flex-shrink-0 w-5 h-5 md:w-6 md:h-6" />
+                <div>
+                  <p className="font-semibold text-sm md:text-base text-[#1A1A1A]">Term 2: 9% monthly</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-3 md:gap-4 p-3 md:p-4 bg-gray-50 rounded-lg">
+                <Percent className="text-[#FF7A19] flex-shrink-0 w-5 h-5 md:w-6 md:h-6" />
+                <div>
+                  <p className="font-semibold text-sm md:text-base text-[#1A1A1A]">Term 1: 8% monthly</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-3 md:gap-4 p-3 md:p-4 bg-gray-50 rounded-lg">
+                <Shield className="text-[#FF7A19] flex-shrink-0 w-5 h-5 md:w-6 md:h-6" />
+                <div>
+                  <p className="font-semibold text-sm md:text-base text-[#1A1A1A]">Principal: 100% returned at the end of the term</p>
+                </div>
+              </div>
+            </div>
+            
+            <p className="text-xs md:text-sm text-[#3A3A3A] text-center mt-4 md:mt-6 italic">
+              This is a private, trade-backed agreement, not a public savings product.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Exclusive Investor Benefits */}
+      <section className="py-12 md:py-16 bg-white">
+        <div className="container mx-auto px-4">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#1A1A1A] text-center mb-8 md:mb-12">
+            Exclusive Investor Benefits
+          </h2>
+          
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 md:gap-8 max-w-6xl mx-auto">
+            {/* Premium Membership */}
+            <div className="bg-white rounded-xl p-6 md:p-8 shadow-lg border border-gray-100">
+              <div className="w-12 h-12 md:w-16 md:h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4 md:mb-6">
+                <Award className="text-[#FF7A19] w-6 h-6 md:w-8 md:h-8" />
+              </div>
+              <h3 className="text-lg md:text-xl font-bold text-[#1A1A1A] mb-3 md:mb-4">Premium Membership</h3>
+              <p className="text-sm md:text-base text-[#3A3A3A] leading-relaxed">
+                Every investor receives 5 Premium Stars to purchase up to 5 gadgets at supplier pricing.
+              </p>
+            </div>
+            
+            {/* Referral Bonus */}
+            <div className="bg-white rounded-xl p-6 md:p-8 shadow-lg border border-gray-100">
+              <div className="w-12 h-12 md:w-16 md:h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4 md:mb-6">
+                <Users className="text-[#FF7A19] w-6 h-6 md:w-8 md:h-8" />
+              </div>
+              <h3 className="text-lg md:text-xl font-bold text-[#1A1A1A] mb-3 md:mb-4">Referral Bonus</h3>
+              <p className="text-sm md:text-base text-[#3A3A3A] leading-relaxed">
+                Earn 1% additional monthly interest for each successful referral.
+              </p>
+            </div>
+            
+            {/* Priority Support */}
+            <div className="bg-white rounded-xl p-6 md:p-8 shadow-lg border border-gray-100 sm:col-span-2 md:col-span-1">
+              <div className="w-12 h-12 md:w-16 md:h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4 md:mb-6">
+                <Headphones className="text-[#FF7A19] w-6 h-6 md:w-8 md:h-8" />
+              </div>
+              <h3 className="text-lg md:text-xl font-bold text-[#1A1A1A] mb-3 md:mb-4">Priority Support</h3>
+              <p className="text-sm md:text-base text-[#3A3A3A] leading-relaxed">
+                Direct access to VENTECH investment team for personalized assistance.
+              </p>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Investment Tiers */}
-      <section className="py-16 bg-gray-50">
+      <section className="py-12 md:py-16 bg-gray-50">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center text-[#1A1A1A] mb-12">Choose Your Investment Path</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold text-center text-[#1A1A1A] mb-8 md:mb-12">Choose Your Investment Path</h2>
 
           {/* VTS Banking */}
           <div className="max-w-6xl mx-auto mb-12">
@@ -262,29 +381,29 @@ export default function LaptopBankingPage() {
               <h3 className="text-2xl font-bold text-[#1A1A1A] mb-2">VTS Banking</h3>
               <p className="text-sm text-[#3A3A3A]">Perfect for first-time investors</p>
             </div>
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
               {vtsBankingTiers.map((tier) => (
-                <div key={tier.name} className="bg-white rounded-xl p-6 border-2 border-gray-200 hover:border-[#FF7A19] transition-all">
-                  <h4 className="font-bold text-xl text-[#1A1A1A] mb-4">{tier.name}</h4>
-                  <div className="mb-6">
-                    <p className="text-sm text-[#3A3A3A] mb-2">Investment</p>
-                    <p className="text-2xl font-bold text-[#FF7A19]">GHS {tier.investment.toLocaleString()}</p>
+                <div key={tier.name} className="bg-white rounded-xl p-4 md:p-6 border-2 border-gray-200 hover:border-[#FF7A19] transition-all">
+                  <h4 className="font-bold text-lg md:text-xl text-[#1A1A1A] mb-3 md:mb-4">{tier.name}</h4>
+                  <div className="mb-4 md:mb-6">
+                    <p className="text-xs md:text-sm text-[#3A3A3A] mb-1 md:mb-2">Investment</p>
+                    <p className="text-xl md:text-2xl font-bold text-[#FF7A19]">GHS {tier.investment.toLocaleString()}</p>
                   </div>
-                  <div className="space-y-3 mb-6">
-                    <div className="flex justify-between text-sm">
+                  <div className="space-y-2 md:space-y-3 mb-4 md:mb-6">
+                    <div className="flex justify-between text-xs md:text-sm">
                       <span className="text-[#3A3A3A]">Term 1 (8%)</span>
                       <span className="font-semibold text-[#1A1A1A]">GHS {tier.term1.toLocaleString()}</span>
                     </div>
-                    <div className="flex justify-between text-sm">
+                    <div className="flex justify-between text-xs md:text-sm">
                       <span className="text-[#3A3A3A]">Term 2 (9%)</span>
                       <span className="font-semibold text-[#1A1A1A]">GHS {tier.term2.toLocaleString()}</span>
                     </div>
-                    <div className="border-t pt-3 flex justify-between">
-                      <span className="font-bold text-[#1A1A1A]">Total Return</span>
-                      <span className="font-bold text-[#FF7A19] text-lg">GHS {tier.total.toLocaleString()}</span>
+                    <div className="border-t pt-2 md:pt-3 flex justify-between">
+                      <span className="font-bold text-sm md:text-base text-[#1A1A1A]">Total Return</span>
+                      <span className="font-bold text-[#FF7A19] text-base md:text-lg">GHS {tier.total.toLocaleString()}</span>
                     </div>
                   </div>
-                  <Button variant="primary" className="w-full" onClick={() => handleSelectPlan(tier.fullName)}>
+                  <Button variant="primary" className="w-full text-sm md:text-base" onClick={() => handleSelectPlan(tier.fullName)}>
                     Select Plan
                   </Button>
                 </div>
@@ -298,33 +417,33 @@ export default function LaptopBankingPage() {
               <h3 className="text-2xl font-bold text-[#1A1A1A] mb-2">Exclusive Banking</h3>
               <p className="text-sm text-[#3A3A3A]">For growth-focused investors</p>
             </div>
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
               {exclusiveBankingTiers.map((tier) => (
-                <div key={tier.name} className="bg-gradient-to-br from-[#1A1A1A] to-[#3A3A3A] rounded-xl p-6 border-2 border-[#FF7A19] text-white">
-                  <div className="inline-flex items-center gap-2 bg-[#FF7A19] rounded-full px-3 py-1 mb-4">
-                    <Award size={14} />
-                    <span className="text-xs font-semibold">EXCLUSIVE</span>
+                <div key={tier.name} className="bg-gradient-to-br from-[#1A1A1A] to-[#3A3A3A] rounded-xl p-4 md:p-6 border-2 border-[#FF7A19] text-white">
+                  <div className="inline-flex items-center gap-2 bg-[#FF7A19] rounded-full px-2 md:px-3 py-1 mb-3 md:mb-4">
+                    <Award className="w-3 h-3 md:w-[14px] md:h-[14px]" />
+                    <span className="text-[10px] md:text-xs font-semibold">EXCLUSIVE</span>
                   </div>
-                  <h4 className="font-bold text-xl mb-4">{tier.name}</h4>
-                  <div className="mb-6">
-                    <p className="text-sm text-white/80 mb-2">Investment</p>
-                    <p className="text-2xl font-bold text-[#FF7A19]">GHS {tier.investment.toLocaleString()}</p>
+                  <h4 className="font-bold text-lg md:text-xl mb-3 md:mb-4">{tier.name}</h4>
+                  <div className="mb-4 md:mb-6">
+                    <p className="text-xs md:text-sm text-white/80 mb-1 md:mb-2">Investment</p>
+                    <p className="text-xl md:text-2xl font-bold text-[#FF7A19]">GHS {tier.investment.toLocaleString()}</p>
                   </div>
-                  <div className="space-y-3 mb-6">
-                    <div className="flex justify-between text-sm">
+                  <div className="space-y-2 md:space-y-3 mb-4 md:mb-6">
+                    <div className="flex justify-between text-xs md:text-sm">
                       <span className="text-white/80">Term 1 (8%)</span>
                       <span className="font-semibold">GHS {tier.term1.toLocaleString()}</span>
                     </div>
-                    <div className="flex justify-between text-sm">
+                    <div className="flex justify-between text-xs md:text-sm">
                       <span className="text-white/80">Term 2 (9%)</span>
                       <span className="font-semibold">GHS {tier.term2.toLocaleString()}</span>
                     </div>
-                    <div className="border-t border-white/20 pt-3 flex justify-between">
-                      <span className="font-bold">Total Return</span>
-                      <span className="font-bold text-[#FF7A19] text-lg">GHS {tier.total.toLocaleString()}</span>
+                    <div className="border-t border-white/20 pt-2 md:pt-3 flex justify-between">
+                      <span className="font-bold text-sm md:text-base">Total Return</span>
+                      <span className="font-bold text-[#FF7A19] text-base md:text-lg">GHS {tier.total.toLocaleString()}</span>
                     </div>
                   </div>
-                  <Button variant="secondary" className="w-full" onClick={() => handleSelectPlan(tier.fullName)}>
+                  <Button variant="secondary" className="w-full text-sm md:text-base" onClick={() => handleSelectPlan(tier.fullName)}>
                     Select Plan
                   </Button>
                 </div>
@@ -334,75 +453,16 @@ export default function LaptopBankingPage() {
         </div>
       </section>
 
-      {/* Premium Benefits */}
-      <section className="py-16">
-        <div className="container mx-auto px-4">
-          <div className="max-w-6xl mx-auto">
-            <div className="grid md:grid-cols-2 gap-8">
-              {/* Premium Membership */}
-              <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-8">
-                <div className="flex items-center gap-3 mb-4">
-                  <Gift className="text-[#FF7A19]" size={32} />
-                  <h3 className="text-2xl font-bold text-[#1A1A1A]">Premium Membership</h3>
-                </div>
-                <p className="text-[#3A3A3A] mb-6">
-                  Every investor gets <strong>5 Premium Stars</strong> to buy up to 5 gadgets at supplier pricing
-                </p>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="text-[#FF7A19]" size={20} />
-                    <span className="text-sm text-[#1A1A1A]">Redeem within 6-month period anytime</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="text-[#FF7A19]" size={20} />
-                    <span className="text-sm text-[#1A1A1A]">Buy laptops, phones, accessories below retail</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="text-[#FF7A19]" size={20} />
-                    <span className="text-sm text-[#1A1A1A]">Shareable with family or friends</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Referral Bonus */}
-              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-8">
-                <div className="flex items-center gap-3 mb-4">
-                  <Users className="text-green-600" size={32} />
-                  <h3 className="text-2xl font-bold text-[#1A1A1A]">Referral Bonus</h3>
-                </div>
-                <p className="text-[#3A3A3A] mb-6">
-                  Refer a customer who buys and earn <strong className="text-green-600">GHS 100 cash</strong>
-                </p>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="text-green-600" size={20} />
-                    <span className="text-sm text-[#1A1A1A]">Unlimited referrals</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="text-green-600" size={20} />
-                    <span className="text-sm text-[#1A1A1A]">Paid via MoMo or bank transfer</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="text-green-600" size={20} />
-                    <span className="text-sm text-[#1A1A1A]">Bonus after sale confirmation</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Contact Form */}
-      <section id="investment-form" className="py-16 bg-gray-50">
+      <section id="investment-form" className="py-12 md:py-16 bg-white">
         <div className="container mx-auto px-4">
           <div className="max-w-2xl mx-auto">
-            <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-[#1A1A1A] mb-4">Start Your Investment Journey</h2>
-              <p className="text-[#3A3A3A]">Fill out the form below and we'll contact you within 24 hours</p>
+            <div className="text-center mb-6 md:mb-8">
+              <h2 className="text-2xl sm:text-3xl font-bold text-[#1A1A1A] mb-3 md:mb-4">Start Your Investment Journey</h2>
+              <p className="text-sm md:text-base text-[#3A3A3A]">Fill out the form below and we'll contact you within 24 hours</p>
             </div>
 
-            <div className="bg-white rounded-xl p-8 shadow-lg">
+            <div className="bg-white rounded-xl p-6 md:p-8 shadow-lg border border-gray-200">
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-[#1A1A1A] mb-2">Full Name *</label>
@@ -471,7 +531,7 @@ export default function LaptopBankingPage() {
                   variant="primary" 
                   size="lg" 
                   className="w-full" 
-                  icon={<ArrowRight size={20} />}
+                  icon={<ArrowRight className="w-5 h-5" />}
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? 'Submitting...' : 'Submit Application'}
@@ -573,7 +633,7 @@ export default function LaptopBankingPage() {
                   variant="primary" 
                   size="lg" 
                   className="w-full" 
-                  icon={<ArrowRight size={20} />}
+                  icon={<ArrowRight className="w-5 h-5" />}
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? 'Submitting...' : 'Submit Application'}
@@ -603,7 +663,7 @@ export default function LaptopBankingPage() {
                 <span className="text-sm">Ho Civic Center Shop #22 & Accra</span>
               </div>
             </div>
-            <p className="mt-8 text-sm text-[#FF7A19]">
+            <p className="mt-8 text-sm" style={{ color: '#ffffff' }}>
               Signed contract within 24 hours | Limited slots available per cycle
             </p>
           </div>
@@ -612,4 +672,3 @@ export default function LaptopBankingPage() {
     </div>
   );
 }
-

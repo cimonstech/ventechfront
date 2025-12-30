@@ -69,3 +69,14 @@ p {
     --foreground: #1A1A1A;
   }
 }
+
+/* Mobile price text - bigger font on mobile */
+.product-card-price-mobile {
+  font-size: 1rem !important; /* 16px on mobile */
+}
+
+@media (min-width: 640px) {
+  .product-card-price-mobile {
+    font-size: 0.875rem !important; /* 14px on sm and above */
+  }
+}

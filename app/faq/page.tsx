@@ -20,7 +20,7 @@ const faqs: FAQItem[] = [
   {
     category: 'Orders & Shipping',
     question: 'Do you offer free delivery?',
-    answer: 'Yes! We offer free delivery on all orders over GHS 500. For orders below this amount, a standard delivery fee applies based on your location.',
+    answer: 'Yes! We offer free delivery on all orders over GHS 20,000. For orders below this amount, a standard delivery fee applies based on your location.',
   },
   {
     category: 'Orders & Shipping',

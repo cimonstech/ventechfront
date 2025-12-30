@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { CategoryCard, CategoryCardSimple } from '@/components/cards/CategoryCard';
 import { Button } from '@/components/ui/Button';
-import { Spinner } from '@/components/loaders/Spinner';
+import CheckmarkLoader from '@/components/loaders/CheckmarkLoader';
 import { Grid, List } from 'lucide-react';
 import { Category } from '@/types/product';
 import { getCategories } from '@/services/category.service';
@@ -70,7 +70,7 @@ export default function CategoriesPage() {
         {/* Loading State */}
         {isLoading && (
           <div className="flex items-center justify-center py-20">
-            <Spinner size="lg" />
+            <CheckmarkLoader size={72} color="#FF7A19" speedMs={600} />
           </div>
         )}
 

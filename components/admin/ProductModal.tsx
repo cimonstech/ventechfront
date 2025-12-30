@@ -347,8 +347,8 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name || !formData.slug || !formData.price) {
-      toast.error('Please fill in all required fields');
+    if (!formData.name || !formData.slug || !formData.price || !formData.description || !formData.description.trim()) {
+      toast.error('Please fill in all required fields (including description)');
       return;
     }
 
@@ -626,7 +626,7 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
           {/* Description */}
           <div>
             <label className="block text-sm font-semibold text-[#1A1A1A] mb-2">
-              Description
+              Description <span className="text-red-500">*</span>
             </label>
             <textarea
               value={formData.description}
@@ -634,6 +634,7 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
               placeholder="Product description..."
               rows={4}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
+              required
             />
           </div>
 
@@ -669,9 +670,6 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
                 Add Spec
               </Button>
             </div>
-            <p className="text-xs text-gray-500 mb-3">
-              These will appear as colored buttons on product cards. Desktop: above "Add to Cart", Mobile: below prices.
-            </p>
             
             {keySpecs.length === 0 ? (
               <div className="p-4 border-2 border-dashed border-gray-300 rounded-lg text-center text-gray-500 text-sm">

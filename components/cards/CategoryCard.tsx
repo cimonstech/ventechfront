@@ -24,22 +24,22 @@ export const CategoryCard: React.FC<CategoryCardProps> = ({ category }) => {
             className="object-cover group-hover:scale-110 transition-transform duration-500"
           />
 
-          {/* Orange overlay on hover */}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#FF7A19]/80 via-[#FF7A19]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          {/* Orange overlay - always visible */}
+          <div className="absolute inset-0 bg-[#FF7A19]/60 z-10" />
         </div>
 
         {/* Content */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[#1A1A1A]/90 to-transparent text-white transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-          <h3 className="text-base font-bold mb-1">{category.name}</h3>
+        <div className="absolute bottom-0 left-0 right-0 p-4 z-20 text-white transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+          <h3 className="text-base font-bold mb-1 text-white">{category.name}</h3>
           
           <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-200">
+            <p className="text-sm text-white">
               {category.product_count} {category.product_count === 1 ? 'product' : 'products'}
             </p>
             
-            <div className="flex items-center gap-1 text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <div className="flex items-center gap-1 text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-white">
               <span>Shop Now</span>
-              <ArrowRight size={16} />
+              <ArrowRight size={16} className="text-white" />
             </div>
           </div>
         </div>

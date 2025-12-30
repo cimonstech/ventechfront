@@ -1,6 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
+import { Button } from '@/components/ui/Button';
+import { Laptop, ArrowRight, TrendingUp, Target, FileText, Users, Share2, DollarSign, FolderOpen } from 'lucide-react';
 
 export default function AffiliatePage() {
   const [formData, setFormData] = useState({
@@ -74,102 +77,161 @@ export default function AffiliatePage() {
     }
   };
 
+  const scrollToSection = (id: string) => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}
-      <section className="bg-gradient-to-r from-[#FF7A19] to-[#FF9A19] py-12 sm:py-16 text-white">
-        <div className="container mx-auto px-4 sm:px-6 text-center">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4 text-white">
-            Join the Ventech Gadgets Affiliate Program
-          </h1>
-          <p className="text-xl md:text-2xl font-semibold text-white mb-4">
-            JOIN • PROMOTE • EARN
-          </p>
-          <p className="text-lg md:text-xl text-white/90 max-w-2xl mx-auto">
-            Earn commissions by promoting smartphones, accessories, and the latest tech gadgets your audience already loves.
-          </p>
+      <section className="relative text-white py-12 md:py-20 lg:py-24 overflow-hidden">
+        {/* Background Image with Orange Overlay */}
+        <div className="absolute inset-0 pointer-events-none">
+          {/* Orange Background - hidden on mobile, visible on desktop */}
+          <div className="hidden md:block absolute inset-0 bg-[#FF7A19] z-0"></div>
+          
+          {/* Image - full width on mobile, starts from middle on desktop */}
+          <div className="absolute inset-0 md:left-1/2 md:right-0 top-0 bottom-0 z-0">
+            <div className="relative w-full h-full">
+              <Image
+                src="/affiliate-.webp"
+                alt="VENTECH Affiliate Program"
+                fill
+                sizes="(max-width: 768px) 100vw, 50vw"
+                className="object-cover"
+                priority
+              />
+              {/* Orange Overlay - full on mobile, partial on desktop */}
+              <div className="absolute inset-0 bg-[#FF7A19]/80 md:bg-[#FF7A19]/60"></div>
+            </div>
+          </div>
         </div>
-      </section>
-
-      {/* What Affiliates Earn */}
-      <section className="py-12 md:py-16 bg-white">
-        <div className="container mx-auto px-4 sm:px-6">
-          <div className="max-w-4xl mx-auto">
-            <h2 className="text-2xl md:text-3xl font-bold text-center mb-8 text-[#FF7A19]">
-              What Affiliates Earn
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-              <div className="text-center p-4 md:p-6 bg-gray-50 rounded-lg hover:shadow-lg transition-shadow">
-                <div className="text-4xl md:text-5xl mb-3 text-[#FF7A19]">
-                  <i className="fas fa-dollar-sign"></i>
-                </div>
-                <p className="font-semibold text-[#1A1A1A] text-sm md:text-base">Competitive commission on every successful sale</p>
-              </div>
-              <div className="text-center p-4 md:p-6 bg-gray-50 rounded-lg hover:shadow-lg transition-shadow">
-                <div className="text-4xl md:text-5xl mb-3 text-[#FF7A19]">
-                  <i className="fas fa-link"></i>
-                </div>
-                <p className="font-semibold text-[#1A1A1A] text-sm md:text-base">Unique referral link & tracking</p>
-              </div>
-              <div className="text-center p-4 md:p-6 bg-gray-50 rounded-lg hover:shadow-lg transition-shadow">
-                <div className="text-4xl md:text-5xl mb-3 text-[#FF7A19]">
-                  <i className="fas fa-box"></i>
-                </div>
-                <p className="font-semibold text-[#1A1A1A] text-sm md:text-base">Promote trending gadgets & accessories</p>
-              </div>
-              <div className="text-center p-4 md:p-6 bg-gray-50 rounded-lg hover:shadow-lg transition-shadow">
-                <div className="text-4xl md:text-5xl mb-3 text-[#FF7A19]">
-                  <i className="fas fa-calendar-alt"></i>
-                </div>
-                <p className="font-semibold text-[#1A1A1A] text-sm md:text-base">Monthly payouts</p>
-              </div>
-              <div className="text-center p-4 md:p-6 bg-gray-50 rounded-lg col-span-2 lg:col-span-1 hover:shadow-lg transition-shadow">
-                <div className="text-4xl md:text-5xl mb-3 text-[#FF7A19]">
-                  <i className="fas fa-globe"></i>
-                </div>
-                <p className="font-semibold text-[#1A1A1A] text-sm md:text-base">Open to affiliates worldwide</p>
-              </div>
+        
+        <div className="container mx-auto px-4 relative z-20">
+          <div className="max-w-2xl md:max-w-3xl">
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-3 md:px-4 py-2 mb-4 md:mb-6">
+              <Laptop className="w-4 h-4 md:w-[18px] md:h-[18px]" />
+              <span className="text-xs md:text-sm font-semibold">Partner with VENTECH</span>
+            </div>
+            
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 leading-tight text-white md:text-white">
+              Crush It as a Ventech Gadgets Affiliate
+            </h1>
+            
+            <p className="text-lg sm:text-xl md:text-2xl mb-6 md:mb-8 text-white leading-relaxed">
+              Turn your following into income. Promote the tech everyone wants. Earn for every sale you make.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
+              <Button 
+                variant="secondary" 
+                size="lg" 
+                icon={<ArrowRight className="w-[18px] h-[18px] md:w-5 md:h-5" />}
+                onClick={() => scrollToSection('affiliate-form')}
+                className="bg-black hover:bg-gray-800 text-white border-none text-sm md:text-base"
+              >
+                Join Now
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="lg" 
+                className="text-white border-2 border-white hover:bg-white/10 bg-transparent text-sm md:text-base"
+                onClick={() => scrollToSection('how-it-works')}
+              >
+                How It Works
+              </Button>
             </div>
           </div>
         </div>
       </section>
 
-      {/* How It Works */}
-      <section className="py-12 md:py-16 bg-gray-50">
-        <div className="container mx-auto px-4 sm:px-6">
-          <div className="max-w-4xl mx-auto">
-            <h2 className="text-2xl md:text-3xl font-bold text-center mb-12 text-[#FF7A19]">
-              How It Works
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-              <div className="text-center p-4 md:p-6 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
-                <div className="w-12 h-12 md:w-16 md:h-16 bg-[#FF7A19] rounded-full flex items-center justify-center text-white text-lg md:text-2xl mx-auto mb-3 md:mb-4">
-                  <i className="fas fa-user-plus"></i>
-                </div>
-                <h3 className="font-semibold text-base md:text-lg mb-2 text-[#1A1A1A]">Sign Up</h3>
-                <p className="text-gray-600 text-xs md:text-sm">Complete the affiliate form.</p>
+      {/* Why Partner with Ventech */}
+      <section className="py-12 md:py-16 bg-white">
+        <div className="container mx-auto px-4">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#1A1A1A] text-center mb-8 md:mb-12">
+            Why Partner with Ventech
+          </h2>
+          
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 md:gap-8 max-w-6xl mx-auto">
+            {/* Competitive Commissions */}
+            <div className="bg-white rounded-xl p-6 md:p-8 shadow-lg border border-gray-100">
+              <div className="w-12 h-12 md:w-16 md:h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4 md:mb-6">
+                <TrendingUp className="text-[#FF7A19] w-6 h-6 md:w-8 md:h-8" />
               </div>
-              <div className="text-center p-4 md:p-6 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
-                <div className="w-12 h-12 md:w-16 md:h-16 bg-[#FF7A19] rounded-full flex items-center justify-center text-white text-lg md:text-2xl mx-auto mb-3 md:mb-4">
-                  <i className="fas fa-link"></i>
-                </div>
-                <h3 className="font-semibold text-base md:text-lg mb-2 text-[#1A1A1A]">Get Your Link</h3>
-                <p className="text-gray-600 text-xs md:text-sm">Receive your unique referral link.</p>
+              <h3 className="text-lg md:text-xl font-bold text-[#1A1A1A] mb-3 md:mb-4">Competitive Commissions</h3>
+              <p className="text-sm md:text-base text-[#3A3A3A] leading-relaxed">
+                Earn up to 12% on every sale you refer. More sales mean higher commissions.
+              </p>
+            </div>
+            
+            {/* In-Demand Products */}
+            <div className="bg-white rounded-xl p-6 md:p-8 shadow-lg border border-gray-100">
+              <div className="w-12 h-12 md:w-16 md:h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4 md:mb-6">
+                <Target className="text-[#FF7A19] w-6 h-6 md:w-8 md:h-8" />
               </div>
-              <div className="text-center p-4 md:p-6 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
-                <div className="w-12 h-12 md:w-16 md:h-16 bg-[#FF7A19] rounded-full flex items-center justify-center text-white text-lg md:text-2xl mx-auto mb-3 md:mb-4">
-                  <i className="fas fa-share-alt"></i>
-                </div>
-                <h3 className="font-semibold text-base md:text-lg mb-2 text-[#1A1A1A]">Promote Gadgets</h3>
-                <p className="text-gray-600 text-xs md:text-sm">Share products with your audience.</p>
+              <h3 className="text-lg md:text-xl font-bold text-[#1A1A1A] mb-3 md:mb-4">In-Demand Products</h3>
+              <p className="text-sm md:text-base text-[#3A3A3A] leading-relaxed">
+                Promote the latest smartphones, laptops, earbuds, and gadgets your audience wants.
+              </p>
+            </div>
+            
+            {/* Reliable Payouts */}
+            <div className="bg-white rounded-xl p-6 md:p-8 shadow-lg border border-gray-100 sm:col-span-2 md:col-span-1">
+              <div className="w-12 h-12 md:w-16 md:h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4 md:mb-6">
+                <FileText className="text-[#FF7A19] w-6 h-6 md:w-8 md:h-8" />
               </div>
-              <div className="text-center p-4 md:p-6 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
-                <div className="w-12 h-12 md:w-16 md:h-16 bg-[#FF7A19] rounded-full flex items-center justify-center text-white text-lg md:text-2xl mx-auto mb-3 md:mb-4">
-                  <i className="fas fa-money-bill-wave"></i>
-                </div>
-                <h3 className="font-semibold text-base md:text-lg mb-2 text-[#1A1A1A]">Earn Commissions</h3>
-                <p className="text-gray-600 text-xs md:text-sm">Get paid for every successful sale.</p>
+              <h3 className="text-lg md:text-xl font-bold text-[#1A1A1A] mb-3 md:mb-4">Reliable Payouts</h3>
+              <p className="text-sm md:text-base text-[#3A3A3A] leading-relaxed">
+                Enjoy monthly payouts via MoMo, bank transfer, or crypto.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How the Affiliate Program Works */}
+      <section id="how-it-works" className="py-12 md:py-16 bg-gray-50">
+        <div className="container mx-auto px-4">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#1A1A1A] text-center mb-8 md:mb-12">
+            How the Affiliate Program Works
+          </h2>
+          
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 md:gap-8 max-w-6xl mx-auto">
+            {/* Join */}
+            <div className="bg-white rounded-xl p-6 md:p-8 shadow-lg border border-gray-100">
+              <div className="w-12 h-12 md:w-16 md:h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4 md:mb-6">
+                <FileText className="text-[#FF7A19] w-6 h-6 md:w-8 md:h-8" />
               </div>
+              <h3 className="text-lg md:text-xl font-bold text-[#1A1A1A] mb-3 md:mb-4">Join</h3>
+              <p className="text-sm md:text-base text-[#3A3A3A] leading-relaxed">
+                Sign up and get your unique referral link. It's quick and free.
+              </p>
+            </div>
+            
+            {/* Promote */}
+            <div className="bg-white rounded-xl p-6 md:p-8 shadow-lg border border-gray-100">
+              <div className="w-12 h-12 md:w-16 md:h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4 md:mb-6">
+                <Share2 className="text-[#FF7A19] w-6 h-6 md:w-8 md:h-8" />
+              </div>
+              <h3 className="text-lg md:text-xl font-bold text-[#1A1A1A] mb-3 md:mb-4">Promote</h3>
+              <p className="text-sm md:text-base text-[#3A3A3A] leading-relaxed">
+                Share your link and content. Drive traffic to ventechgadgets.com.
+              </p>
+            </div>
+            
+            {/* Earn */}
+            <div className="bg-white rounded-xl p-6 md:p-8 shadow-lg border border-gray-100 sm:col-span-2 md:col-span-1">
+              <div className="w-12 h-12 md:w-16 md:h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4 md:mb-6">
+                <DollarSign className="text-[#FF7A19] w-6 h-6 md:w-8 md:h-8" />
+              </div>
+              <h3 className="text-lg md:text-xl font-bold text-[#1A1A1A] mb-3 md:mb-4">Earn</h3>
+              <p className="text-sm md:text-base text-[#3A3A3A] leading-relaxed">
+                Receive real-time earnings into your account for every verified sale.
+              </p>
             </div>
           </div>
         </div>
@@ -379,25 +441,50 @@ export default function AffiliatePage() {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-12 md:py-16 bg-gradient-to-br from-[#1A1A1A] to-[#2D2D2D] text-white">
-        <div className="container mx-auto px-4 sm:px-6 text-center">
-          <h2 className="affiliate-cta-heading text-2xl md:text-3xl font-bold mb-6 text-white" style={{ color: '#ffffff' }}>
-            Start Earning with Ventech
+      {/* Unlock Exclusive Benefits */}
+      <section className="relative py-12 md:py-16 text-white overflow-hidden">
+        {/* Background Image */}
+        <div className="absolute inset-0 z-0">
+          <Image
+            src="/affiliatepageimage.webp"
+            alt="Affiliate Benefits"
+            fill
+            sizes="100vw"
+            className="object-cover"
+            priority
+          />
+          {/* White Overlay */}
+          <div className="absolute inset-0 bg-white/60 z-10"></div>
+        </div>
+        
+        <div className="container mx-auto px-4 text-center relative z-20">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 md:mb-6 text-[#1A1A1A]">
+            Unlock Exclusive Benefits
           </h2>
-          <p className="affiliate-cta-text text-lg mb-8 max-w-2xl mx-auto" style={{ color: '#ffffff' }}>
-            Join thousands of affiliates promoting the latest tech gadgets and earning competitive commissions.
+          <p className="text-lg md:text-xl mb-8 md:mb-12 max-w-2xl mx-auto text-[#3A3A3A]">
+            Get rewarded for sharing quality tech with your followers.
           </p>
-          <a
-            href="#affiliate-form"
-            className="inline-block bg-[#FF7A19] text-white font-semibold py-4 px-8 rounded-lg hover:bg-[#e66a0f] transition-colors text-lg"
-            onClick={(e) => {
-              e.preventDefault();
-              document.getElementById('affiliate-form')?.scrollIntoView({ behavior: 'smooth' });
-            }}
-          >
-            Join as an Affiliate
-          </a>
+          
+          <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-2xl mx-auto">
+            <Button
+              variant="secondary"
+              size="lg"
+              icon={<ArrowRight className="w-5 h-5" />}
+              onClick={() => scrollToSection('affiliate-form')}
+              className="bg-[#FF7A19] hover:bg-[#e66a0f] text-white border-none"
+            >
+              Join Now
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              icon={<FolderOpen className="w-5 h-5" />}
+              onClick={() => window.open('mailto:ventechgadgets@gmail.com', '_blank')}
+              className="border-2 border-[#1A1A1A] text-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white bg-transparent"
+            >
+              Contact Support
+            </Button>
+          </div>
         </div>
       </section>
     </div>

@@ -82,6 +82,7 @@ export default function RootLayout({
           </div>
           <Toaster
             position="top-right"
+            containerClassName="hidden md:block"
             toastOptions={{
               duration: 3000,
               style: {

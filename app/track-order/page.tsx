@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
-import { Spinner } from '@/components/loaders/Spinner';
+import CheckmarkLoader from '@/components/loaders/CheckmarkLoader';
 import { Package, Search, MapPin, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { orderService } from '@/services/order.service';
 import { Order } from '@/types/order';
@@ -167,7 +167,7 @@ export default function TrackOrderPage() {
         {/* Loading State */}
         {isLoading && (
           <div className="flex items-center justify-center py-12">
-            <Spinner size="lg" />
+            <CheckmarkLoader size={72} color="#FF7A19" speedMs={600} />
           </div>
         )}
 

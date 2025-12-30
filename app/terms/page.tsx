@@ -98,7 +98,7 @@ export default function TermsOfServicePage() {
             <ul className="list-disc list-inside space-y-2 text-[#3A3A3A]">
               <li>Delivery times are estimates and not guaranteed</li>
               <li>We ship to addresses within Ghana (Accra, Ho, and other regions)</li>
-              <li>Free delivery available for orders over GHS 500</li>
+              <li>Free delivery available for orders over GHS 20,000</li>
               <li>You are responsible for providing accurate delivery information</li>
               <li>Risk of loss passes to you upon delivery to the carrier</li>
             </ul>

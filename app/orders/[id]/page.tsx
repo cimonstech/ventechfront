@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { Spinner } from '@/components/loaders/Spinner';
+import CheckmarkLoader from '@/components/loaders/CheckmarkLoader';
 import { ChevronLeft, Package, MapPin, CreditCard, FileText } from 'lucide-react';
 import { Order } from '@/types/order';
 import { orderService } from '@/services/order.service';
@@ -124,7 +124,7 @@ export default function OrderDetailPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Spinner size="lg" />
+        <CheckmarkLoader size={72} color="#FF7A19" speedMs={600} />
       </div>
     );
   }
