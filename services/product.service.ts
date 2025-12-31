@@ -339,7 +339,10 @@ export const getProductBySlug = async (slug: string): Promise<Product | null> =>
 
     // If that fails, try with automatic foreign key resolution
     if (error) {
-      console.warn('First query failed, trying alternative query:', error);
+      // Only log if it's not a "not found" error (PGRST116)
+      if (error.code !== 'PGRST116') {
+        console.warn('First query failed, trying alternative query:', error);
+      }
       const result = await supabase
         .from('products')
         .select(`
@@ -358,7 +361,10 @@ export const getProductBySlug = async (slug: string): Promise<Product | null> =>
 
     // If still fails, try without relations
     if (error) {
-      console.warn('Second query failed, fetching without relations:', error);
+      // Only log if it's not a "not found" error (PGRST116)
+      if (error.code !== 'PGRST116') {
+        console.warn('Second query failed, fetching without relations:', error);
+      }
       const result = await supabase
         .from('products')
         .select('*, rating, review_count')
@@ -384,7 +390,10 @@ export const getProductBySlug = async (slug: string): Promise<Product | null> =>
     }
 
     if (error) {
-      console.error('Error fetching product by slug:', error);
+      // Only log actual errors, not "not found" errors (PGRST116 is expected when product doesn't exist)
+      if (error.code !== 'PGRST116') {
+        console.error('Error fetching product by slug:', error);
+      }
       return null;
     }
 

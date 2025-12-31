@@ -817,7 +817,7 @@ export default function CheckoutPage() {
                 {/* Contact Information */}
                 <div className="p-4 bg-blue-50 rounded-lg">
                   <p className="text-sm text-[#3A3A3A]">
-                    For more information, call or WhatsApp: <a href="tel:0257140078" className="text-[#FF7A19] font-semibold hover:underline">0257140078</a>
+                    For more information, call or WhatsApp: <a href="tel:0551344310" className="text-[#FF7A19] font-semibold hover:underline">055 134 4310</a>
                   </p>
                 </div>
 

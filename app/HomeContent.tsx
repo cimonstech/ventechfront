@@ -421,7 +421,7 @@ export function HomeContent() {
           <h2 className="text-2xl md:text-3xl font-bold mb-3 !text-white" style={{ color: '#ffffff' }}>
             Ready to Upgrade Your Tech?
           </h2>
-          <p className="text-base text-white/90 mb-6">
+          <p className="home-cta-description text-base mb-6" style={{ color: '#ffffff' }}>
             Explore our collection of the latest gadgets and electronics
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">

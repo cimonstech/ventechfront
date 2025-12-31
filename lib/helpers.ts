@@ -1,16 +1,17 @@
-// Format currency to GHS (Ghanaian Cedis)
+// Format currency to GH₵ (Ghanaian Cedis)
 export const formatCurrency = (amount: number): string => {
   // Handle NaN, null, undefined, or invalid numbers
   const validAmount = Number(amount);
   if (isNaN(validAmount) || !isFinite(validAmount)) {
     console.warn('Invalid amount passed to formatCurrency:', amount);
-    return 'GHS 0.00';
+    return 'GH₵ 0.00';
   }
-  return new Intl.NumberFormat('en-GH', {
-    style: 'currency',
-    currency: 'GHS',
+  // Format with commas and 2 decimal places, then replace GHS with GH₵
+  const formatted = new Intl.NumberFormat('en-GH', {
     minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(validAmount);
+  return `GH₵ ${formatted}`;
 };
 
 // Calculate discount percentage

@@ -22,6 +22,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
   const { items } = useAppSelector((state) => state.cart);
   const { isInWishlist, toggleItem } = useWishlist();
   
+  // Safety check: return null if product is invalid
+  if (!product || !product.id) {
+    return null;
+  }
+  
   const isInCart = items.some(item => item.id === product.id);
   const isWishlisted = isInWishlist(product.id);
 
@@ -32,7 +37,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
 
   const isPreOrder = (product as any).is_pre_order === true;
 
-  const handleAddToCart = (e: React.MouseEvent) => {
+  const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -40,7 +45,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
       ...product,
       quantity: 1,
       selected_variants: {},
-      subtotal: product.discount_price || product.original_price,
+      subtotal: product.discount_price || product.original_price || 0,
       is_pre_order: isPreOrder,
     };
 
@@ -50,6 +55,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
         quantity: 1,
       })
     );
+
+    // Remove from wishlist if it's in the wishlist
+    if (isWishlisted) {
+      try {
+        await toggleItem(product.id);
+      } catch (error) {
+        console.error('Error removing from wishlist:', error);
+      }
+    }
 
     toast.success(isPreOrder ? `${product.name} added to pre-order cart!` : `${product.name} added to cart!`);
   };
@@ -236,7 +250,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
             >
               <Heart
                 size={16}
-                className={isWishlisted ? 'fill-[#FF7A19] text-[#FF7A19]' : 'text-[#3A3A3A]'}
+                className={isWishlisted ? 'fill-[#FF7A19] text-[#FF7A19]' : 'text-white'}
               />
             </button>
             {onQuickView && (
@@ -276,7 +290,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
             >
               <Heart
                 size={18}
-                className={isWishlisted ? 'fill-[#FF7A19] text-[#FF7A19]' : 'text-[#3A3A3A]'}
+                className={isWishlisted ? 'fill-[#FF7A19] text-[#FF7A19]' : 'text-white'}
               />
             </button>
           </div>
@@ -321,13 +335,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
           {/* Price - Displayed after key specs on both mobile and desktop */}
           <div className="flex items-baseline gap-2 mb-3 mt-auto flex-wrap">
             {product.price_range?.hasRange ? (
-              <span className="text-[#FF7A19] product-card-price-mobile">
+              <span className="text-[#FF7A19] product-card-price-mobile font-bold">
                 {formatCurrency(product.price_range.min)} - {formatCurrency(product.price_range.max)}
               </span>
             ) : (
               <>
-                <span className="text-[#FF7A19] product-card-price-mobile">
-                  {formatCurrency(product.discount_price || product.original_price)}
+                <span className="text-[#FF7A19] product-card-price-mobile font-bold">
+                  {formatCurrency(product.discount_price || product.original_price || 0)}
                 </span>
                 {hasDiscount && (
                   <span className="text-[10px] sm:text-xs text-[#3A3A3A] line-through">

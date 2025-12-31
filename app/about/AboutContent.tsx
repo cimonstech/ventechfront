@@ -16,10 +16,9 @@ export function AboutContent() {
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
-      <section className="relative text-white py-12 md:py-20 lg:py-24 overflow-hidden">
-        {/* Background Image with Orange Overlay */}
+      <section className="about-header relative overflow-hidden" style={{ paddingTop: '2.5rem', paddingBottom: '2.5rem', minHeight: 'auto' }}>
+        {/* Background Image with Dark Orange/Brown Overlay */}
         <div className="absolute inset-0 pointer-events-none">
-          {/* Image - full width on both mobile and desktop */}
           <div className="absolute inset-0 z-0">
             <div className="relative w-full h-full">
               <Image
@@ -28,22 +27,59 @@ export function AboutContent() {
                 fill
                 sizes="100vw"
                 className="object-cover object-center"
-                style={{ objectFit: 'cover' }}
                 priority
               />
-              {/* Orange Overlay - consistent on both mobile and desktop */}
-              <div className="absolute inset-0 bg-[#FF7A19]/60"></div>
+              {/* Dark Orange/Brown Overlay - textured wood-like appearance */}
+              <div className="absolute inset-0 bg-gradient-to-b from-[#8B4513]/85 via-[#A0522D]/90 to-[#654321]/85"></div>
+              {/* Texture pattern for wood-like effect */}
+              <div className="absolute inset-0 opacity-40" style={{
+                backgroundImage: `
+                  repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(0,0,0,0.1) 2px, rgba(0,0,0,0.1) 4px),
+                  repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.05) 2px, rgba(0,0,0,0.05) 4px)
+                `,
+              }}></div>
             </div>
           </div>
         </div>
         
-        <div className="container mx-auto px-4 relative z-20">
-          <div className="max-w-2xl md:max-w-3xl mx-auto text-center">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 leading-tight text-white">
+        <div className="container mx-auto px-4 sm:px-6 relative z-20">
+          <div className="max-w-4xl mx-auto text-center">
+            {/* Heading */}
+            <h1 
+              className="text-base sm:text-xl md:text-2xl lg:text-3xl font-bold mb-4 md:mb-5 tracking-wide uppercase"
+              style={{ color: '#ffffff !important' }}
+            >
               ABOUT VENTECH
             </h1>
-            <p className="text-lg sm:text-xl md:text-2xl text-white leading-relaxed">
-              Trusted for Tech
+            
+            {/* Tagline - Large, Bold White Text with proper spacing */}
+            <div className="space-y-2 md:space-y-2.5 mb-4 md:mb-5">
+              <p 
+                className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight"
+                style={{ color: '#ffffff !important' }}
+              >
+                Trusted Technology.
+              </p>
+              <p 
+                className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight"
+                style={{ color: '#ffffff !important' }}
+              >
+                Built for Performance.
+              </p>
+              <p 
+                className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight"
+                style={{ color: '#ffffff !important' }}
+              >
+                Priced for Access.
+              </p>
+            </div>
+            
+            {/* Description Paragraph */}
+            <p 
+              className="text-base sm:text-lg md:text-xl leading-relaxed max-w-3xl mx-auto font-light"
+              style={{ color: '#ffffff !important' }}
+            >
+              VENTECH Gadgets is a Ghana-based technology brand delivering high-quality laptops and gadgets engineered for work, learning, and innovation.
             </p>
           </div>
         </div>
@@ -57,17 +93,18 @@ export function AboutContent() {
             {/* Image - Centered on desktop */}
             <div className="relative w-full h-64 md:h-96 mx-auto max-w-2xl rounded-xl overflow-hidden bg-gradient-to-br from-orange-50 to-gray-50">
               <Image
-                src="/placeholders/bg-gadgets1.webp"
+                src="/aboutlaptop.jpeg"
                 alt="VENTECH Products"
                 fill
                 className="object-cover"
                 sizes="(max-width: 768px) 100vw, 80vw"
+                priority
               />
             </div>
             
-            {/* Text Content - Centered on desktop */}
-            <div className="text-center md:text-center">
-              <p className="text-[#3A3A3A] text-sm md:text-base leading-relaxed max-w-2xl mx-auto">
+            {/* Text Content - Left aligned on mobile, centered on desktop */}
+            <div className="text-left md:text-center">
+              <p className="text-[#3A3A3A] text-sm md:text-base leading-relaxed max-w-2xl md:mx-auto">
                 <strong className="text-[#1A1A1A]">VENTECH Gadgets</strong> is a modern technology brand focused on making quality laptops and gadgets accessible in Ghana. We provide reliable, high-performance devices for learning, work, and innovation.
               </p>
             </div>

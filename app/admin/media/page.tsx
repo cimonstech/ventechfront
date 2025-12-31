@@ -297,7 +297,7 @@ export default function MediaLibraryPage() {
                   loading="lazy"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
-                    target.src = '/placeholders/placeholder-image.webp';
+                    target.src = '/placeholders/placeholder-product.webp';
                   }}
                 />
                 

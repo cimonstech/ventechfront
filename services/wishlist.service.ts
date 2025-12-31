@@ -22,7 +22,39 @@ export const wishlistService = {
         }
         throw error;
       }
-      return data || [];
+
+      // Transform products to ensure proper structure (map price to original_price)
+      const transformedData = (data || []).map((item: any) => ({
+        ...item,
+        product: item.product ? {
+          ...item.product,
+          // Map price field to original_price for Product interface compatibility
+          original_price: item.product.price || item.product.original_price || 0,
+          discount_price: item.product.discount_price || null,
+          // Ensure other fields are properly set
+          category_name: item.product.category?.name || item.product.category_name || null,
+          category_slug: item.product.category?.slug || item.product.category_slug || null,
+          brand: item.product.brand?.name || item.product.brand || '',
+          featured: item.product.is_featured || item.product.featured || false,
+          // Parse key_specs if it's a string (JSONB from Supabase)
+          key_specs: (() => {
+            if (!item.product.key_specs) return undefined;
+            if (Array.isArray(item.product.key_specs)) return item.product.key_specs;
+            if (typeof item.product.key_specs === 'string') {
+              try {
+                const parsed = JSON.parse(item.product.key_specs);
+                return Array.isArray(parsed) ? parsed : undefined;
+              } catch (e) {
+                console.warn('Failed to parse key_specs:', e);
+                return undefined;
+              }
+            }
+            return undefined;
+          })(),
+        } : null,
+      }));
+
+      return transformedData;
     } catch (error) {
       console.error('Error fetching wishlist:', error);
       return [];

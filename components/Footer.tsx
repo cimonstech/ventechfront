@@ -58,7 +58,7 @@ export function Footer() {
           {/* Store Info */}
           <div>
             <h3 className="footer-store-name font-bold text-lg mb-3">{storeName}</h3>
-            <p className="text-sm text-white mb-4">{storeTagline}</p>
+            <p className="footer-tagline text-sm mb-4" style={{ color: '#ffffff' }}>{storeTagline}</p>
             <div className="space-y-2 text-sm text-gray-400">
               {storePhone && (
                 <a href={`tel:${storePhone.replace(/\s/g, '')}`} className="block hover:text-[#FF7A19] transition-colors">

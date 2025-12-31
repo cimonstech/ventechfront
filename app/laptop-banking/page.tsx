@@ -252,7 +252,7 @@ export default function LaptopBankingPage() {
           
           <div className="grid grid-cols-2 md:grid-cols-3 gap-6 md:gap-8 max-w-5xl mx-auto mb-8 md:mb-12">
             {/* Step 1 */}
-            <div className="text-center">
+            <div className="text-center bg-white rounded-xl p-4 md:p-6 shadow-md border border-gray-200">
               <div className="w-16 h-16 md:w-20 md:h-20 bg-[#FF7A19] text-white rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6 font-bold text-xl md:text-2xl">
                 1
               </div>
@@ -263,7 +263,7 @@ export default function LaptopBankingPage() {
             </div>
             
             {/* Step 2 */}
-            <div className="text-center">
+            <div className="text-center bg-white rounded-xl p-4 md:p-6 shadow-md border border-gray-200">
               <div className="w-16 h-16 md:w-20 md:h-20 bg-[#FF7A19] text-white rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6 font-bold text-xl md:text-2xl">
                 2
               </div>
@@ -273,8 +273,8 @@ export default function LaptopBankingPage() {
               </p>
             </div>
             
-            {/* Step 3 */}
-            <div className="text-center col-span-2 md:col-span-1">
+            {/* Step 3 - Under Step 1 on mobile */}
+            <div className="text-center col-span-1 md:col-span-1 bg-white rounded-xl p-4 md:p-6 shadow-md border border-gray-200">
               <div className="w-16 h-16 md:w-20 md:h-20 bg-[#FF7A19] text-white rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6 font-bold text-xl md:text-2xl">
                 3
               </div>

@@ -56,6 +56,31 @@ h3 {
   color: #ffffff !important;
 }
 
+footer .footer-tagline,
+.footer-tagline {
+  color: #ffffff !important;
+}
+
+footer p.footer-tagline {
+  color: #ffffff !important;
+}
+
+.home-cta-description {
+  color: #ffffff !important;
+}
+
+.bulk-order-header-title,
+.bulk-order-header-subtitle,
+.bulk-order-header-description {
+  color: #ffffff !important;
+}
+
+.pre-order-section-title,
+.pre-order-empty-title,
+.pre-order-empty-text {
+  color: #ffffff !important;
+}
+
 p {
   font-size: 0.875rem; /* 14px */
   color: var(--neutral-dark-gray);
@@ -79,4 +104,10 @@ p {
   .product-card-price-mobile {
     font-size: 0.875rem !important; /* 14px on sm and above */
   }
+}
+
+/* Force white text for About page header */
+.about-header h1,
+.about-header p {
+  color: #ffffff !important;
 }
