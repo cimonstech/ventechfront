@@ -179,7 +179,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
 
   return (
     <Link href={`/product/${product.slug}`}>
-      <div className="group bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 h-full flex flex-col">
+      <div className="group bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-orange-200 md:border-gray-100 h-full flex flex-col">
         {/* Image Container */}
         <div className="relative aspect-square overflow-hidden bg-gray-50">
           <Image
@@ -250,7 +250,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
             >
               <Heart
                 size={16}
-                className={isWishlisted ? 'fill-[#FF7A19] text-[#FF7A19]' : 'text-white'}
+                className={isWishlisted ? 'fill-[#FF7A19] text-[#FF7A19] stroke-black' : 'text-white stroke-black'}
+                strokeWidth={2}
               />
             </button>
             {onQuickView && (
@@ -297,7 +298,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
         </div>
 
         {/* Content */}
-        <div className="p-4 flex-1 flex flex-col">
+        <div className="p-[14px] md:p-4 flex-1 flex flex-col">
           {/* Brand/Category - Using p tag, smaller than product name */}
           <p className="text-[7px] sm:text-[9px] text-[#FF7A19] font-medium uppercase tracking-wide mb-1">
             {product.brand}
@@ -333,7 +334,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
           )}
 
           {/* Price - Displayed after key specs on both mobile and desktop */}
-          <div className="flex items-baseline gap-2 mb-3 mt-auto flex-wrap">
+          <div className="flex items-baseline gap-2 mb-0 md:mb-3 mt-auto flex-wrap">
             {product.price_range?.hasRange ? (
               <span className="text-[#FF7A19] product-card-price-mobile font-bold">
                 {formatCurrency(product.price_range.min)} - {formatCurrency(product.price_range.max)}

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { ProductCard } from '@/components/cards/ProductCard';
 import { QuickView } from '@/components/shop/QuickView';
 import { Product, Category } from '@/types/product';
@@ -23,10 +24,13 @@ interface ProductFilters {
   minPrice?: number;
   maxPrice?: number;
   inStock?: boolean;
+  featured?: boolean;
+  preOrder?: boolean;
   sortBy?: 'newest' | 'price_asc' | 'price_desc' | 'rating';
 }
 
 export function ShopContent() {
+  const searchParams = useSearchParams();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showFilters, setShowFilters] = useState(false); // For mobile only
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
@@ -42,6 +46,26 @@ export function ShopContent() {
   });
 
   const productsPerPage = 20;
+
+  // Read URL parameters on mount and when they change
+  useEffect(() => {
+    const featured = searchParams.get('featured');
+    if (featured === 'true') {
+      setFilters(prev => ({
+        ...prev,
+        featured: true
+      }));
+      // Reset to page 1 when filter changes
+      setCurrentPage(1);
+      setProducts([]);
+    } else if (featured === null || featured === 'false') {
+      // Clear featured filter if not in URL or explicitly false
+      setFilters(prev => {
+        const { featured, ...rest } = prev;
+        return rest;
+      });
+    }
+  }, [searchParams]);
 
   // Fetch categories and brands for filters
   useEffect(() => {
@@ -66,11 +90,24 @@ export function ShopContent() {
       setIsLoading(true);
       try {
         const offset = (currentPage - 1) * productsPerPage;
-        const productsData = await productService.getProducts({
+        // Build query params - explicitly include featured and preOrder if they're set
+        const queryParams: any = {
           ...filters,
           limit: productsPerPage,
           offset
-        });
+        };
+        
+        // Explicitly set featured filter if it exists
+        if (filters.featured !== undefined) {
+          queryParams.featured = filters.featured;
+        }
+        
+        // Explicitly set preOrder filter if it exists
+        if (filters.preOrder !== undefined) {
+          queryParams.preOrder = filters.preOrder;
+        }
+        
+        const productsData = await productService.getProducts(queryParams);
         
         if (currentPage === 1) {
           setProducts(productsData);
@@ -124,6 +161,19 @@ export function ShopContent() {
       filtered = filtered.filter(p => p.in_stock === filters.inStock);
     }
     
+    // Apply featured filter (client-side safety check)
+    if (filters.featured === true) {
+      filtered = filtered.filter(p => {
+        const isFeatured = p.featured === true || (p as any).is_featured === true;
+        return isFeatured;
+      });
+    }
+    
+    // Apply pre-order filter (client-side safety check)
+    if (filters.preOrder === true) {
+      filtered = filtered.filter(p => (p as any).is_pre_order === true);
+    }
+    
     // Apply sorting
     if (filters.sortBy) {
       filtered.sort((a, b) => {
@@ -161,6 +211,10 @@ export function ShopContent() {
   const clearFilters = () => {
     setFilters({ sortBy: 'newest' });
     setCurrentPage(1);
+    // Clear URL parameters
+    if (searchParams.get('featured')) {
+      window.history.pushState({}, '', '/shop');
+    }
   };
 
   return (
@@ -168,8 +222,14 @@ export function ShopContent() {
       <div className="container mx-auto px-3 sm:px-4 max-w-full overflow-x-hidden">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Shop All Products</h1>
-          <p className="text-gray-600">Browse our complete collection of gadgets and electronics</p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+            {filters.featured ? 'Featured Products' : 'Shop All Products'}
+          </h1>
+          <p className="text-gray-600">
+            {filters.featured 
+              ? 'Top-rated and trending items' 
+              : 'Browse our complete collection of gadgets and electronics'}
+          </p>
         </div>
 
         <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
@@ -179,7 +239,7 @@ export function ShopContent() {
               <div className="flex items-center justify-between mb-6">
                 <h3 className="font-semibold text-[#1A1A1A] text-lg">Filters</h3>
                 <div className="flex items-center gap-2">
-                  {(filters.category || filters.brand || filters.minPrice || filters.maxPrice || filters.inStock !== undefined) && (
+                  {(filters.category || filters.brand || filters.minPrice || filters.maxPrice || filters.inStock !== undefined || filters.featured || filters.preOrder) && (
                     <button
                       onClick={clearFilters}
                       className="text-sm text-[#FF7A19] hover:underline"
@@ -288,6 +348,44 @@ export function ShopContent() {
                       className="w-4 h-4 text-[#FF7A19] border-gray-300 rounded focus:ring-[#FF7A19]"
                     />
                     <span className="text-sm text-gray-700">In Stock Only</span>
+                  </label>
+                </div>
+
+                {/* Featured Filter */}
+                <div className="mb-6">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={filters.featured === true}
+                      onChange={(e) => {
+                        const newValue = e.target.checked ? true : undefined;
+                        handleFilterChange('featured', newValue);
+                        // Update URL when featured filter changes
+                        if (newValue) {
+                          window.history.pushState({}, '', '/shop?featured=true');
+                        } else {
+                          window.history.pushState({}, '', '/shop');
+                        }
+                      }}
+                      className="w-4 h-4 text-[#FF7A19] border-gray-300 rounded focus:ring-[#FF7A19]"
+                    />
+                    <span className="text-sm text-gray-700">Featured Products</span>
+                  </label>
+                </div>
+
+                {/* Pre-Order Filter */}
+                <div className="mb-6">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={filters.preOrder === true}
+                      onChange={(e) => {
+                        const newValue = e.target.checked ? true : undefined;
+                        handleFilterChange('preOrder', newValue);
+                      }}
+                      className="w-4 h-4 text-[#FF7A19] border-gray-300 rounded focus:ring-[#FF7A19]"
+                    />
+                    <span className="text-sm text-gray-700">Pre-Order Products</span>
                   </label>
                 </div>
             </div>

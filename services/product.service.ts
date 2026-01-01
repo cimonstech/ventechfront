@@ -9,6 +9,7 @@ interface GetProductsParams {
   maxPrice?: number;
   inStock?: boolean;
   featured?: boolean;
+  preOrder?: boolean;
   sortBy?: 'price_asc' | 'price_desc' | 'newest' | 'rating';
   limit?: number;
   offset?: number;
@@ -49,6 +50,9 @@ export const getProducts = async (params: GetProductsParams = {}): Promise<Produ
       if (params.featured === true) {
         query = query.eq('is_pre_order', false);
       }
+    }
+    if (params.preOrder !== undefined) {
+      query = query.eq('is_pre_order', params.preOrder);
     }
 
     // Apply sorting
@@ -102,6 +106,9 @@ export const getProducts = async (params: GetProductsParams = {}): Promise<Produ
           fallbackQuery = fallbackQuery.eq('is_pre_order', false);
         }
       }
+      if (params.preOrder !== undefined) {
+        fallbackQuery = fallbackQuery.eq('is_pre_order', params.preOrder);
+      }
       
       const { data: productsOnly, error: fallbackError } = await fallbackQuery
         .order('created_at', { ascending: false })
@@ -121,6 +128,9 @@ export const getProducts = async (params: GetProductsParams = {}): Promise<Produ
           if (params.featured === true) {
             basicQuery = basicQuery.eq('is_pre_order', false);
           }
+        }
+        if (params.preOrder !== undefined) {
+          basicQuery = basicQuery.eq('is_pre_order', params.preOrder);
         }
         
         const { data: productsBasic } = await basicQuery

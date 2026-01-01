@@ -134,17 +134,6 @@ export default function SearchPage() {
           <h1 className="text-2xl font-bold text-[#1A1A1A] mb-4">
             {query ? `Search Results for "${query}"` : 'Search Products'}
           </h1>
-          
-          {/* Search Bar */}
-          <div className="max-w-2xl">
-            <SearchBar
-              placeholder="Search products, categories, brands..."
-              onSearch={(searchQuery) => {
-                window.history.pushState({}, '', `/search?q=${encodeURIComponent(searchQuery)}`);
-                searchProducts(searchQuery);
-              }}
-            />
-          </div>
         </div>
 
         {/* Results Summary */}
@@ -152,7 +141,7 @@ export default function SearchPage() {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
               <p className="text-sm text-gray-600">
-                {isLoading ? 'Searching...' : `${searchResults.total} results found`}
+                {isLoading ? 'Searching...' : `${searchResults.total || searchResults.products.length} results found`}
               </p>
               
               {/* Active Filters */}

@@ -32,13 +32,14 @@ export const searchService = {
       }
 
       // Build the search query - search in product fields first
+      // Note: count with relationships can be problematic, so we'll use products.length as fallback
       let searchQuery = supabase
         .from('products')
         .select(`
           *,
           category:categories!products_category_id_fkey(name, slug),
           brand:brands!products_brand_id_fkey(name, slug)
-        `)
+        `, { count: 'exact' })
         .or(`name.ilike.%${query}%,description.ilike.%${query}%,sku.ilike.%${query}%`);
 
       // Also search for products by category and brand names
@@ -177,7 +178,7 @@ export const searchService = {
 
       return {
         products: transformedProducts,
-        total: count || 0,
+        total: count || transformedProducts.length || 0,
         categories,
         brands
       };
