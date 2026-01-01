@@ -76,7 +76,7 @@ export function BulkOrderContent() {
         </div>
         <div className="container mx-auto px-4 text-center relative z-10">
           <h1 className="bulk-order-header-title text-3xl sm:text-4xl md:text-5xl font-bold mb-4" style={{ color: '#ffffff' }}>
-            VENTECH Bulk Order Request
+            Bulk Order Request
           </h1>
           <p className="bulk-order-header-subtitle text-lg md:text-xl max-w-2xl mx-auto mt-4" style={{ color: '#ffffff' }}>
             Smart sourcing for large-scale tech needs
@@ -121,7 +121,7 @@ export function BulkOrderContent() {
       {/* Form Section */}
       <section className="container mx-auto px-4 py-12">
         <div className="max-w-3xl mx-auto">
-          <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 md:p-10">
+          <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 md:p-10 border border-gray-200">
             <form onSubmit={handleSubmit} className="space-y-8">
               {/* 1. Contact Info */}
               <div>

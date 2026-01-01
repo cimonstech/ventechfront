@@ -111,3 +111,12 @@ p {
 .about-header p {
   color: #ffffff !important;
 }
+
+/* Force white text for Exclusive VIP cards */
+.exclusive-vip-card,
+.exclusive-vip-card p,
+.exclusive-vip-card span,
+.exclusive-vip-card h4,
+.exclusive-vip-card div {
+  color: #ffffff !important;
+}

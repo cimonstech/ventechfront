@@ -226,7 +226,7 @@ export default function LaptopBankingPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.open('https://files.ventechgadgets.com/laptopbanking.pdf', '_blank', 'noopener,noreferrer')}
+              onClick={() => window.open('https://files.ventechgadgets.com/VENTECH%20LAPTOP%20BANKING%20INVESTMENT%20AGREEMENT.pdf', '_blank', 'noopener,noreferrer')}
               className="w-full px-3 py-2 sm:px-4 sm:py-2 text-sm border-2 border-[#FF7A19] text-[#FF7A19] hover:!bg-[#FF7A19] hover:!text-white transition-colors"
             >
               Learn More
@@ -237,7 +237,7 @@ export default function LaptopBankingPage() {
               onClick={() => window.open('https://files.ventechgadgets.com/VENTECH%20LAPTOP%20BANKING%20INVESTMENT%20AGREEMENT.pdf', '_blank', 'noopener,noreferrer')}
               className="w-full px-3 py-2 sm:px-4 sm:py-2 text-sm border-2 border-[#FF7A19] text-[#FF7A19] hover:!bg-[#FF7A19] hover:!text-white transition-colors"
             >
-              Agreement
+              Read Agreement
             </Button>
           </div>
         </div>
@@ -419,27 +419,27 @@ export default function LaptopBankingPage() {
             </div>
             <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
               {exclusiveBankingTiers.map((tier) => (
-                <div key={tier.name} className="bg-gradient-to-br from-[#1A1A1A] to-[#3A3A3A] rounded-xl p-4 md:p-6 border-2 border-[#FF7A19] text-white">
+                <div key={tier.name} className="exclusive-vip-card bg-gradient-to-br from-[#1A1A1A] to-[#3A3A3A] rounded-xl p-4 md:p-6 border-2 border-[#FF7A19] text-white">
                   <div className="inline-flex items-center gap-2 bg-[#FF7A19] rounded-full px-2 md:px-3 py-1 mb-3 md:mb-4">
                     <Award className="w-3 h-3 md:w-[14px] md:h-[14px]" />
                     <span className="text-[10px] md:text-xs font-semibold">EXCLUSIVE</span>
                   </div>
                   <h4 className="font-bold text-lg md:text-xl mb-3 md:mb-4">{tier.name}</h4>
                   <div className="mb-4 md:mb-6">
-                    <p className="text-xs md:text-sm text-white/80 mb-1 md:mb-2">Investment</p>
-                    <p className="text-xl md:text-2xl font-bold text-[#FF7A19]">GHS {tier.investment.toLocaleString()}</p>
+                    <p className="text-xs md:text-sm text-white mb-1 md:mb-2" style={{ color: '#ffffff' }}>Investment</p>
+                    <p className="text-xl md:text-2xl font-bold text-white" style={{ color: '#ffffff' }}>GHS {tier.investment.toLocaleString()}</p>
                   </div>
                   <div className="space-y-2 md:space-y-3 mb-4 md:mb-6">
                     <div className="flex justify-between text-xs md:text-sm">
-                      <span className="text-white/80">Term 1 (8%)</span>
-                      <span className="font-semibold">GHS {tier.term1.toLocaleString()}</span>
+                      <span className="text-white" style={{ color: '#ffffff' }}>Term 1 (8%)</span>
+                      <span className="font-semibold text-white" style={{ color: '#ffffff' }}>GHS {tier.term1.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-xs md:text-sm">
-                      <span className="text-white/80">Term 2 (9%)</span>
-                      <span className="font-semibold">GHS {tier.term2.toLocaleString()}</span>
+                      <span className="text-white" style={{ color: '#ffffff' }}>Term 2 (9%)</span>
+                      <span className="font-semibold text-white" style={{ color: '#ffffff' }}>GHS {tier.term2.toLocaleString()}</span>
                     </div>
                     <div className="border-t border-white/20 pt-2 md:pt-3 flex justify-between">
-                      <span className="font-bold text-sm md:text-base">Total Return</span>
+                      <span className="font-bold text-sm md:text-base text-white" style={{ color: '#ffffff' }}>Total Return</span>
                       <span className="font-bold text-[#FF7A19] text-base md:text-lg">GHS {tier.total.toLocaleString()}</span>
                     </div>
                   </div>
