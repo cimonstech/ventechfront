@@ -226,7 +226,7 @@ export default function LaptopBankingPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.open('https://files.ventechgadgets.com/VENTECH%20LAPTOP%20BANKING%20INVESTMENT%20AGREEMENT.pdf', '_blank', 'noopener,noreferrer')}
+              onClick={() => window.open('https://files.ventechgadgets.com/laptopbanking.pdf', '_blank', 'noopener,noreferrer')}
               className="w-full px-3 py-2 sm:px-4 sm:py-2 text-sm border-2 border-[#FF7A19] text-[#FF7A19] hover:!bg-[#FF7A19] hover:!text-white transition-colors"
             >
               Learn More
