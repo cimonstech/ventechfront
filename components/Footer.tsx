@@ -232,7 +232,16 @@ export function Footer() {
 
         <div className="border-t border-gray-800 pt-6 text-center">
           <p className="text-sm text-gray-400">
-            &copy; {new Date().getFullYear()} {storeName}. All rights reserved.
+            &copy; {new Date().getFullYear()} {storeName}. All rights reserved.{' '}
+            <span className="text-[#FF7A19]">Powered by </span>
+            <a 
+              href="https://cimonstechnologies.com" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-[#FFB84D] hover:text-[#FFC966] transition-colors"
+            >
+              Cimons Tech
+            </a>
           </p>
         </div>
       </div>

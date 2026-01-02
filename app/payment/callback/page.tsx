@@ -343,10 +343,10 @@ export default function PaymentCallbackPage() {
               setStatus('success');
               if (orders.length > 1) {
                 setMessage(`Payment successful! ${orders.length} orders have been created.`);
-                toast.success(`${orders.length} orders created successfully!`);
+                toast.success(`${orders.length} orders created successfully! Check your email for confirmation. We'll also call you to confirm your order.`, { duration: 5000 });
               } else {
                 setMessage('Payment successful! Your order has been created.');
-                toast.success(`Order ${firstOrder.order_number || firstOrder.id} created successfully!`);
+                toast.success(`Order ${firstOrder.order_number || firstOrder.id} created successfully! Check your email for confirmation. We'll also call you to confirm your order.`, { duration: 5000 });
               }
               
               // Redirect to order detail page

@@ -64,31 +64,44 @@ export function BulkOrderContent() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}
-      <section className="relative bg-gradient-to-r from-[#FF7A19] to-[#FF9A19] py-12 sm:py-16 overflow-hidden">
+      <section className="relative bg-gradient-to-b from-[#FF7A19] via-[#FF8C3A] to-[#D2691E] text-white py-20 md:py-28 overflow-hidden">
+        {/* Background Image Overlay */}
         <div className="absolute inset-0">
           <Image
             src="/bulkrequest.jpeg"
             alt="Bulk Order"
             fill
-            className="object-cover opacity-20"
+            className="object-cover opacity-30"
             priority
+            sizes="100vw"
           />
+          {/* Gradient Overlay for better text readability */}
+          <div className="absolute inset-0 bg-gradient-to-b from-[#FF7A19]/90 via-[#FF8C3A]/85 to-[#D2691E]/90"></div>
+        </div>
+        {/* Texture Pattern */}
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute inset-0" style={{
+            backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
+            backgroundSize: '40px 40px'
+          }}></div>
         </div>
         <div className="container mx-auto px-4 text-center relative z-10">
-          <h1 className="bulk-order-header-title text-3xl sm:text-4xl md:text-5xl font-bold mb-4" style={{ color: '#ffffff' }}>
-            Bulk Order Request
-          </h1>
-          <p className="bulk-order-header-subtitle text-lg md:text-xl max-w-2xl mx-auto mt-4" style={{ color: '#ffffff' }}>
-            Smart sourcing for large-scale tech needs
-          </p>
-          <p className="bulk-order-header-description text-base md:text-lg max-w-3xl mx-auto mt-4" style={{ color: '#ffffff' }}>
-            Need laptops, smartphones, or gadgets in bulk? VENTECH makes bulk procurement simple, secure, and cost-effective. Whether you&apos;re equipping an office, school, organization, or resale business, we provide genuine devices at competitive supplier prices—delivered on time.
-          </p>
+          <div className="max-w-3xl mx-auto">
+            <h1 className="bulk-order-header-title text-4xl md:text-5xl lg:text-6xl font-bold mb-4 drop-shadow-lg" style={{ color: '#ffffff' }}>
+              Bulk Order Request
+            </h1>
+            <p className="bulk-order-header-subtitle text-lg md:text-xl max-w-2xl mx-auto mb-4 leading-relaxed drop-shadow-md" style={{ color: '#ffffff' }}>
+              Smart sourcing for large-scale tech needs
+            </p>
+            <p className="bulk-order-header-description text-base md:text-lg max-w-3xl mx-auto mb-8 leading-relaxed drop-shadow-md" style={{ color: '#ffffff' }}>
+              Need laptops, smartphones, or gadgets in bulk? VENTECH makes bulk procurement simple, secure, and cost-effective. Whether you&apos;re equipping an office, school, organization, or resale business, we provide genuine devices at competitive supplier prices—delivered on time.
+            </p>
+          </div>
         </div>
       </section>
 
       {/* Value Highlights */}
-      <section className="bg-white py-8 md:py-12 border-b border-gray-200">
+      <section className="bg-white py-8 md:py-12 border-b border-gray-200 rounded-t-3xl -mt-10 md:-mt-16 relative z-20">
         <div className="container mx-auto px-4">
           <h2 className="text-2xl md:text-3xl font-bold text-[#1A1A1A] text-center mb-6 md:mb-8">
             Why Choose VENTECH for Bulk Orders?

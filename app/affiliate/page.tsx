@@ -87,46 +87,44 @@ export default function AffiliatePage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}
-      <section className="relative text-white py-12 md:py-20 lg:py-24 overflow-hidden">
-        {/* Background Image with Orange Overlay */}
-        <div className="absolute inset-0 pointer-events-none">
-          {/* Orange Background - hidden on mobile, visible on desktop */}
-          <div className="hidden md:block absolute inset-0 bg-[#FF7A19] z-0"></div>
-          
-          {/* Image - full width on mobile, starts from middle on desktop */}
-          <div className="absolute inset-0 md:left-1/2 md:right-0 top-0 bottom-0 z-0">
-            <div className="relative w-full h-full">
-              <Image
-                src="/affiliate-.webp"
-                alt="VENTECH Affiliate Program"
-                fill
-                sizes="(max-width: 768px) 100vw, 50vw"
-                className="object-cover"
-                priority
-              />
-              {/* Orange Overlay - full on mobile, partial on desktop */}
-              <div className="absolute inset-0 bg-[#FF7A19]/80 md:bg-[#FF7A19]/60"></div>
-            </div>
-          </div>
+      <section className="relative bg-gradient-to-b from-[#FF7A19] via-[#FF8C3A] to-[#D2691E] text-white py-20 md:py-28 overflow-hidden">
+        {/* Background Image Overlay */}
+        <div className="absolute inset-0">
+          <Image
+            src="/affiliate-.webp"
+            alt="VENTECH Affiliate Program"
+            fill
+            className="object-cover opacity-30"
+            priority
+            sizes="100vw"
+          />
+          {/* Gradient Overlay for better text readability */}
+          <div className="absolute inset-0 bg-gradient-to-b from-[#FF7A19]/90 via-[#FF8C3A]/85 to-[#D2691E]/90"></div>
         </div>
-        
-        <div className="container mx-auto px-4 relative z-20">
-          <div className="max-w-2xl md:max-w-3xl">
+        {/* Texture Pattern */}
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute inset-0" style={{
+            backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
+            backgroundSize: '40px 40px'
+          }}></div>
+        </div>
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="max-w-2xl md:max-w-3xl mx-auto text-center">
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-3 md:px-4 py-2 mb-4 md:mb-6">
+            <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-3 md:px-4 py-2 mb-6">
               <Laptop className="w-4 h-4 md:w-[18px] md:h-[18px]" />
               <span className="text-xs md:text-sm font-semibold">Partner with VENTECH</span>
             </div>
             
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 leading-tight text-white md:text-white">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4 drop-shadow-lg">
               Crush It as a Ventech Gadgets Affiliate
             </h1>
             
-            <p className="text-lg sm:text-xl md:text-2xl mb-6 md:mb-8 text-white leading-relaxed">
+            <p className="text-lg md:text-xl mb-8 leading-relaxed drop-shadow-md">
               Turn your following into income. Promote the tech everyone wants. Earn for every sale you make.
             </p>
             
-            <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
+            <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-center">
               <Button 
                 variant="secondary" 
                 size="lg" 
@@ -150,7 +148,7 @@ export default function AffiliatePage() {
       </section>
 
       {/* Why Partner with Ventech */}
-      <section className="py-12 md:py-16 bg-white">
+      <section className="py-12 md:py-16 bg-white rounded-t-3xl -mt-10 md:-mt-16 relative z-20">
         <div className="container mx-auto px-4">
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#1A1A1A] text-center mb-8 md:mb-12">
             Why Partner with Ventech

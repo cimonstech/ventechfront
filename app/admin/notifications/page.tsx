@@ -164,9 +164,10 @@ export default function NotificationsPage() {
 
   const markAsRead = async (notificationId: string) => {
     try {
+      // Only update is_read - read_at column may not exist in schema
       const { error } = await supabase
         .from('notifications')
-        .update({ is_read: true, read_at: new Date().toISOString() })
+        .update({ is_read: true })
         .eq('id', notificationId);
 
       if (error) {
@@ -181,7 +182,17 @@ export default function NotificationsPage() {
         )
       );
     } catch (error) {
-      console.error('Error marking notification as read:', error);
+      // Only log meaningful error messages
+      if (process.env.NODE_ENV === 'development') {
+        const errorObj = error as any;
+        const errorMessage = errorObj?.message || errorObj?.details || errorObj?.hint || errorObj?.error_description || '';
+        
+        // Only log if we have a meaningful error message
+        if (errorMessage && typeof errorMessage === 'string' && errorMessage.trim() !== '' && errorMessage !== '{}') {
+          console.error('Error marking notification as read:', errorMessage);
+        }
+        // Don't log if error is empty or has no meaningful message
+      }
     }
   };
 
@@ -190,20 +201,41 @@ export default function NotificationsPage() {
       const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
       if (unreadIds.length === 0) return;
       
+      // Only update is_read - read_at column may not exist in schema
       const { error } = await supabase
         .from('notifications')
-        .update({ is_read: true, read_at: new Date().toISOString() })
+        .update({ is_read: true })
         .in('id', unreadIds);
 
       if (error) {
-        if (error.code === '42P01') return; // Table doesn't exist
+        // Check if it's a "table doesn't exist" or "column doesn't exist" error
+        const errorMessage = error.message || '';
+        if (
+          error.code === '42P01' ||
+          error.code === 'PGRST116' ||
+          errorMessage.includes('does not exist') ||
+          errorMessage.includes('schema cache') ||
+          errorMessage.includes('column')
+        ) {
+          return; // Table or column doesn't exist - silently fail
+        }
         throw error;
       }
 
       // Update local state
       setNotifications(notifications.map((n) => ({ ...n, is_read: true })));
     } catch (error) {
-      console.error('Error marking all as read:', error);
+      // Only log meaningful error messages
+      if (process.env.NODE_ENV === 'development') {
+        const errorObj = error as any;
+        const errorMessage = errorObj?.message || errorObj?.details || errorObj?.hint || errorObj?.error_description || '';
+        
+        // Only log if we have a meaningful error message
+        if (errorMessage && typeof errorMessage === 'string' && errorMessage.trim() !== '' && errorMessage !== '{}') {
+          console.error('Error marking all as read:', errorMessage);
+        }
+        // Don't log if error is empty or has no meaningful message
+      }
     }
   };
 
@@ -222,7 +254,17 @@ export default function NotificationsPage() {
       // Update local state
       setNotifications(notifications.filter((n) => n.id !== notificationId));
     } catch (error) {
-      console.error('Error deleting notification:', error);
+      // Only log meaningful error messages
+      if (process.env.NODE_ENV === 'development') {
+        const errorObj = error as any;
+        const errorMessage = errorObj?.message || errorObj?.details || errorObj?.hint || errorObj?.error_description || '';
+        
+        // Only log if we have a meaningful error message
+        if (errorMessage && typeof errorMessage === 'string' && errorMessage.trim() !== '' && errorMessage !== '{}') {
+          console.error('Error deleting notification:', errorMessage);
+        }
+        // Don't log if error is empty or has no meaningful message
+      }
     }
   };
 

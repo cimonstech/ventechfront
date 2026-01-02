@@ -112,6 +112,13 @@ p {
   color: #ffffff !important;
 }
 
+/* Force white text for About page hero section */
+.about-hero-section h1,
+.about-hero-section p,
+.about-hero-section * {
+  color: #ffffff !important;
+}
+
 /* Force white text for Exclusive VIP cards */
 .exclusive-vip-card,
 .exclusive-vip-card p,

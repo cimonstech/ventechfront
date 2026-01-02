@@ -547,9 +547,9 @@ export default function CheckoutPage() {
       } else {
         // All orders succeeded
         if (hasMixedCart) {
-          toast.success(`Both orders placed successfully! You will receive confirmation emails shortly.`);
+          toast.success(`Both orders placed successfully! Check your email for confirmation. We'll also call you to confirm your order.`, { duration: 5000 });
         } else {
-          toast.success('Order placed successfully! You will receive a confirmation email shortly.');
+          toast.success('Order placed successfully! Check your email for confirmation. We\'ll also call you to confirm your order.', { duration: 5000 });
         }
       }
 

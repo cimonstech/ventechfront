@@ -51,11 +51,20 @@ export function MediaPicker({
     try {
       setLoading(true);
       const mediaFiles = await mediaService.listFiles(folder);
+      console.log(`📸 Fetched ${mediaFiles.length} files from folder: ${folder || 'all'}`);
       setFiles(mediaFiles);
       setFilteredFiles(mediaFiles);
+      
+      if (mediaFiles.length === 0 && folder) {
+        console.warn(`⚠️ No files found in folder: ${folder}. Check if files exist in R2 bucket.`);
+      }
     } catch (error: any) {
       console.error('Error fetching files:', error);
-      toast.error(error.message || 'Failed to fetch media files');
+      const errorMessage = error?.message || 'Failed to fetch media files';
+      toast.error(errorMessage);
+      // Set empty arrays on error
+      setFiles([]);
+      setFilteredFiles([]);
     } finally {
       setLoading(false);
     }

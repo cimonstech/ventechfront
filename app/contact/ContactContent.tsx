@@ -89,35 +89,33 @@ export function ContactContent() {
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
-      <section className="relative text-white py-12 md:py-20 lg:py-24 overflow-hidden">
-        {/* Background Image with Orange Overlay */}
-        <div className="absolute inset-0 pointer-events-none">
-          {/* Orange Background - hidden on mobile, visible on desktop */}
-          <div className="hidden md:block absolute inset-0 bg-[#FF7A19] z-0"></div>
-          
-          {/* Image - full width on mobile, starts from middle on desktop */}
-          <div className="absolute inset-0 md:left-1/2 md:right-0 top-0 bottom-0 z-0">
-            <div className="relative w-full h-full">
-              <Image
-                src="/contactpageimage.webp"
-                alt="Contact VENTECH"
-                fill
-                sizes="(max-width: 768px) 100vw, 50vw"
-                className="object-cover"
-                priority
-              />
-              {/* Orange Overlay - full on mobile, partial on desktop */}
-              <div className="absolute inset-0 bg-[#FF7A19]/80 md:bg-[#FF7A19]/60"></div>
-            </div>
-          </div>
+      <section className="relative bg-gradient-to-b from-[#FF7A19] via-[#FF8C3A] to-[#D2691E] text-white py-20 md:py-28 overflow-hidden">
+        {/* Background Image Overlay */}
+        <div className="absolute inset-0">
+          <Image
+            src="/contactpageimage.webp"
+            alt="Contact VENTECH"
+            fill
+            className="object-cover opacity-30"
+            priority
+            sizes="100vw"
+          />
+          {/* Gradient Overlay for better text readability */}
+          <div className="absolute inset-0 bg-gradient-to-b from-[#FF7A19]/90 via-[#FF8C3A]/85 to-[#D2691E]/90"></div>
         </div>
-        
-        <div className="container mx-auto px-4 relative z-20">
+        {/* Texture Pattern */}
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute inset-0" style={{
+            backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
+            backgroundSize: '40px 40px'
+          }}></div>
+        </div>
+        <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-2xl md:max-w-3xl mx-auto text-center">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 leading-tight text-white">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4 drop-shadow-lg">
               Get in Touch
             </h1>
-            <p className="text-lg sm:text-xl md:text-2xl text-white leading-relaxed">
+            <p className="text-lg md:text-xl mb-8 leading-relaxed drop-shadow-md">
               Have a questions or need assistance? We&apos;re here to help. Reach out us anytime!
             </p>
           </div>
@@ -125,7 +123,7 @@ export function ContactContent() {
       </section>
 
       {/* Reach Out to Ventech Section */}
-      <section className="bg-gray-50 py-12 md:py-16">
+      <section className="bg-gray-50 py-12 md:py-16 rounded-t-3xl -mt-10 md:-mt-16 relative z-20">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center mb-8 md:mb-12">
             <h2 className="text-2xl md:text-3xl font-bold text-[#1A1A1A] mb-3">Reach Out to Ventech</h2>

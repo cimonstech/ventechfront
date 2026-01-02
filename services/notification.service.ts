@@ -57,7 +57,7 @@ export const notificationService = {
     } catch (error) {
       // Silently handle notification errors - notifications are non-critical
       if (process.env.NODE_ENV === 'development') {
-        const errorMessage = (error as any)?.message || JSON.stringify(error);
+        const errorMessage = (error as any)?.message || (error as any)?.details || (error as any)?.hint || 'Unknown error';
         const errorCode = (error as any)?.code || '';
         
         // Only log if it's not a "table doesn't exist" error
@@ -68,7 +68,10 @@ export const notificationService = {
           !errorMessage.includes('relation') &&
           !errorMessage.includes('not found')
         ) {
-          console.error('Error creating notification:', error);
+          // Only log meaningful error messages
+          if (errorMessage && errorMessage !== 'Unknown error' && errorMessage !== '{}') {
+            console.error('Error creating notification:', errorMessage);
+          }
         }
       }
       return null;
@@ -120,29 +123,44 @@ export const notificationService = {
   // Send low stock email to admin
   async sendLowStockEmail(productName: string, stockQuantity: number): Promise<void> {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/admin/send-email`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/admin/send-email`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           type: 'low_stock',
-          to: 'ventechgadget@gmail.com',
+          to: 'ventechgadgets@gmail.com',
           productName,
           stockQuantity,
         }),
       });
 
       if (!response.ok) {
-        // Silently handle email errors - emails are non-critical
+        // Check if endpoint doesn't exist (404) - silently skip
+        if (response.status === 404) {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('Email endpoint not found. Low stock emails are disabled.');
+          }
+          return;
+        }
+        
+        // For other errors, log in development only
         if (process.env.NODE_ENV === 'development') {
-          console.error('Failed to send low stock email');
+          const errorText = await response.text().catch(() => 'Unknown error');
+          console.error('Failed to send low stock email:', response.status, errorText);
         }
       }
     } catch (error) {
       // Silently handle email errors - emails are non-critical
+      // Only log network errors in development
       if (process.env.NODE_ENV === 'development') {
-        console.error('Error sending low stock email:', error);
+        const errorMessage = (error as any)?.message || 'Network error';
+        // Don't log if it's just a missing endpoint
+        if (!errorMessage.includes('fetch') || errorMessage.includes('Failed to fetch')) {
+          console.warn('Email service unavailable:', errorMessage);
+        }
       }
     }
   },
@@ -150,23 +168,43 @@ export const notificationService = {
   // Send out of stock email to admin
   async sendOutOfStockEmail(productName: string): Promise<void> {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/admin/send-email`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/admin/send-email`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           type: 'out_of_stock',
-          to: 'ventechgadget@gmail.com',
+          to: 'ventechgadgets@gmail.com',
           productName,
         }),
       });
 
       if (!response.ok) {
-        console.error('Failed to send out of stock email');
+        // Check if endpoint doesn't exist (404) - silently skip
+        if (response.status === 404) {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('Email endpoint not found. Out of stock emails are disabled.');
+          }
+          return;
+        }
+        
+        // For other errors, log in development only
+        if (process.env.NODE_ENV === 'development') {
+          const errorText = await response.text().catch(() => 'Unknown error');
+          console.error('Failed to send out of stock email:', response.status, errorText);
+        }
       }
     } catch (error) {
-      console.error('Error sending out of stock email:', error);
+      // Silently handle email errors - emails are non-critical
+      if (process.env.NODE_ENV === 'development') {
+        const errorMessage = (error as any)?.message || 'Network error';
+        // Don't log if it's just a missing endpoint
+        if (!errorMessage.includes('fetch') || errorMessage.includes('Failed to fetch')) {
+          console.warn('Email service unavailable:', errorMessage);
+        }
+      }
     }
   },
 
@@ -179,10 +217,32 @@ export const notificationService = {
         .order('created_at', { ascending: false })
         .limit(limit);
 
-      if (error) throw error;
+      if (error) {
+        // Check if it's a "table doesn't exist" error
+        const errorMessage = error.message || '';
+        const errorCode = (error as any).code || '';
+        
+        if (
+          errorCode === '42P01' ||
+          errorCode === 'PGRST116' ||
+          errorMessage.includes('does not exist') ||
+          errorMessage.includes('relation') ||
+          errorMessage.includes('not found')
+        ) {
+          // Table doesn't exist - return empty array
+          return [];
+        }
+        throw error;
+      }
       return data || [];
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      // Only log meaningful error messages
+      if (process.env.NODE_ENV === 'development') {
+        const errorMessage = (error as any)?.message || (error as any)?.details || (error as any)?.hint || 'Unknown error';
+        if (errorMessage && errorMessage !== 'Unknown error' && errorMessage !== '{}') {
+          console.error('Error fetching notifications:', errorMessage);
+        }
+      }
       return [];
     }
   },
@@ -195,10 +255,32 @@ export const notificationService = {
         .select('*', { count: 'exact', head: true })
         .eq('is_read', false);
 
-      if (error) throw error;
+      if (error) {
+        // Check if it's a "table doesn't exist" error
+        const errorMessage = error.message || '';
+        const errorCode = (error as any).code || '';
+        
+        if (
+          errorCode === '42P01' ||
+          errorCode === 'PGRST116' ||
+          errorMessage.includes('does not exist') ||
+          errorMessage.includes('relation') ||
+          errorMessage.includes('not found')
+        ) {
+          // Table doesn't exist - return 0
+          return 0;
+        }
+        throw error;
+      }
       return count || 0;
     } catch (error) {
-      console.error('Error fetching unread count:', error);
+      // Only log meaningful error messages
+      if (process.env.NODE_ENV === 'development') {
+        const errorMessage = (error as any)?.message || (error as any)?.details || (error as any)?.hint || 'Unknown error';
+        if (errorMessage && errorMessage !== 'Unknown error' && errorMessage !== '{}') {
+          console.error('Error fetching unread count:', errorMessage);
+        }
+      }
       return 0;
     }
   },
@@ -206,34 +288,87 @@ export const notificationService = {
   // Mark notification as read
   async markAsRead(notificationId: string): Promise<void> {
     try {
+      // Only update is_read - read_at column may not exist in schema
       const { error } = await supabase
         .from('notifications')
         .update({
           is_read: true,
-          read_at: new Date().toISOString(),
         })
         .eq('id', notificationId);
 
-      if (error) throw error;
+      if (error) {
+        // Check if it's a "table doesn't exist" error
+        const errorMessage = error.message || '';
+        const errorCode = (error as any).code || '';
+        
+        if (
+          errorCode === '42P01' ||
+          errorCode === 'PGRST116' ||
+          errorMessage.includes('does not exist') ||
+          errorMessage.includes('relation') ||
+          errorMessage.includes('not found') ||
+          errorMessage.includes('schema cache') ||
+          errorMessage.includes('column')
+        ) {
+          // Table or column doesn't exist - silently fail
+          return;
+        }
+        throw error;
+      }
     } catch (error) {
-      console.error('Error marking notification as read:', error);
+      // Only log meaningful error messages
+      if (process.env.NODE_ENV === 'development') {
+        // Extract error message from various possible locations
+        const errorObj = error as any;
+        const errorMessage = errorObj?.message || errorObj?.details || errorObj?.hint || errorObj?.error_description || '';
+        
+        // Only log if we have a meaningful error message
+        if (errorMessage && typeof errorMessage === 'string' && errorMessage.trim() !== '' && errorMessage !== '{}') {
+          console.error('Error marking notification as read:', errorMessage);
+        }
+        // Don't log if error is empty or has no meaningful message
+      }
     }
   },
 
   // Mark all as read
   async markAllAsRead(): Promise<void> {
     try {
+      // Only update is_read - read_at column may not exist in schema
       const { error } = await supabase
         .from('notifications')
         .update({
           is_read: true,
-          read_at: new Date().toISOString(),
         })
         .eq('is_read', false);
 
-      if (error) throw error;
+      if (error) {
+        // Check if it's a "table doesn't exist" error
+        const errorMessage = error.message || '';
+        const errorCode = (error as any).code || '';
+        
+        if (
+          errorCode === '42P01' ||
+          errorCode === 'PGRST116' ||
+          errorMessage.includes('does not exist') ||
+          errorMessage.includes('relation') ||
+          errorMessage.includes('not found') ||
+          errorMessage.includes('schema cache') ||
+          errorMessage.includes('column')
+        ) {
+          // Table or column doesn't exist - silently fail
+          return;
+        }
+        throw error;
+      }
     } catch (error) {
-      console.error('Error marking all notifications as read:', error);
+      // Only log meaningful error messages
+      if (process.env.NODE_ENV === 'development') {
+        const errorMessage = (error as any)?.message || (error as any)?.details || (error as any)?.hint || 'Unknown error';
+        if (errorMessage && errorMessage !== 'Unknown error' && errorMessage !== '{}') {
+          console.error('Error marking all notifications as read:', errorMessage);
+        }
+      }
     }
   },
 };

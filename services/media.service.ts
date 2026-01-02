@@ -22,16 +22,31 @@ export const mediaService = {
       if (folder) params.append('folder', folder);
       if (maxKeys) params.append('maxKeys', maxKeys.toString());
 
-      const response = await fetch(`${API_URL}/api/upload/list?${params.toString()}`);
+      const url = `${API_URL}/api/upload/list?${params.toString()}`;
+      console.log(`📡 Fetching media files from: ${url}`);
+      
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        console.error(`❌ API error (${response.status}):`, errorText);
+        throw new Error(`Failed to fetch files: ${response.status} ${response.statusText}`);
+      }
+      
       const data: MediaListResponse = await response.json();
+      console.log(`✅ API response:`, { success: data.success, count: data.count, files: data.files?.length || 0 });
 
       if (data.success && data.files) {
+        console.log(`📦 Returning ${data.files.length} files`);
         return data.files;
       }
 
-      throw new Error(data.error || 'Failed to list files');
+      const errorMsg = data.error || 'Failed to list files';
+      console.error(`❌ API returned error:`, errorMsg);
+      throw new Error(errorMsg);
     } catch (error) {
       console.error('Error listing media files:', error);
+      // Return empty array instead of throwing to prevent UI crashes
       return [];
     }
   },

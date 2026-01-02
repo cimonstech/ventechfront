@@ -362,7 +362,7 @@ export function SidebarAdModal({ isOpen, onClose, ad, onSuccess }: SidebarAdModa
             setFormData(prev => ({ ...prev, image_url: url }));
             setShowMediaPicker(false);
           }}
-          folder="uploads"
+          folder="sidebar-ads"
         />
 
         {/* Product Picker */}

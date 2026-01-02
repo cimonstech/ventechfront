@@ -16,58 +16,53 @@ export function AboutContent() {
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
-      <section className="about-header relative overflow-hidden" style={{ paddingTop: '2.5rem', paddingBottom: '2.5rem', minHeight: 'auto' }}>
-        {/* Background Image with Dark Orange/Brown Overlay */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute inset-0 z-0">
-            <div className="relative w-full h-full">
-              <Image
-                src="/affiliatepageimage.webp"
-                alt="About VENTECH"
-                fill
-                sizes="100vw"
-                className="object-cover object-center"
-                priority
-              />
-              {/* Dark Orange/Brown Overlay - textured wood-like appearance */}
-              <div className="absolute inset-0 bg-gradient-to-b from-[#8B4513]/85 via-[#A0522D]/90 to-[#654321]/85"></div>
-              {/* Texture pattern for wood-like effect */}
-              <div className="absolute inset-0 opacity-40" style={{
-                backgroundImage: `
-                  repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(0,0,0,0.1) 2px, rgba(0,0,0,0.1) 4px),
-                  repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.05) 2px, rgba(0,0,0,0.05) 4px)
-                `,
-              }}></div>
-            </div>
-          </div>
+      <section className="about-hero-section relative bg-gradient-to-b from-[#FF7A19] via-[#FF8C3A] to-[#D2691E] text-white py-20 md:py-28 overflow-hidden">
+        {/* Background Image Overlay */}
+        <div className="absolute inset-0">
+          <Image
+            src="/affiliatepageimage.webp"
+            alt="About VENTECH"
+            fill
+            className="object-cover opacity-30"
+            priority
+            sizes="100vw"
+          />
+          {/* Gradient Overlay for better text readability */}
+          <div className="absolute inset-0 bg-gradient-to-b from-[#FF7A19]/90 via-[#FF8C3A]/85 to-[#D2691E]/90"></div>
         </div>
-        
-        <div className="container mx-auto px-4 sm:px-6 relative z-20">
+        {/* Texture Pattern */}
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute inset-0" style={{
+            backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
+            backgroundSize: '40px 40px'
+          }}></div>
+        </div>
+        <div className="container mx-auto px-4 sm:px-6 relative z-10">
           <div className="max-w-4xl mx-auto text-center">
             {/* Heading */}
             <h1 
-              className="text-base sm:text-xl md:text-2xl lg:text-3xl font-bold mb-4 md:mb-5 tracking-wide uppercase"
+              className="text-base sm:text-xl md:text-2xl lg:text-3xl font-bold mb-6 tracking-wide uppercase drop-shadow-lg"
               style={{ color: '#ffffff !important' }}
             >
               ABOUT VENTECH
             </h1>
             
             {/* Tagline - Large, Bold White Text with proper spacing */}
-            <div className="space-y-2 md:space-y-2.5 mb-4 md:mb-5">
+            <div className="space-y-2 md:space-y-3 mb-6">
               <p 
-                className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight"
+                className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight drop-shadow-lg"
                 style={{ color: '#ffffff !important' }}
               >
                 Trusted Technology.
               </p>
               <p 
-                className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight"
+                className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight drop-shadow-lg"
                 style={{ color: '#ffffff !important' }}
               >
                 Built for Performance.
               </p>
               <p 
-                className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight"
+                className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight drop-shadow-lg"
                 style={{ color: '#ffffff !important' }}
               >
                 Priced for Access.
@@ -76,7 +71,7 @@ export function AboutContent() {
             
             {/* Description Paragraph */}
             <p 
-              className="text-base sm:text-lg md:text-xl leading-relaxed max-w-3xl mx-auto font-light"
+              className="text-base sm:text-lg md:text-xl leading-relaxed max-w-3xl mx-auto font-light mb-8 drop-shadow-md"
               style={{ color: '#ffffff !important' }}
             >
               VENTECH Gadgets is a Ghana-based technology brand delivering high-quality laptops and gadgets engineered for work, learning, and innovation.
@@ -86,7 +81,7 @@ export function AboutContent() {
       </section>
 
       {/* Intro Section with Image and Text */}
-      <section className="container mx-auto px-4 py-12 md:py-16">
+      <section className="container mx-auto px-4 py-12 md:py-16 bg-white rounded-t-3xl -mt-10 md:-mt-16 relative z-20">
         <div className="max-w-4xl mx-auto">
           {/* Mobile: Side by side */}
           <div className="grid md:grid-cols-1 gap-8 md:gap-12">
