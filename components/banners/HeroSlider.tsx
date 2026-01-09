@@ -73,7 +73,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
             <div className="max-w-2xl text-center">
               {banner.subtitle && (
                 <p 
-                  className="text-xs sm:text-sm md:text-base font-medium mb-2 uppercase tracking-wide text-white"
+                  className="text-xs sm:text-sm md:text-base font-medium mb-2 uppercase tracking-wide"
                   style={{ color: banner.text_color || '#FFFFFF' }}
                 >
                   {banner.subtitle}
@@ -81,7 +81,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
               )}
               {banner.title && (
                 <h2 
-                  className="text-xl sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-bold mb-4 text-white"
+                  className="text-xl sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-bold mb-4"
                   style={{ color: banner.text_color || '#FFFFFF' }}
                 >
                   {banner.title}
@@ -89,15 +89,36 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
               )}
               {banner.description && (
                 <p 
-                  className="text-xs sm:text-sm md:text-base lg:text-xl mb-6 max-w-xl mx-auto text-white"
+                  className="text-xs sm:text-sm md:text-base lg:text-xl mb-6 max-w-xl mx-auto"
                   style={{ color: banner.text_color || '#FFFFFF' }}
                 >
                   {banner.description}
                 </p>
               )}
-              {banner.link_url && banner.link_text && (
+              {banner.link_url && banner.button_text && (
                 <Link href={banner.link_url}>
-                  <Button variant="primary" size="lg">
+                  <Button 
+                    variant="primary" 
+                    size="lg"
+                    style={{ 
+                      color: banner.text_color || '#FFFFFF',
+                      borderColor: banner.text_color || '#FFFFFF'
+                    }}
+                  >
+                    {banner.button_text}
+                  </Button>
+                </Link>
+              )}
+              {banner.link_url && banner.link_text && !banner.button_text && (
+                <Link href={banner.link_url}>
+                  <Button 
+                    variant="primary" 
+                    size="lg"
+                    style={{ 
+                      color: banner.text_color || '#FFFFFF',
+                      borderColor: banner.text_color || '#FFFFFF'
+                    }}
+                  >
                     {banner.link_text}
                   </Button>
                 </Link>

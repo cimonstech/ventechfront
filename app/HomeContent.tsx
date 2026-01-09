@@ -223,21 +223,21 @@ export function HomeContent() {
         <div className="container mx-auto px-3 sm:px-4">
           <div className="grid grid-cols-3 md:grid-cols-3 gap-3 sm:gap-4">
             {/* Momo & Cards - First on mobile */}
-            <div className="flex flex-col items-center text-center p-4">
+            <div className="flex flex-col items-center text-center p-4" style={{ transform: 'scale(0.8)', transformOrigin: 'center' }}>
               <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center mb-3">
                 <Shield className="text-[#FF7A19]" size={18} />
               </div>
               <p className="font-semibold text-xs sm:text-sm text-[#1A1A1A]">Momo & Cards</p>
             </div>
             {/* Quality Guarantee */}
-            <div className="flex flex-col items-center text-center p-4">
+            <div className="flex flex-col items-center text-center p-4" style={{ transform: 'scale(0.8)', transformOrigin: 'center' }}>
               <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center mb-3">
                 <Award className="text-[#FF7A19]" size={18} />
               </div>
               <p className="font-semibold text-xs sm:text-sm text-[#1A1A1A]">Quality Guarantee</p>
             </div>
             {/* 24/7 Support */}
-            <div className="flex flex-col items-center text-center p-4">
+            <div className="flex flex-col items-center text-center p-4" style={{ transform: 'scale(0.8)', transformOrigin: 'center' }}>
               <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center mb-3">
                 <Headphones className="text-[#FF7A19]" size={18} />
               </div>

@@ -67,7 +67,7 @@ export default function BannersPage() {
       
       // Filter for hero type banners and map to expected format
       const heroBanners = (result.data || [])
-        .filter((b: any) => !b.type || b.type === 'hero') // Include all if no type field exists, or filter by hero
+        .filter((b: any) => !b.type || b.type === 'hero')
         .map((b: any) => ({
           id: b.id,
           title: b.title || '',
@@ -77,7 +77,7 @@ export default function BannersPage() {
           button_text: b.button_text || 'Shop Now',
           display_order: b.position || b.order || b.display_order || 1,
           active: b.active !== false,
-          text_color: b.text_color || '#FFFFFF',
+          text_color: b.text_color ?? '#FFFFFF',
         }))
         .sort((a: any, b: any) => a.display_order - b.display_order);
 
@@ -140,7 +140,7 @@ export default function BannersPage() {
       button_text: banner.button_text || 'Shop Now',
       display_order: banner.display_order || 1,
       active: banner.active !== false,
-      text_color: banner.text_color || '#FFFFFF',
+      text_color: banner.text_color ?? '#FFFFFF',
     });
     setShowForm(true);
   };
@@ -178,7 +178,6 @@ export default function BannersPage() {
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
       const isEditing = !!editingBanner;
-      
       const response = await fetch(
         isEditing ? `${apiUrl}/api/banners/${editingBanner!.id}` : `${apiUrl}/api/banners`,
         {
@@ -191,11 +190,11 @@ export default function BannersPage() {
             title: formData.title || null,
             subtitle: formData.subtitle || null,
             image_url: formData.image_url,
-            link: formData.link_url || null, // Use 'link' column (matches database schema)
+            link: formData.link_url || null,
             button_text: formData.button_text || null,
-            order: formData.display_order || 0, // Use 'order' column (matches database schema)
+            order: formData.display_order || 0,
             active: formData.active !== false,
-            text_color: formData.text_color || '#FFFFFF',
+            text_color: formData.text_color,
           }),
         }
       );
@@ -205,11 +204,13 @@ export default function BannersPage() {
         throw new Error(error.message || `Failed to ${isEditing ? 'update' : 'create'} banner`);
       }
 
+      await response.json();
+
       toast.success(`Banner ${isEditing ? 'updated' : 'added'} successfully!`);
       handleCancel();
 
       // Refresh banners list
-      fetchBanners();
+      await fetchBanners();
     } catch (error: any) {
       console.error('Save error:', error);
       toast.error(error.message || 'Failed to save banner');

@@ -178,7 +178,7 @@ export default function LaptopBankingPage() {
       </section>
 
       {/* Why Laptop Banking Works */}
-      <section className="py-12 md:py-16 bg-white">
+      <section className="py-12 md:py-16 bg-white border-b border-gray-200 rounded-t-3xl -mt-10 md:-mt-16 relative z-20">
         <div className="container mx-auto px-4">
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#1A1A1A] text-center mb-8 md:mb-12">
             Why Laptop Banking Works
