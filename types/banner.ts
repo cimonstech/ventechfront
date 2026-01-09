@@ -7,6 +7,7 @@ export interface Banner {
   mobile_image_url?: string;
   link_url?: string;
   link_text?: string;
+  button_text?: string;
   type: 'hero' | 'sidebar' | 'promotion' | 'category';
   position: number;
   active: boolean;

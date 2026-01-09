@@ -95,7 +95,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
                   {banner.description}
                 </p>
               )}
-              {banner.link_url && banner.button_text && (
+              {banner.link_url && (banner.button_text || banner.link_text) && (
                 <Link href={banner.link_url}>
                   <Button 
                     variant="primary" 
@@ -105,21 +105,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
                       borderColor: banner.text_color || '#FFFFFF'
                     }}
                   >
-                    {banner.button_text}
-                  </Button>
-                </Link>
-              )}
-              {banner.link_url && banner.link_text && !banner.button_text && (
-                <Link href={banner.link_url}>
-                  <Button 
-                    variant="primary" 
-                    size="lg"
-                    style={{ 
-                      color: banner.text_color || '#FFFFFF',
-                      borderColor: banner.text_color || '#FFFFFF'
-                    }}
-                  >
-                    {banner.link_text}
+                    {banner.button_text || banner.link_text}
                   </Button>
                 </Link>
               )}
