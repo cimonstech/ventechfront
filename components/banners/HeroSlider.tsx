@@ -73,7 +73,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
             <div className="max-w-2xl text-center">
               {banner.subtitle && (
                 <p 
-                  className="text-[10px] sm:text-xs md:text-sm font-medium mb-1 sm:mb-2 uppercase tracking-wide"
+                  className="text-[7px] sm:text-[10px] md:text-xs font-medium mb-0.5 sm:mb-2 uppercase tracking-wide"
                   style={{ color: banner.text_color || '#FFFFFF' }}
                 >
                   {banner.subtitle}
@@ -81,7 +81,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
               )}
               {banner.title && (
                 <h2 
-                  className="text-sm sm:text-lg md:text-2xl lg:text-4xl xl:text-5xl font-bold mb-2 sm:mb-4"
+                  className="text-[10px] sm:text-base md:text-xl lg:text-3xl xl:text-4xl font-bold mb-1 sm:mb-4"
                   style={{ color: banner.text_color || '#FFFFFF' }}
                 >
                   {banner.title}
@@ -89,7 +89,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
               )}
               {banner.description && (
                 <p 
-                  className="text-[10px] sm:text-xs md:text-sm lg:text-base mb-4 sm:mb-6 max-w-xl mx-auto"
+                  className="text-[7px] sm:text-[10px] md:text-xs lg:text-sm mb-2 sm:mb-6 max-w-xl mx-auto"
                   style={{ color: banner.text_color || '#FFFFFF' }}
                 >
                   {banner.description}
