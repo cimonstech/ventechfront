@@ -45,7 +45,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
   }
 
   return (
-    <div className="relative w-full aspect-[16/9] md:aspect-[16/5] rounded-xl overflow-hidden group">
+    <div className="relative w-full aspect-[2/1] sm:aspect-[16/9] md:aspect-[16/5] rounded-xl overflow-hidden group">
       {/* Slides */}
       {banners.map((banner, index) => (
         <div
@@ -73,7 +73,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
             <div className="max-w-2xl text-center">
               {banner.subtitle && (
                 <p 
-                  className="text-xs sm:text-sm md:text-base font-medium mb-2 uppercase tracking-wide"
+                  className="text-[10px] sm:text-xs md:text-sm font-medium mb-1 sm:mb-2 uppercase tracking-wide"
                   style={{ color: banner.text_color || '#FFFFFF' }}
                 >
                   {banner.subtitle}
@@ -81,7 +81,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
               )}
               {banner.title && (
                 <h2 
-                  className="text-xl sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-bold mb-4"
+                  className="text-sm sm:text-lg md:text-2xl lg:text-4xl xl:text-5xl font-bold mb-2 sm:mb-4"
                   style={{ color: banner.text_color || '#FFFFFF' }}
                 >
                   {banner.title}
@@ -89,7 +89,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
               )}
               {banner.description && (
                 <p 
-                  className="text-xs sm:text-sm md:text-base lg:text-xl mb-6 max-w-xl mx-auto"
+                  className="text-[10px] sm:text-xs md:text-sm lg:text-base mb-4 sm:mb-6 max-w-xl mx-auto"
                   style={{ color: banner.text_color || '#FFFFFF' }}
                 >
                   {banner.description}
