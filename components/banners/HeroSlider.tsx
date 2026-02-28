@@ -70,10 +70,10 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
 
           {/* Content */}
           <div className="relative h-full container mx-auto px-4 flex items-center justify-center">
-            <div className="max-w-2xl text-center">
+            <div className="max-w-2xl text-center scale-[0.575] sm:scale-100 origin-center">
               {banner.subtitle && (
                 <p 
-                  className="text-[7px] sm:text-[10px] md:text-xs font-medium mb-0.5 sm:mb-2 uppercase tracking-wide"
+                  className="text-[8px] sm:text-sm md:text-base font-medium mb-0.5 sm:mb-2 uppercase tracking-wide"
                   style={{ color: banner.text_color || '#FFFFFF' }}
                 >
                   {banner.subtitle}
@@ -81,7 +81,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
               )}
               {banner.title && (
                 <h2 
-                  className="text-[10px] sm:text-base md:text-xl lg:text-3xl xl:text-4xl font-bold mb-1 sm:mb-4"
+                  className="text-[11px] sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-bold mb-1 sm:mb-4"
                   style={{ color: banner.text_color || '#FFFFFF' }}
                 >
                   {banner.title}
@@ -89,7 +89,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({
               )}
               {banner.description && (
                 <p 
-                  className="text-[7px] sm:text-[10px] md:text-xs lg:text-sm mb-2 sm:mb-6 max-w-xl mx-auto"
+                  className="text-[8px] sm:text-sm md:text-base lg:text-xl mb-2 sm:mb-6 max-w-xl mx-auto"
                   style={{ color: banner.text_color || '#FFFFFF' }}
                 >
                   {banner.description}
