@@ -9,7 +9,7 @@ export interface MediaFile {
   lastModified?: Date;
 }
 
-export interface MediaListResponse {
+interface MediaListResponse {
   success: boolean;
   files?: MediaFile[];
   count?: number;

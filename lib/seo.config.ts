@@ -125,7 +125,7 @@ export const seoConfig = {
 /**
  * Generate page title with site name
  */
-export const getPageTitle = (title: string): string => {
+const getPageTitle = (title: string): string => {
   return `${title} | ${seoConfig.business.fullName}`;
 };
 

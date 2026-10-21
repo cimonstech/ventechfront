@@ -1,21 +1,21 @@
 import { supabase } from '@/lib/supabase';
 import { Review } from '@/types/review';
 
-export interface CreateReviewData {
+interface CreateReviewData {
   product_id: string;
   rating: number;
   title?: string;
   comment?: string;
 }
 
-export interface UpdateReviewData {
+interface UpdateReviewData {
   rating?: number;
   title?: string;
   comment?: string;
 }
 
 // Get reviews for a product
-export const getProductReviews = async (productId: string): Promise<Review[]> => {
+const getProductReviews = async (productId: string): Promise<Review[]> => {
   try {
     const { data, error } = await supabase
       .from('reviews')
@@ -45,7 +45,7 @@ export const getProductReviews = async (productId: string): Promise<Review[]> =>
 };
 
 // Get user's review for a product
-export const getUserReview = async (productId: string): Promise<Review | null> => {
+const getUserReview = async (productId: string): Promise<Review | null> => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
@@ -73,7 +73,7 @@ export const getUserReview = async (productId: string): Promise<Review | null> =
 };
 
 // Create a new review
-export const createReview = async (reviewData: CreateReviewData): Promise<Review | null> => {
+const createReview = async (reviewData: CreateReviewData): Promise<Review | null> => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -112,7 +112,7 @@ export const createReview = async (reviewData: CreateReviewData): Promise<Review
 };
 
 // Update a review
-export const updateReview = async (reviewId: string, reviewData: UpdateReviewData): Promise<Review | null> => {
+const updateReview = async (reviewId: string, reviewData: UpdateReviewData): Promise<Review | null> => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -151,7 +151,7 @@ export const updateReview = async (reviewId: string, reviewData: UpdateReviewDat
 };
 
 // Delete a review
-export const deleteReview = async (reviewId: string): Promise<boolean> => {
+const deleteReview = async (reviewId: string): Promise<boolean> => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -177,7 +177,7 @@ export const deleteReview = async (reviewId: string): Promise<boolean> => {
 };
 
 // Get review statistics for a product
-export const getReviewStats = async (productId: string) => {
+const getReviewStats = async (productId: string) => {
   try {
     const { data, error } = await supabase
       .from('reviews')
@@ -224,7 +224,7 @@ export const getReviewStats = async (productId: string) => {
 };
 
 // Admin: Get all reviews (including unapproved)
-export const getAllReviews = async (): Promise<Review[]> => {
+const getAllReviews = async (): Promise<Review[]> => {
   try {
     // Try with generic foreign key reference (without specific constraint name)
     let { data, error } = await supabase
@@ -272,7 +272,7 @@ export const getAllReviews = async (): Promise<Review[]> => {
 };
 
 // Admin: Delete any review
-export const adminDeleteReview = async (reviewId: string): Promise<boolean> => {
+const adminDeleteReview = async (reviewId: string): Promise<boolean> => {
   try {
     const { error } = await supabase
       .from('reviews')

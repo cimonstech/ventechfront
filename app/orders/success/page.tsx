@@ -26,7 +26,8 @@ export default function OrderSuccessPage() {
   const fetchOrder = async () => {
     try {
       setLoading(true);
-      const orderData = await orderService.getOrderById(orderId!);
+      const email = sessionStorage.getItem('order_access_email');
+      const orderData = await orderService.getOrderById(orderId!, email);
       setOrder(orderData);
     } catch (error: any) {
       console.error('Error fetching order:', error);

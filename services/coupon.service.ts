@@ -5,7 +5,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 export const couponService = {
   // Validate coupon code
-  async validateCoupon(code: string, cartAmount: number = 0, userId?: string | null): Promise<CouponValidation> {
+  async validateCoupon(code: string, cartAmount: number = 0, _userId?: string | null): Promise<CouponValidation> {
     try {
       const response = await fetch(`${API_URL}/api/coupons/validate`, {
         method: 'POST',
@@ -16,7 +16,6 @@ export const couponService = {
         body: JSON.stringify({
           code: code.trim().toUpperCase(),
           cart_amount: cartAmount,
-          user_id: userId || null,
         }),
       });
 
@@ -55,6 +54,38 @@ export const couponService = {
         error_message: 'Failed to validate coupon. Please try again.',
       };
     }
+  },
+
+  // Re-check a saved coupon against the cart as it is now.
+  // A saved discount is never reused after the cart changes.
+  async refreshAppliedCoupon(
+    coupon: CouponValidation | null,
+    cartAmount: number
+  ): Promise<{ coupon: CouponValidation | null; removedMessage?: string; changed: boolean }> {
+    if (!coupon) return { coupon: null, changed: false };
+
+    if (!coupon.code) {
+      return {
+        coupon: null,
+        changed: true,
+        removedMessage: 'Apply the coupon again. The cart changed and the saved discount could not be checked.',
+      };
+    }
+
+    const validation = await this.validateCoupon(coupon.code, cartAmount);
+    if (!validation.is_valid) {
+      return {
+        coupon: null,
+        changed: true,
+        removedMessage: validation.error_message || 'This coupon does not apply to the current cart.',
+      };
+    }
+
+    const next: CouponValidation = { ...validation, code: coupon.code };
+    return {
+      coupon: next,
+      changed: next.discount_amount !== coupon.discount_amount,
+    };
   },
 
 

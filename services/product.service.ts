@@ -16,7 +16,7 @@ interface GetProductsParams {
 }
 
 // Fetch products with filters
-export const getProducts = async (params: GetProductsParams = {}): Promise<Product[]> => {
+const getProducts = async (params: GetProductsParams = {}): Promise<Product[]> => {
   try {
     let query = supabase
       .from('products')
@@ -508,7 +508,7 @@ export const getProductBySlug = async (slug: string): Promise<Product | null> =>
 };
 
 // Fetch featured products (excludes pre-order products - pre-orders cannot be featured)
-export const getFeaturedProducts = async (limit: number = 8): Promise<Product[]> => {
+const getFeaturedProducts = async (limit: number = 8): Promise<Product[]> => {
   try {
     const { data, error } = await supabase
       .from('products')
@@ -552,7 +552,7 @@ export const getFeaturedProducts = async (limit: number = 8): Promise<Product[]>
 };
 
 // Fetch similar products
-export const getSimilarProducts = async (productId: string, categoryId: string, limit: number = 4): Promise<Product[]> => {
+const getSimilarProducts = async (productId: string, categoryId: string, limit: number = 4): Promise<Product[]> => {
   try {
     const { data, error } = await supabase
       .from('products')
@@ -596,7 +596,7 @@ export const getSimilarProducts = async (productId: string, categoryId: string, 
 };
 
 // Search products
-export const searchProducts = async (query: string, limit: number = 20): Promise<Product[]> => {
+const searchProducts = async (query: string, limit: number = 20): Promise<Product[]> => {
   try {
     const { data, error } = await supabase
       .from('products')
@@ -639,7 +639,7 @@ export const searchProducts = async (query: string, limit: number = 20): Promise
 };
 
 // Delete product (admin only)
-export const deleteProduct = async (id: string): Promise<void> => {
+const deleteProduct = async (id: string): Promise<void> => {
   try {
     const { error } = await supabase
       .from('products')

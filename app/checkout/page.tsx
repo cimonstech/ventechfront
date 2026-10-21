@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -8,11 +8,12 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useAppSelector, useAppDispatch } from '@/store';
 import { clearCart } from '@/store/cartSlice';
-import { Check, Banknote, ChevronLeft, Package, Clock } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 import { formatCurrency } from '@/lib/helpers';
 import { orderService } from '@/services/order.service';
 import { deliveryOptionsService } from '@/services/deliveryOptions.service';
 import { paymentService } from '@/services/payment.service';
+import { couponService } from '@/services/coupon.service';
 import { DeliveryOption } from '@/types/order';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
@@ -29,12 +30,12 @@ export default function CheckoutPage() {
   const { items, total } = useAppSelector((state) => state.cart);
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
 
-  const [step, setStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   
   // Get applied coupon from sessionStorage (set by cart page)
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
+  const [couponBusy, setCouponBusy] = useState(false);
   
   useEffect(() => {
     // Load coupon from sessionStorage on mount
@@ -50,12 +51,43 @@ export default function CheckoutPage() {
     }
   }, []);
 
+  // Drop or recalculate a coupon when the cart no longer matches the cart it was applied to.
+  useEffect(() => {
+    if (!isMounted || !appliedCoupon || items.length === 0) return;
+
+    let cancelled = false;
+    setCouponBusy(true);
+
+    couponService.refreshAppliedCoupon(appliedCoupon, total).then((result) => {
+      if (cancelled) return;
+
+      if (result.removedMessage) {
+        setAppliedCoupon(null);
+        sessionStorage.removeItem('applied_coupon');
+        toast.error(result.removedMessage);
+      } else if (result.coupon) {
+        setAppliedCoupon(result.coupon);
+        sessionStorage.setItem('applied_coupon', JSON.stringify(result.coupon));
+        if (result.changed) {
+          toast.success('Coupon updated for the current cart');
+        }
+      }
+
+      setCouponBusy(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isMounted, total, items.length, appliedCoupon?.code]);
+
   // Customer Bio Information (for identification - guest and registered)
   const [customerBio, setCustomerBio] = useState({
     name: user?.full_name || '',
     email: user?.email || '',
     phone: user?.phone || '',
   });
+  const [deliverToSomeoneElse, setDeliverToSomeoneElse] = useState(false);
 
   // Delivery Information - New structure
   const [deliveryInfo, setDeliveryInfo] = useState({
@@ -66,6 +98,16 @@ export default function CheckoutPage() {
     recipient_region: '',
     alternate_contact_number: '',
   });
+
+    // Same person is the recipient unless they are sending the order to someone else.
+  useEffect(() => {
+    if (deliverToSomeoneElse) return;
+    setDeliveryInfo(prev => ({
+      ...prev,
+      recipient_name: customerBio.name,
+      recipient_number: customerBio.phone,
+    }));
+  }, [deliverToSomeoneElse, customerBio.name, customerBio.phone]);
 
   // Auto-fill delivery info when user logs in or component mounts
   useEffect(() => {
@@ -180,8 +222,8 @@ export default function CheckoutPage() {
     }
   };
 
-  // Handle client-side mounting
-  useEffect(() => {
+  // Handle client-side mounting before the browser paints, so the page does not flash empty.
+  useLayoutEffect(() => {
     setIsMounted(true);
   }, []);
 
@@ -215,10 +257,18 @@ export default function CheckoutPage() {
   };
 
   const handleCustomerBioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setCustomerBio({
+    const next = {
       ...customerBio,
       [e.target.name]: e.target.value,
-    });
+    };
+    setCustomerBio(next);
+    if (!deliverToSomeoneElse && (e.target.name === 'name' || e.target.name === 'phone')) {
+      setDeliveryInfo((prev) => ({
+        ...prev,
+        recipient_name: next.name,
+        recipient_number: next.phone,
+      }));
+    }
   };
 
   const validateDeliveryInfo = () => {
@@ -242,8 +292,8 @@ export default function CheckoutPage() {
       return false;
     }
 
-    // Validate delivery info
-    const required = ['gadget_name', 'recipient_name', 'recipient_number', 'recipient_location', 'recipient_region'];
+    // The product names are filled from the cart. The customer only types the address.
+    const required = ['recipient_name', 'recipient_number', 'recipient_location', 'recipient_region'];
     for (const field of required) {
       if (!deliveryInfo[field as keyof typeof deliveryInfo]) {
         const fieldName = field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
@@ -265,11 +315,28 @@ export default function CheckoutPage() {
     return true;
   };
 
-  const handleNextStep = () => {
-    if (step === 1 && !validateDeliveryInfo()) {
-      return;
+  const confirmCouponStillApplies = async (): Promise<boolean> => {
+    if (couponBusy) {
+      toast.error('Still checking the coupon. Wait a moment and try again.');
+      return false;
     }
-    setStep(step + 1);
+
+    const refreshed = await couponService.refreshAppliedCoupon(appliedCoupon, total);
+    if (refreshed.removedMessage) {
+      setAppliedCoupon(null);
+      sessionStorage.removeItem('applied_coupon');
+      toast.error(refreshed.removedMessage);
+      return false;
+    }
+
+    if (refreshed.changed && refreshed.coupon) {
+      setAppliedCoupon(refreshed.coupon);
+      sessionStorage.setItem('applied_coupon', JSON.stringify(refreshed.coupon));
+      toast.error('The coupon changed with your cart. Review the new total, then continue.');
+      return false;
+    }
+
+    return true;
   };
 
   // Handle Paystack payment initialization
@@ -281,6 +348,10 @@ export default function CheckoutPage() {
       if (!validateDeliveryInfo()) {
         return;
       }
+    }
+
+    if (!(await confirmCouponStillApplies())) {
+      return;
     }
 
     setIsProcessing(true);
@@ -311,7 +382,9 @@ export default function CheckoutPage() {
           alternate_contact_number: deliveryInfo.alternate_contact_number || '',
           country: 'Ghana',
           is_default: false,
+          email: customerBio.email,
         },
+        customer_bio: customerBio,
         subtotal: total, // Cart subtotal (sum of all items) - MUST be in GHS
         discount: couponDiscount, // Coupon discount - MUST be in GHS
         coupon_id: appliedCoupon?.coupon_id || null,
@@ -364,6 +437,7 @@ export default function CheckoutPage() {
       }
 
       // Store checkout data in sessionStorage for order creation after payment
+      sessionStorage.setItem('order_access_email', customerBio.email);
       sessionStorage.setItem('pending_checkout_data', JSON.stringify(checkoutData));
       sessionStorage.setItem('pending_payment_reference', paymentReference);
       sessionStorage.setItem('clear_cart_after_payment', 'true');
@@ -427,6 +501,10 @@ export default function CheckoutPage() {
     }
 
     // For cash on delivery, proceed with order creation
+    if (!(await confirmCouponStillApplies())) {
+      return;
+    }
+
     setIsProcessing(true);
 
     try {
@@ -455,7 +533,9 @@ export default function CheckoutPage() {
               alternate_contact_number: deliveryInfo.alternate_contact_number || '',
               country: 'Ghana',
               is_default: false,
+              email: customerBio.email,
             },
+            customer_bio: customerBio,
             delivery_option: regularDeliveryOption,
             payment_method: paymentMethod,
             notes: hasMixedCart ? `${notes || ''}\n\n[Regular Items Order]`.trim() : notes,
@@ -510,7 +590,9 @@ export default function CheckoutPage() {
               alternate_contact_number: deliveryInfo.alternate_contact_number || '',
               country: 'Ghana',
               is_default: false,
+              email: customerBio.email,
             },
+            customer_bio: customerBio,
             delivery_option: preOrderDeliveryOption,
             payment_method: paymentMethod,
             notes: hasMixedCart ? `${notes || ''}\n\n[Pre-Order Items]`.trim() : notes,
@@ -518,11 +600,11 @@ export default function CheckoutPage() {
             pre_order_shipping_option: selectedPreOrderShipping.id,
             estimated_arrival_date: estimatedArrival.date.toISOString(),
             subtotal: preOrderSubtotal,
-            discount: couponDiscount,
-            coupon_id: appliedCoupon?.coupon_id || null,
+            discount: hasRegularItems ? 0 : couponDiscount,
+            coupon_id: hasRegularItems ? null : (appliedCoupon?.coupon_id || null),
             delivery_fee: preOrderDeliveryFee, // ✅ Include pre-order shipping fee
             tax: 0,
-            total: preOrderSubtotal + preOrderDeliveryFee - couponDiscount, // ✅ Include shipping in total
+            total: preOrderSubtotal + preOrderDeliveryFee - (hasRegularItems ? 0 : couponDiscount),
           };
 
           const preOrder = await orderService.createOrder(preOrderCheckoutData, userId);
@@ -558,8 +640,9 @@ export default function CheckoutPage() {
         dispatch(clearCart());
         // Clear coupon after successful order
         sessionStorage.removeItem('applied_coupon');
-        // Redirect to the first order (or could show a summary page)
-        router.push(`/orders/${orders[0].order.id}`);
+        sessionStorage.setItem('order_access_email', customerBio.email);
+        const accessEmail = encodeURIComponent(customerBio.email);
+        router.push(`/orders/${orders[0].order.id}?email=${accessEmail}`);
       } else {
         setIsProcessing(false);
       }
@@ -613,8 +696,8 @@ export default function CheckoutPage() {
   const totalDeliveryFee = regularDeliveryFee + preOrderDeliveryFee;
   
   const tax = 0;
-  const couponDiscount = appliedCoupon?.discount_amount || 0;
-  const grandTotal = total + totalDeliveryFee + tax - couponDiscount;
+  const couponDiscount = couponBusy ? 0 : (appliedCoupon?.discount_amount || 0);
+  const grandTotal = Math.max(0, total + totalDeliveryFee + tax - couponDiscount);
   
   // Calculate estimated arrival for pre-orders
   const estimatedArrival = hasPreOrderItems && selectedPreOrderShipping
@@ -663,51 +746,19 @@ export default function CheckoutPage() {
             Back to Cart
           </Button>
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Checkout</h1>
-        </div>
-
-        {/* Progress Steps */}
-        <div className="flex items-center justify-center mb-8">
-          <div className="flex items-center gap-4">
-            <div className={`flex items-center gap-2 ${step >= 1 ? 'text-[#FF7A19]' : 'text-gray-400'}`}>
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                step >= 1 ? 'bg-[#FF7A19] text-white' : 'bg-gray-200'
-              }`}>
-                {step > 1 ? <Check size={20} /> : '1'}
-              </div>
-              <span className="font-medium hidden sm:block">Delivery</span>
-            </div>
-
-            <div className="w-16 h-0.5 bg-gray-300" />
-
-            <div className={`flex items-center gap-2 ${step >= 2 ? 'text-[#FF7A19]' : 'text-gray-400'}`}>
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                step >= 2 ? 'bg-[#FF7A19] text-white' : 'bg-gray-200'
-              }`}>
-                {step > 2 ? <Check size={20} /> : '2'}
-              </div>
-              <span className="font-medium hidden sm:block">Payment</span>
-            </div>
-
-            <div className="w-16 h-0.5 bg-gray-300" />
-
-            <div className={`flex items-center gap-2 ${step >= 3 ? 'text-[#FF7A19]' : 'text-gray-400'}`}>
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                step >= 3 ? 'bg-[#FF7A19] text-white' : 'bg-gray-200'
-              }`}>
-                3
-              </div>
-              <span className="font-medium hidden sm:block">Review</span>
-            </div>
-          </div>
+          {hasMixedCart && (
+            <p className="mt-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+              This cart has regular items and pre-order items. They will be placed as two orders, each with its own delivery.
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2">
-            {/* Step 1: Delivery Details */}
-            {step === 1 && (
+            <div className="space-y-6">
               <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">DELIVERY DETAILS</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Delivery and payment</h2>
                 
                 {/* Customer Bio Information */}
                 <div className="mb-8 p-4 bg-gray-50 rounded-lg">
@@ -744,31 +795,36 @@ export default function CheckoutPage() {
                   </div>
                 </div>
                 
+                <label className="mb-4 flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={deliverToSomeoneElse}
+                    onChange={(e) => setDeliverToSomeoneElse(e.target.checked)}
+                  />
+                  Deliver to someone else
+                </label>
+
                 <div className="space-y-4 mb-6">
-                  <Input
-                    label="GADGET NAME"
-                    name="gadget_name"
-                    value={deliveryInfo.gadget_name}
-                    onChange={handleDeliveryInfoChange}
-                    required
-                    placeholder="Product name(s) from your cart"
-                  />
-                  <Input
-                    label="RECIPIENT'S NAME"
-                    name="recipient_name"
-                    value={deliveryInfo.recipient_name}
-                    onChange={handleDeliveryInfoChange}
-                    required
-                  />
-                  <Input
-                    label="RECIPIENT'S NUMBER"
-                    name="recipient_number"
-                    type="tel"
-                    value={deliveryInfo.recipient_number}
-                    onChange={handleDeliveryInfoChange}
-                    required
-                    placeholder="+233 XX XXX XXXX"
-                  />
+                  {deliverToSomeoneElse && (
+                    <>
+                      <Input
+                        label="Recipient's name"
+                        name="recipient_name"
+                        value={deliveryInfo.recipient_name}
+                        onChange={handleDeliveryInfoChange}
+                        required
+                      />
+                      <Input
+                        label="Recipient's number"
+                        name="recipient_number"
+                        type="tel"
+                        value={deliveryInfo.recipient_number}
+                        onChange={handleDeliveryInfoChange}
+                        required
+                        placeholder="+233 XX XXX XXXX"
+                      />
+                    </>
+                  )}
                   <Input
                     label="RECIPIENT'S LOCATION"
                     name="recipient_location"
@@ -938,19 +994,8 @@ export default function CheckoutPage() {
                   )}
                 </div>
 
-                <Button
-                  variant="primary"
-                  size="lg"
-                  className="w-full mt-6"
-                  onClick={handleNextStep}
-                >
-                  Continue to Payment
-                </Button>
               </div>
-            )}
 
-            {/* Step 2: Payment Method */}
-            {step === 2 && (
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">Payment Method</h2>
 
@@ -1042,212 +1087,18 @@ export default function CheckoutPage() {
                   />
                 </div>
 
-                <div className="flex gap-4">
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    onClick={() => setStep(1)}
-                    className="flex-1"
-                  >
-                    Back
-                  </Button>
-                  <Button
-                    variant="primary"
-                    size="lg"
-                    onClick={handleNextStep}
-                    className="flex-1"
-                  >
-                    Review Order
-                  </Button>
-                </div>
+                <Button
+                  variant="primary"
+                  size="lg"
+                  className="w-full"
+                  onClick={handlePlaceOrder}
+                  isLoading={isProcessing || couponBusy}
+                  disabled={couponBusy}
+                >
+                  {paymentMethod === 'paystack' ? 'Pay now' : 'Place order'}
+                </Button>
               </div>
-            )}
-
-            {/* Step 3: Review & Confirm */}
-            {step === 3 && (
-              <div className="space-y-6">
-                {/* Mixed Cart Notice */}
-                {hasMixedCart && (
-                  <div className="bg-yellow-50 border-l-4 border-yellow-600 rounded-lg p-4">
-                    <h3 className="font-bold text-yellow-900 mb-2 flex items-center gap-2">
-                      <Package size={20} />
-                      Split Order Notice
-                    </h3>
-                    <p className="text-sm text-yellow-800 mb-2">
-                      Your cart contains both regular and pre-order items. These will be processed as <strong>two separate orders</strong>:
-                    </p>
-                    <ul className="list-disc list-inside text-sm text-yellow-800 space-y-1 ml-2">
-                      <li><strong>Regular Order:</strong> {regularItems.length} item{regularItems.length > 1 ? 's' : ''} with standard delivery</li>
-                      <li><strong>Pre-Order:</strong> {preOrderItems.length} item{preOrderItems.length > 1 ? 's' : ''} with pre-order shipping</li>
-                    </ul>
-                  </div>
-                )}
-
-                {/* Pre-Order Notice (only if no regular items) */}
-                {hasPreOrderItems && !hasRegularItems && (
-                  <div className="bg-blue-50 border-l-4 border-blue-600 rounded-lg p-4">
-                    <h3 className="font-bold text-blue-900 mb-2 flex items-center gap-2">
-                      <Package size={20} />
-                      Pre-Order Notice
-                    </h3>
-                    <p className="text-sm text-blue-800 mb-2">
-                      This order contains pre-order items. Full payment is required upfront.
-                    </p>
-                    {selectedPreOrderShipping && estimatedArrival && (
-                      <div className="mt-3 pt-3 border-t border-blue-200">
-                        <p className="text-sm font-semibold text-blue-900">
-                          Selected Shipping: {selectedPreOrderShipping.name}
-                        </p>
-                        <p className="text-sm text-blue-700">
-                          Estimated Arrival: {estimatedArrival.formatted} 
-                          {' '}({formatEstimatedDelivery(selectedPreOrderShipping)})
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Order Items */}
-                <div className="bg-white rounded-xl shadow-sm p-6">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-4">Order Items</h2>
-                  <div className="space-y-4">
-                    {items.map((item, index) => (
-                      <div key={index} className="flex gap-4">
-                        <div className="relative w-16 h-16 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
-                          <Image
-                            src={item.thumbnail || '/placeholder-product.webp'}
-                            alt={item.name}
-                            fill
-                            sizes="64px"
-                            className="object-cover"
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <p className="font-semibold text-gray-900">{item.name}</p>
-                            {item.is_pre_order && (
-                              <span className="px-2 py-0.5 bg-[#FF7A19] text-white text-xs font-semibold rounded">
-                                Pre-Order
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
-                        </div>
-                        <span className="font-semibold text-gray-900">{formatCurrency(item.subtotal)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Customer Information */}
-                <div className="bg-white rounded-xl shadow-sm p-6">
-                  <h3 className="font-bold text-gray-900 mb-2">Customer Information</h3>
-                  <p className="text-gray-600">
-                    <strong>Name:</strong> {customerBio.name}<br />
-                    <strong>Email:</strong> {customerBio.email}<br />
-                    <strong>Phone:</strong> {customerBio.phone}
-                  </p>
-                </div>
-
-                {/* Delivery Details */}
-                <div className="bg-white rounded-xl shadow-sm p-6">
-                  <h3 className="font-bold text-gray-900 mb-2">Delivery Details</h3>
-                  <p className="text-gray-600">
-                    <strong>Gadget:</strong> {deliveryInfo.gadget_name}<br />
-                    <strong>Recipient:</strong> {deliveryInfo.recipient_name}<br />
-                    <strong>Phone:</strong> {deliveryInfo.recipient_number}<br />
-                    <strong>Location:</strong> {deliveryInfo.recipient_location}<br />
-                    <strong>Region:</strong> {deliveryInfo.recipient_region}
-                    {deliveryInfo.alternate_contact_number && (
-                      <>
-                        <br />
-                        <strong>Alternate Contact:</strong> {deliveryInfo.alternate_contact_number}
-                      </>
-                    )}
-                  </p>
-                </div>
-
-                {/* Shipping Method */}
-                {hasMixedCart ? (
-                  <div className="space-y-4">
-                    {hasRegularItems && (
-                      <div className="bg-white rounded-xl shadow-sm p-6">
-                        <h3 className="font-bold text-gray-900 mb-2">Regular Items Delivery</h3>
-                        <p className="text-gray-600">
-                          {selectedDelivery?.name || 'Standard Delivery'}
-                        </p>
-                      </div>
-                    )}
-                    {hasPreOrderItems && selectedPreOrderShipping && (
-                      <div className="bg-white rounded-xl shadow-sm p-6">
-                        <h3 className="font-bold text-gray-900 mb-2">Pre-Order Shipping</h3>
-                        <p className="text-gray-900 font-semibold">{selectedPreOrderShipping.name}</p>
-                        <p className="text-sm text-gray-600">{selectedPreOrderShipping.description}</p>
-                        {estimatedArrival && (
-                          <p className="text-sm text-blue-600 mt-1">
-                            Estimated Arrival: {estimatedArrival.formatted}
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="bg-white rounded-xl shadow-sm p-6">
-                    <h3 className="font-bold text-gray-900 mb-2">
-                      {hasPreOrderItems ? 'Shipping Method' : 'Delivery Method'}
-                    </h3>
-                    {hasPreOrderItems && selectedPreOrderShipping ? (
-                      <div>
-                        <p className="text-gray-900 font-semibold">{selectedPreOrderShipping.name}</p>
-                        <p className="text-sm text-gray-600">{selectedPreOrderShipping.description}</p>
-                        {estimatedArrival && (
-                          <p className="text-sm text-blue-600 mt-1">
-                            Estimated Arrival: {estimatedArrival.formatted}
-                          </p>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-gray-600">
-                        {selectedDelivery?.name || 'Standard Delivery'}
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {/* Payment Method */}
-                <div className="bg-white rounded-xl shadow-sm p-6">
-                  <h3 className="font-bold text-gray-900 mb-2">Payment Method</h3>
-                  <p className="text-gray-600 capitalize">
-                    {paymentMethod === 'paystack' ? 'Paystack (Card/Mobile Money/Bank Transfer)' : 'Cash on Delivery'}
-                  </p>
-                  {hasPreOrderItems && (
-                    <p className="text-sm text-orange-600 mt-2 font-semibold">
-                      ⚠️ Full payment required for pre-orders
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex gap-4">
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    onClick={() => setStep(2)}
-                    className="flex-1"
-                  >
-                    Back
-                  </Button>
-                  <Button
-                    variant="primary"
-                    size="lg"
-                    onClick={handlePlaceOrder}
-                    isLoading={isProcessing}
-                    className="flex-1"
-                  >
-                    Place Order
-                  </Button>
-                </div>
-              </div>
-            )}
+            </div>
           </div>
 
           {/* Order Summary Sidebar */}

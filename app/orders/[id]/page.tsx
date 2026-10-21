@@ -53,7 +53,13 @@ export default function OrderDetailPage() {
   const fetchOrder = async () => {
     try {
       setIsLoading(true);
-      const data = await orderService.getOrderById(orderId);
+      const urlParams = new URLSearchParams(window.location.search);
+      const email =
+        urlParams.get('email') ||
+        sessionStorage.getItem('order_access_email') ||
+        user?.email ||
+        undefined;
+      const data = await orderService.getOrderById(orderId, email);
       
       // Transform order data to match Order interface
       const formattedOrder: Order = {

@@ -44,8 +44,8 @@ export const {
   setWishlistItems,
   addToWishlist,
   removeFromWishlist,
-  setLoading,
-  clearWishlist,
+  
+  
 } = wishlistSlice.actions;
 
 export default wishlistSlice.reducer;

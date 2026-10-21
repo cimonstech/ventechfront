@@ -313,24 +313,6 @@ export default function PaymentCallbackPage() {
             
             // Order(s) created successfully
               
-              // Update transaction with order_id after order is created (link to first order)
-              try {
-                const API_URL = typeof window !== 'undefined' 
-                  ? (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000')
-                  : 'http://localhost:5000';
-                await fetch(`${API_URL}/api/payments/update-order-link`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    transaction_reference: reference,
-                    order_id: firstOrder.id,
-                  }),
-                });
-              } catch (linkError) {
-                console.error('Error linking transaction to order:', linkError);
-                // Don't fail if linking fails
-              }
-              
               // Clear cart
               dispatch(clearCart());
               
@@ -350,9 +332,9 @@ export default function PaymentCallbackPage() {
               }
               
               // Redirect to order detail page
-              setTimeout(() => {
-                router.push(`/orders/${firstOrder.id}`);
-              }, 2000);
+              const accessEmail = sessionStorage.getItem('order_access_email') || '';
+              const emailQuery = accessEmail ? `?email=${encodeURIComponent(accessEmail)}` : '';
+              router.push(`/orders/${firstOrder.id}${emailQuery}`);
             } catch (orderError: any) {
               console.error('Error creating order:', {
                 error: orderError,

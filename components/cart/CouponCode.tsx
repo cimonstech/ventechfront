@@ -37,7 +37,7 @@ export const CouponCode: React.FC<CouponCodeProps> = ({
       const validation = await couponService.validateCoupon(code.trim().toUpperCase(), cartTotal, userId);
       
       if (validation.is_valid) {
-        onCouponApplied(validation);
+        onCouponApplied({ ...validation, code: code.trim().toUpperCase() });
         setCode('');
         toast.success('Coupon applied successfully!');
       } else {
@@ -84,6 +84,7 @@ export const CouponCode: React.FC<CouponCodeProps> = ({
                   {appliedCoupon.discount_amount === 0 ? 'Free Delivery' : 'Coupon Applied'}
                 </p>
                 <p className="text-xs text-green-600">
+                  {appliedCoupon.code ? `${appliedCoupon.code} · ` : ''}
                   {getDiscountText(appliedCoupon)}
                 </p>
               </div>

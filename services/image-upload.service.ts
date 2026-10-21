@@ -256,26 +256,3 @@ export async function uploadImages(
   return Promise.all(uploadPromises);
 }
 
-/**
- * Get image from media library by URL
- */
-export async function getImageFromLibrary(url: string): Promise<MediaLibraryItem | null> {
-  try {
-    const { data, error } = await supabase
-      .from('media_library')
-      .select('*')
-      .eq('url', url)
-      .limit(1)
-      .single();
-
-    if (error || !data) {
-      return null;
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Error getting image from library:', error);
-    return null;
-  }
-}
-

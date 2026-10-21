@@ -13,17 +13,6 @@ export interface FlashDeal {
   updated_at: string;
 }
 
-export interface FlashDealProduct {
-  id: string;
-  flash_deal_id: string;
-  product_id: string;
-  discount_percentage: number;
-  flash_price?: number;
-  sort_order: number;
-  created_at: string;
-  product?: Product;
-}
-
 // Fetch active flash deals
 export const getActiveFlashDeals = async (): Promise<FlashDeal[]> => {
   try {
@@ -110,47 +99,6 @@ export const getActiveFlashDeals = async (): Promise<FlashDeal[]> => {
   }
 };
 
-// Fetch flash deal products
-export const getFlashDealProducts = async (flashDealId?: string): Promise<FlashDealProduct[]> => {
-  try {
-    let query = supabase
-      .from('flash_deal_products')
-      .select(`
-        *,
-        product:products(*)
-      `)
-      .order('sort_order', { ascending: true });
-
-    if (flashDealId) {
-      query = query.eq('flash_deal_id', flashDealId);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      // Check if table doesn't exist - silently return empty array
-      const errorCode = error.code || (error as any)?.statusCode || (error as any)?.status;
-      const errorMessage = error.message || String(error) || '';
-      const isTableMissing = 
-        errorCode === 'PGRST116' || 
-        errorCode === 404 || 
-        errorMessage.includes('relation') || 
-        errorMessage.includes('does not exist');
-      
-      if (isTableMissing) {
-        return [];
-      }
-      // For other errors, log warning
-      console.warn('Error fetching flash deal products:', { code: errorCode, message: errorMessage });
-      return [];
-    }
-    return data || [];
-  } catch (error: any) {
-    // Silently handle errors - table might not exist
-    return [];
-  }
-};
-
 // Fetch products that are currently in flash deals
 export const getFlashDealProductsList = async (): Promise<Product[]> => {
   try {
@@ -178,7 +126,7 @@ export const getFlashDealProductsList = async (): Promise<Product[]> => {
 };
 
 // Calculate time remaining for flash deal
-export const getTimeRemaining = (endTime: string): { hours: number; minutes: number; seconds: number } => {
+const getTimeRemaining = (endTime: string): { hours: number; minutes: number; seconds: number } => {
   const now = new Date().getTime();
   const end = new Date(endTime).getTime();
   const difference = end - now;

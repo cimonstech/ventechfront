@@ -29,37 +29,3 @@ export const supabasePublic = createClient(buildSafeUrl, buildSafeKey, {
   },
 });
 
-// Helper function to get the current user
-export const getCurrentUser = async () => {
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error) {
-    console.error('Error getting user:', error.message);
-    return null;
-  }
-
-  return user;
-};
-
-// Helper function to check if user is admin
-export const isAdmin = async () => {
-  const user = await getCurrentUser();
-  if (!user) return false;
-
-  const { data, error } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (error) {
-    console.error('Error checking admin status:', error.message);
-    return false;
-  }
-
-  return data?.role === 'admin';
-};
-

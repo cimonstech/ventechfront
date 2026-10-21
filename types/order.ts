@@ -62,27 +62,6 @@ export interface DeliveryOption {
   estimated_days?: number;
 }
 
-export interface PaymentDetails {
-  method: PaymentMethod;
-  reference?: string;
-  provider?: 'paystack' | 'hubtel';
-  phone?: string; // For mobile money
-  card_last4?: string; // For card payments
-}
-
-export interface OrderTracking {
-  order_id: string;
-  status: OrderStatus;
-  timeline: OrderTrackingEvent[];
-}
-
-export interface OrderTrackingEvent {
-  status: OrderStatus;
-  message: string;
-  location?: string;
-  timestamp: string;
-}
-
 export interface CheckoutData {
   items: CartItem[];
   delivery_address: Partial<Address> | Omit<Address, 'id' | 'user_id' | 'created_at' | 'updated_at'>;

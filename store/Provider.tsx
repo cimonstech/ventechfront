@@ -2,26 +2,25 @@
 
 import { Provider } from 'react-redux';
 import { store } from './index';
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect } from 'react';
 import { loadCartFromStorage } from './cartSlice';
 import { setUser, setLoading } from './authSlice';
 import { onAuthStateChange, getUserProfile } from '@/services/auth.service';
 import { supabase } from '@/lib/supabase';
 
 export function ReduxProvider({ children }: { children: React.ReactNode }) {
-  useEffect(() => {
-    // Load cart from localStorage on app start
-    if (typeof window !== 'undefined') {
-      try {
-        const savedCart = localStorage.getItem('cart');
-        if (savedCart) {
-          store.dispatch(loadCartFromStorage(JSON.parse(savedCart)));
-        }
-      } catch (error) {
-        console.error('Error loading cart from localStorage:', error);
+  useLayoutEffect(() => {
+    try {
+      const savedCart = localStorage.getItem('cart');
+      if (savedCart) {
+        store.dispatch(loadCartFromStorage(JSON.parse(savedCart)));
       }
+    } catch (error) {
+      console.error('Error loading cart from localStorage:', error);
     }
+  }, []);
 
+  useEffect(() => {
     // Check initial session first
     const checkInitialSession = async () => {
       try {

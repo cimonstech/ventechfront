@@ -29,16 +29,3 @@ export interface ReviewStats {
   };
 }
 
-export interface CreateReviewData {
-  product_id: string;
-  rating: number;
-  title?: string;
-  comment?: string;
-}
-
-export interface UpdateReviewData {
-  rating?: number;
-  title?: string;
-  comment?: string;
-}
-

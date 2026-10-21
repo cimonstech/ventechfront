@@ -347,7 +347,10 @@ export default function TrackOrderPage() {
                 <div className="flex flex-col sm:flex-row gap-3">
                   <Button
                     variant="outline"
-                    onClick={() => router.push(`/orders/${order.id}`)}
+                    onClick={() => {
+                      sessionStorage.setItem('order_access_email', email.trim());
+                      router.push(`/orders/${order.id}?email=${encodeURIComponent(email.trim())}`);
+                    }}
                     className="flex-1"
                   >
                     View Full Order Details

@@ -11,7 +11,7 @@ interface CheckmarkLoaderProps {
 }
 
 // An animated outline-only orange checkmark that draws progressively.
-export const CheckmarkLoader: React.FC<CheckmarkLoaderProps> = ({
+const CheckmarkLoader: React.FC<CheckmarkLoaderProps> = ({
   size = 64,
   color = '#FF7A19',
   strokeWidth = 6,

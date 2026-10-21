@@ -80,6 +80,7 @@ export const orderService = {
         delivery_option: checkoutData.delivery_option,
         notes: checkoutData.notes || null,
         payment_reference: checkoutData.payment_reference || null, // Include payment reference for transaction linking
+        customer_bio: (checkoutData as any).customer_bio || null,
         order_items,
         // Pre-order fields
         is_pre_order: (checkoutData as any).is_pre_order || false,
@@ -199,11 +200,12 @@ export const orderService = {
   },
 
   // Get order by ID (uses backend API to support both authenticated and guest orders)
-  async getOrderById(orderId: string) {
+  async getOrderById(orderId: string, email?: string | null) {
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    const query = email ? `?email=${encodeURIComponent(email)}` : '';
     
     try {
-      const response = await fetch(`${API_URL}/api/orders/${orderId}`, {
+      const response = await fetch(`${API_URL}/api/orders/${orderId}${query}`, {
         method: 'GET',
         headers: {
           ...(await authHeaders()),

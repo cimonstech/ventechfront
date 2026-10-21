@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 
-export interface ContactFormData {
+interface ContactFormData {
   name: string;
   email: string;
   phone?: string;

@@ -122,10 +122,3 @@ export const getPreOrderProducts = async (): Promise<PreOrderProduct[]> => {
   }
 };
 
-// Get pre-order shipping option by ID
-export const getPreOrderShippingOption = (
-  id: 'air_cargo' | 'ship_cargo'
-): PreOrderShippingOption | undefined => {
-  return PRE_ORDER_SHIPPING_OPTIONS.find((option) => option.id === id);
-};
-

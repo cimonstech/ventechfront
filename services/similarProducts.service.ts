@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { Product } from '@/types/product';
 
 // Get similar products based on category and brand
-export const getSimilarProducts = async (
+const getSimilarProducts = async (
   productId: string, 
   categoryId: string, 
   brandId: string, 
@@ -112,7 +112,7 @@ export const getSimilarProducts = async (
 };
 
 // Get related products based on tags or keywords (if you have a tags system)
-export const getRelatedProducts = async (
+const getRelatedProducts = async (
   productId: string,
   tags: string[],
   limit: number = 4
@@ -129,7 +129,7 @@ export const getRelatedProducts = async (
 };
 
 // Get recently viewed products (if you implement a view tracking system)
-export const getRecentlyViewedProducts = async (
+const getRecentlyViewedProducts = async (
   userId: string,
   limit: number = 4
 ): Promise<Product[]> => {
