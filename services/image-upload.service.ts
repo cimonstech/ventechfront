@@ -10,6 +10,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { authHeaders } from '@/lib/authHeaders';
 
 interface MediaLibraryItem {
   id: string;
@@ -150,6 +151,7 @@ async function uploadToR2(
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
     const response = await fetch(`${apiUrl}/api/upload?folder=${encodeURIComponent(folder)}`, {
       method: 'POST',
+      headers: await authHeaders(),
       body: formData,
     });
 

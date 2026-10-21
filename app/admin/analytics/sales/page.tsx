@@ -1,5 +1,6 @@
 'use client';
 
+import { authHeaders } from '@/lib/authHeaders';
 import { useState, useEffect } from 'react';
 import { TrendingUp, Package, ShoppingBag, Star, Download } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -58,6 +59,7 @@ export default function SalesAnalyticsPage() {
         const response = await fetch(`${API_URL}/api/orders`, {
           method: 'GET',
           headers: {
+            ...(await authHeaders()),
             'Content-Type': 'application/json',
           },
         });
@@ -116,6 +118,7 @@ export default function SalesAnalyticsPage() {
                   const itemsResponse = await fetch(`${API_URL}/api/orders/${orderId}/items`, {
                     method: 'GET',
                     headers: {
+                      ...(await authHeaders()),
                       'Content-Type': 'application/json',
                     },
                   });

@@ -1,5 +1,6 @@
 'use client';
 
+import { authHeaders } from '@/lib/authHeaders';
 import { useState, useEffect } from 'react';
 import {
   DollarSign,
@@ -75,6 +76,7 @@ export default function RevenueAnalyticsPage() {
         const response = await fetch(`${API_URL}/api/orders`, {
           method: 'GET',
           headers: {
+            ...(await authHeaders()),
             'Content-Type': 'application/json',
           },
         });
@@ -142,6 +144,7 @@ export default function RevenueAnalyticsPage() {
         const response = await fetch(`${API_URL}/api/orders`, {
           method: 'GET',
           headers: {
+            ...(await authHeaders()),
             'Content-Type': 'application/json',
           },
         });

@@ -1,3 +1,4 @@
+import { authHeaders } from '@/lib/authHeaders';
 import { Coupon, CreateCouponData, CouponValidation } from '@/types/coupon';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
@@ -9,6 +10,7 @@ export const couponService = {
       const response = await fetch(`${API_URL}/api/coupons/validate`, {
         method: 'POST',
         headers: {
+          ...(await authHeaders()),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -55,35 +57,6 @@ export const couponService = {
     }
   },
 
-  // Record coupon usage (called after order is created)
-  async recordCouponUsage(couponId: string, userId: string | null, orderId: string, discountAmount: number, orderTotal: number): Promise<boolean> {
-    try {
-      const response = await fetch(`${API_URL}/api/coupons/record-usage`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          coupon_id: couponId,
-          user_id: userId,
-          order_id: orderId,
-          discount_amount: discountAmount,
-          order_total: orderTotal,
-        }),
-      });
-
-      if (!response.ok) {
-        console.error('Failed to record coupon usage');
-        return false;
-      }
-
-      const result = await response.json();
-      return result.success || false;
-    } catch (error) {
-      console.error('Error recording coupon usage:', error);
-      return false;
-    }
-  },
 
   // Get all coupons (admin)
   async getAllCoupons(): Promise<Coupon[]> {
@@ -91,6 +64,7 @@ export const couponService = {
       const response = await fetch(`${API_URL}/api/coupons`, {
         method: 'GET',
         headers: {
+          ...(await authHeaders()),
           'Content-Type': 'application/json',
         },
       });
@@ -113,6 +87,7 @@ export const couponService = {
       const response = await fetch(`${API_URL}/api/coupons/${id}`, {
         method: 'GET',
         headers: {
+          ...(await authHeaders()),
           'Content-Type': 'application/json',
         },
       });
@@ -135,6 +110,7 @@ export const couponService = {
       const response = await fetch(`${API_URL}/api/coupons`, {
         method: 'POST',
         headers: {
+          ...(await authHeaders()),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(couponData),
@@ -159,6 +135,7 @@ export const couponService = {
       const response = await fetch(`${API_URL}/api/coupons/${id}`, {
         method: 'PATCH',
         headers: {
+          ...(await authHeaders()),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(updates),
@@ -183,6 +160,7 @@ export const couponService = {
       const response = await fetch(`${API_URL}/api/coupons/${id}`, {
         method: 'DELETE',
         headers: {
+          ...(await authHeaders()),
           'Content-Type': 'application/json',
         },
       });

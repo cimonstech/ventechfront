@@ -1,3 +1,4 @@
+import { authHeaders } from '@/lib/authHeaders';
 import { supabase } from '@/lib/supabase';
 import { CheckoutData, Order } from '@/types/order';
 
@@ -102,6 +103,7 @@ export const orderService = {
       const response = await fetch(`${API_URL}/api/orders`, {
         method: 'POST',
         headers: {
+          ...(await authHeaders()),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(orderPayload),
@@ -204,6 +206,7 @@ export const orderService = {
       const response = await fetch(`${API_URL}/api/orders/${orderId}`, {
         method: 'GET',
         headers: {
+          ...(await authHeaders()),
           'Content-Type': 'application/json',
         },
       });
@@ -314,6 +317,7 @@ export const orderService = {
         const response = await fetch(`${API_URL}/api/orders/track`, {
           method: 'POST',
           headers: {
+            ...(await authHeaders()),
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -553,6 +557,7 @@ export const orderService = {
       const response = await fetch(`${API_URL}/api/orders/${orderId}/cancel`, {
         method: 'PATCH',
         headers: {
+          ...(await authHeaders()),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({

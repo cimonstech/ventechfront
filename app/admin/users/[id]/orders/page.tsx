@@ -1,5 +1,6 @@
 'use client';
 
+import { authHeaders } from '@/lib/authHeaders';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -83,6 +84,7 @@ export default function UserOrdersPage() {
         const response = await fetch(`${API_URL}/api/orders?user_id=${userId}`, {
           method: 'GET',
           headers: {
+            ...(await authHeaders()),
             'Content-Type': 'application/json',
           },
         });
