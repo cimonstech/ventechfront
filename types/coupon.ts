@@ -23,6 +23,7 @@ export interface CouponValidation {
   is_valid: boolean;
   discount_amount: number;
   error_message: string;
+  code?: string;
   coupon_id?: string;
   coupon_name?: string;
   discount_type?: 'percentage' | 'fixed_amount' | 'free_shipping';
@@ -35,21 +36,6 @@ export interface CreateCouponData {
   description?: string;
   discount_type: 'percentage' | 'fixed_amount' | 'free_shipping';
   discount_value: number;
-  minimum_amount?: number;
-  maximum_discount?: number;
-  applies_to?: 'all' | 'products' | 'shipping' | 'total';
-  usage_limit?: number;
-  per_user_limit?: number;
-  is_active?: boolean;
-  valid_from?: string;
-  valid_until?: string;
-}
-
-export interface UpdateCouponData {
-  name?: string;
-  description?: string;
-  discount_type?: 'percentage' | 'fixed_amount' | 'free_shipping';
-  discount_value?: number;
   minimum_amount?: number;
   maximum_discount?: number;
   applies_to?: 'all' | 'products' | 'shipping' | 'total';

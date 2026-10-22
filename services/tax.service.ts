@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 
-export interface Tax {
+interface Tax {
   id: string;
   name: string;
   description?: string;

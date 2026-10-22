@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { ShoppingCart, Heart, Star } from 'lucide-react';
 import { Product } from '@/types/product';
@@ -18,6 +19,7 @@ interface ProductCardProps {
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }) => {
+  const router = useRouter();
   const dispatch = useAppDispatch();
   const { items } = useAppSelector((state) => state.cart);
   const { isInWishlist, toggleItem } = useWishlist();
@@ -40,6 +42,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onQuickView }
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
+    if (product.price_range?.hasRange || (product.variants && product.variants.length > 0)) {
+      router.push(`/product/${product.slug}`);
+      return;
+    }
 
     const cartItem = {
       ...product,

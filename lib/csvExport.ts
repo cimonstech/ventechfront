@@ -2,7 +2,7 @@
  * CSV Export Utility for VENTECH Admin Dashboard
  */
 
-export interface CSVColumn {
+interface CSVColumn {
   key: string;
   label: string;
   format?: (value: any) => string;
@@ -155,15 +155,6 @@ export const OrderColumns: CSVColumn[] = [
   { key: 'status', label: 'Status' },
   { key: 'payment_status', label: 'Payment' },
   { key: 'created_at', label: 'Order Date', format: CSVExporter.formatDateTime },
-];
-
-export const TransactionColumns: CSVColumn[] = [
-  { key: 'order_number', label: 'Order Number' },
-  { key: 'customer_name', label: 'Customer' },
-  { key: 'amount', label: 'Amount', format: CSVExporter.formatCurrency },
-  { key: 'payment_method', label: 'Payment Method' },
-  { key: 'payment_status', label: 'Status' },
-  { key: 'transaction_date', label: 'Date', format: CSVExporter.formatDateTime },
 ];
 
 

@@ -1,7 +1,8 @@
 import { loadPaystack } from '@/lib/paystack';
 import toast from 'react-hot-toast';
+import { authHeaders } from '@/lib/authHeaders';
 
-export interface PaymentData {
+interface PaymentData {
   email: string;
   amount: number; // Amount in pesewas (GHS * 100)
   reference: string;
@@ -13,7 +14,7 @@ export interface PaymentData {
   };
 }
 
-export interface PaymentResponse {
+interface PaymentResponse {
   success: boolean;
   reference?: string;
   authorization_url?: string;
@@ -49,6 +50,7 @@ export const paymentService = {
       const response = await fetch(`${API_URL}/api/payments/initialize`, {
         method: 'POST',
         headers: {
+          ...(await authHeaders()),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({

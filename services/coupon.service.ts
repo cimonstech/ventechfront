@@ -1,20 +1,21 @@
+import { authHeaders } from '@/lib/authHeaders';
 import { Coupon, CreateCouponData, CouponValidation } from '@/types/coupon';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 export const couponService = {
   // Validate coupon code
-  async validateCoupon(code: string, cartAmount: number = 0, userId?: string | null): Promise<CouponValidation> {
+  async validateCoupon(code: string, cartAmount: number = 0, _userId?: string | null): Promise<CouponValidation> {
     try {
       const response = await fetch(`${API_URL}/api/coupons/validate`, {
         method: 'POST',
         headers: {
+          ...(await authHeaders()),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           code: code.trim().toUpperCase(),
           cart_amount: cartAmount,
-          user_id: userId || null,
         }),
       });
 
@@ -55,35 +56,38 @@ export const couponService = {
     }
   },
 
-  // Record coupon usage (called after order is created)
-  async recordCouponUsage(couponId: string, userId: string | null, orderId: string, discountAmount: number, orderTotal: number): Promise<boolean> {
-    try {
-      const response = await fetch(`${API_URL}/api/coupons/record-usage`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          coupon_id: couponId,
-          user_id: userId,
-          order_id: orderId,
-          discount_amount: discountAmount,
-          order_total: orderTotal,
-        }),
-      });
+  // Re-check a saved coupon against the cart as it is now.
+  // A saved discount is never reused after the cart changes.
+  async refreshAppliedCoupon(
+    coupon: CouponValidation | null,
+    cartAmount: number
+  ): Promise<{ coupon: CouponValidation | null; removedMessage?: string; changed: boolean }> {
+    if (!coupon) return { coupon: null, changed: false };
 
-      if (!response.ok) {
-        console.error('Failed to record coupon usage');
-        return false;
-      }
-
-      const result = await response.json();
-      return result.success || false;
-    } catch (error) {
-      console.error('Error recording coupon usage:', error);
-      return false;
+    if (!coupon.code) {
+      return {
+        coupon: null,
+        changed: true,
+        removedMessage: 'Apply the coupon again. The cart changed and the saved discount could not be checked.',
+      };
     }
+
+    const validation = await this.validateCoupon(coupon.code, cartAmount);
+    if (!validation.is_valid) {
+      return {
+        coupon: null,
+        changed: true,
+        removedMessage: validation.error_message || 'This coupon does not apply to the current cart.',
+      };
+    }
+
+    const next: CouponValidation = { ...validation, code: coupon.code };
+    return {
+      coupon: next,
+      changed: next.discount_amount !== coupon.discount_amount,
+    };
   },
+
 
   // Get all coupons (admin)
   async getAllCoupons(): Promise<Coupon[]> {
@@ -91,6 +95,7 @@ export const couponService = {
       const response = await fetch(`${API_URL}/api/coupons`, {
         method: 'GET',
         headers: {
+          ...(await authHeaders()),
           'Content-Type': 'application/json',
         },
       });
@@ -113,6 +118,7 @@ export const couponService = {
       const response = await fetch(`${API_URL}/api/coupons/${id}`, {
         method: 'GET',
         headers: {
+          ...(await authHeaders()),
           'Content-Type': 'application/json',
         },
       });
@@ -135,6 +141,7 @@ export const couponService = {
       const response = await fetch(`${API_URL}/api/coupons`, {
         method: 'POST',
         headers: {
+          ...(await authHeaders()),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(couponData),
@@ -159,6 +166,7 @@ export const couponService = {
       const response = await fetch(`${API_URL}/api/coupons/${id}`, {
         method: 'PATCH',
         headers: {
+          ...(await authHeaders()),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(updates),
@@ -183,6 +191,7 @@ export const couponService = {
       const response = await fetch(`${API_URL}/api/coupons/${id}`, {
         method: 'DELETE',
         headers: {
+          ...(await authHeaders()),
           'Content-Type': 'application/json',
         },
       });

@@ -19,13 +19,4 @@ export interface Banner {
   updated_at: string;
 }
 
-export interface HeroSlide extends Banner {
-  type: 'hero';
-}
-
-export interface SidebarBanner extends Banner {
-  type: 'sidebar';
-  size: 'small' | 'medium' | 'large';
-}
-
 

@@ -1,4 +1,4 @@
-export const ProductCardSkeleton = () => {
+const ProductCardSkeleton = () => {
   return (
     <div className="bg-white rounded-xl shadow-sm overflow-hidden animate-pulse">
       {/* Image Skeleton */}

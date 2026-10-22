@@ -30,24 +30,3 @@ export const loadPaystack = (): Promise<any> => {
   });
 };
 
-// Initialize Paystack payment (simplified version)
-export const initializePaystackPayment = (config: {
-  key: string;
-  email: string;
-  amount: number;
-  ref: string;
-  metadata?: Record<string, any>;
-  currency?: string;
-  callback_url?: string;
-}) => {
-  return loadPaystack().then((PaystackPop: any) => {
-    const handler = PaystackPop.setup({
-      ...config,
-      currency: config.currency || 'GHS',
-    });
-
-    handler.openIframe();
-    return handler;
-  });
-};
-

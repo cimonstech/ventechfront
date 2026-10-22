@@ -1,13 +1,5 @@
 import { supabase } from './supabase';
 
-export interface Setting {
-  id: string;
-  key: string;
-  value: string | null;
-  category: string;
-  description: string | null;
-}
-
 class SettingsService {
   private cache: Map<string, string> = new Map();
   private cacheTimestamp: number = 0;

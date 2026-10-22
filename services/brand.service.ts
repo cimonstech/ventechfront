@@ -51,21 +51,4 @@ export const getFilterBrands = async (): Promise<Brand[]> => {
   }
 };
 
-// Fetch brand by slug
-export const getBrandBySlug = async (slug: string): Promise<Brand | null> => {
-  try {
-    const { data, error } = await supabase
-      .from('brands')
-      .select('*')
-      .eq('slug', slug)
-      .single();
-
-    if (error) throw error;
-    return data;
-  } catch (error) {
-    console.error('Error fetching brand:', error);
-    return null;
-  }
-};
-
 

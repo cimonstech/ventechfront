@@ -110,18 +110,18 @@ const productSlice = createSlice({
 });
 
 export const {
-  setProducts,
-  setCategories,
-  setFeaturedProducts,
-  setCurrentProduct,
-  setFilters,
-  resetFilters,
-  setLoading,
-  setError,
-  setPagination,
-  addProduct,
-  updateProduct,
-  deleteProduct,
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
 } = productSlice.actions;
 
 export default productSlice.reducer;

@@ -1,5 +1,6 @@
 'use client';
 
+import { authHeaders } from '@/lib/authHeaders';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
@@ -315,6 +316,7 @@ export default function AdminDashboard() {
         const response = await fetch(`${API_URL}/api/orders`, {
           method: 'GET',
           headers: {
+            ...(await authHeaders()),
             'Content-Type': 'application/json',
           },
         });

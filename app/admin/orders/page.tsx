@@ -1,5 +1,6 @@
 'use client';
 
+import { authHeaders } from '@/lib/authHeaders';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -95,6 +96,7 @@ export default function AdminOrdersPage() {
         const response = await fetch(`${API_URL}/api/orders`, {
           method: 'GET',
           headers: {
+            ...(await authHeaders()),
             'Content-Type': 'application/json',
           },
         });
@@ -216,6 +218,7 @@ export default function AdminOrdersPage() {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: {
+          ...(await authHeaders()),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -248,6 +251,7 @@ export default function AdminOrdersPage() {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/orders/${orderId}/payment-status`, {
         method: 'PATCH',
         headers: {
+          ...(await authHeaders()),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -350,6 +354,7 @@ export default function AdminOrdersPage() {
       const response = await fetch(pdfUrl, {
         method: 'GET',
         headers: {
+          ...(await authHeaders()),
           'Accept': 'application/pdf',
         },
       }).catch((fetchError) => {

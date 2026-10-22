@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import type { User, Session } from '@supabase/supabase-js';
 
-export interface SignUpData {
+interface SignUpData {
   email: string;
   password: string;
   firstName: string;
@@ -9,20 +9,20 @@ export interface SignUpData {
   phone?: string;
 }
 
-export interface SignInData {
+interface SignInData {
   email: string;
   password: string;
 }
 
-export interface ResetPasswordData {
+interface ResetPasswordData {
   email: string;
 }
 
-export interface UpdatePasswordData {
+interface UpdatePasswordData {
   password: string;
 }
 
-export interface AuthResponse {
+interface AuthResponse {
   user: User | null;
   session: Session | null;
   error: Error | null;
@@ -154,25 +154,13 @@ export const updatePassword = async (data: UpdatePasswordData): Promise<{ error:
 };
 
 // Get current user
-export const getCurrentUser = async (): Promise<User | null> => {
+const getCurrentUser = async (): Promise<User | null> => {
   try {
     const { data: { user }, error } = await supabase.auth.getUser();
     if (error) throw error;
     return user;
   } catch (error) {
     console.error('Error getting current user:', error);
-    return null;
-  }
-};
-
-// Get current session
-export const getCurrentSession = async (): Promise<Session | null> => {
-  try {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    if (error) throw error;
-    return session;
-  } catch (error) {
-    console.error('Error getting current session:', error);
     return null;
   }
 };
@@ -460,7 +448,7 @@ export const getUserProfile = async (userId?: string) => {
 };
 
 // Update user profile
-export const updateUserProfile = async (updates: Partial<{
+const updateUserProfile = async (updates: Partial<{
   first_name: string;
   last_name: string;
   phone: string;

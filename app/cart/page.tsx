@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useLayoutEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/Button';
@@ -12,7 +12,12 @@ import { taxService } from '@/services/tax.service';
 import { discountService } from '@/services/discount.service';
 import { CouponCode } from '@/components/cart/CouponCode';
 import { CouponValidation } from '@/types/coupon';
+import { couponService } from '@/services/coupon.service';
+import { deliveryOptionsService } from '@/services/deliveryOptions.service';
+import { PRE_ORDER_SHIPPING_OPTIONS } from '@/services/preOrder.service';
 import toast from 'react-hot-toast';
+
+const FREE_DELIVERY_THRESHOLD = 20000;
 
 export default function CartPage() {
   const dispatch = useAppDispatch();
@@ -23,9 +28,17 @@ export default function CartPage() {
   const [appliedCoupon, setAppliedCoupon] = useState<CouponValidation | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [standardDelivery, setStandardDelivery] = useState<{ name: string; price: number } | null>(null);
 
-  // Track when component has mounted to avoid hydration mismatch
   React.useEffect(() => {
+    deliveryOptionsService.getActiveDeliveryOptions().then((options) => {
+      const first = options[0];
+      setStandardDelivery(first ? { name: first.name, price: first.price } : { name: 'Delivery', price: 0 });
+    });
+  }, []);
+
+  // First paint matches the server. The saved cart is applied before the browser paints.
+  useLayoutEffect(() => {
     setMounted(true);
     // Load coupon from sessionStorage on mount
     if (typeof window !== 'undefined') {
@@ -50,6 +63,34 @@ export default function CartPage() {
     }
   }, [items.length, appliedCoupon]);
 
+  // The saved discount belongs to the cart it was checked against.
+  // Quantity and product changes must be checked again before the total is shown.
+  React.useEffect(() => {
+    if (!mounted || !appliedCoupon || items.length === 0) return;
+
+    let cancelled = false;
+
+    couponService.refreshAppliedCoupon(appliedCoupon, total).then((result) => {
+      if (cancelled) return;
+
+      if (result.removedMessage) {
+        setAppliedCoupon(null);
+        sessionStorage.removeItem('applied_coupon');
+        toast.error(result.removedMessage);
+      } else if (result.coupon) {
+        setAppliedCoupon(result.coupon);
+        sessionStorage.setItem('applied_coupon', JSON.stringify(result.coupon));
+        if (result.changed) {
+          toast.success('Coupon updated for the current cart');
+        }
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mounted, total, items.length, appliedCoupon?.code]);
+
   const handleRemoveItem = (productId: string) => {
     dispatch(removeFromCart(productId));
     toast.success('Item removed from cart');
@@ -60,11 +101,21 @@ export default function CartPage() {
     dispatch(updateQuantity({ id: productId, quantity }));
   };
 
-  // No delivery fee on cart page - delivery options are selected on checkout
-  const deliveryFee = 0;
+  const regularSubtotal = items
+    .filter((item) => !item.is_pre_order)
+    .reduce((sum, item) => sum + (Number(item.subtotal) || 0), 0);
+  const hasRegularItems = items.some((item) => !item.is_pre_order);
+  const hasPreOrderItems = items.some((item) => item.is_pre_order);
+  const regularDeliveryFee = !hasRegularItems
+    ? 0
+    : regularSubtotal >= FREE_DELIVERY_THRESHOLD
+      ? 0
+      : (standardDelivery?.price ?? 0);
+  const preOrderDeliveryFee = hasPreOrderItems ? PRE_ORDER_SHIPPING_OPTIONS[0].price : 0;
+  const deliveryFee = regularDeliveryFee + preOrderDeliveryFee;
   const couponDiscount = appliedCoupon?.discount_amount || 0;
   const totalDiscount = discountAmount + couponDiscount;
-  const grandTotal = total + taxAmount - totalDiscount;
+  const grandTotal = Math.max(0, total + deliveryFee + taxAmount - totalDiscount);
 
   const handleCouponApplied = (validation: CouponValidation) => {
     setAppliedCoupon(validation);
@@ -110,15 +161,11 @@ export default function CartPage() {
     calculateTaxesAndDiscounts();
   }, [total]);
 
-  // Prevent hydration mismatch by showing consistent content until mounted
   if (!mounted) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="container mx-auto px-4">
-          <div className="mb-6">
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Shopping Cart</h1>
-            <p className="text-xs sm:text-sm text-gray-600">Loading...</p>
-          </div>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Shopping Cart</h1>
         </div>
       </div>
     );
@@ -149,6 +196,11 @@ export default function CartPage() {
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Shopping Cart</h1>
+          {hasRegularItems && hasPreOrderItems && (
+            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4">
+              Regular items and pre-order items ship separately. Checkout will place two orders.
+            </p>
+          )}
           <p className="text-xs sm:text-sm text-gray-600">{itemCount} {itemCount === 1 ? 'item' : 'items'} in your cart</p>
         </div>
 
@@ -284,9 +336,22 @@ export default function CartPage() {
                   </div>
                 )}
                 
-                <div className="text-xs text-gray-500 mt-2">
-                  <span>Delivery fee will be calculated at checkout</span>
+                <div className="flex justify-between text-gray-600">
+                  <span>Delivery</span>
+                  <span>
+                    {standardDelivery === null && hasRegularItems && regularSubtotal < FREE_DELIVERY_THRESHOLD
+                      ? '...'
+                      : deliveryFee === 0
+                        ? 'FREE'
+                        : formatCurrency(deliveryFee)}
+                  </span>
                 </div>
+                <p className="text-xs text-gray-500">
+                  {regularSubtotal >= FREE_DELIVERY_THRESHOLD && hasRegularItems
+                    ? 'Free delivery on orders from GH₵ 20,000.'
+                    : `${standardDelivery?.name ?? 'Delivery'} is included. You can choose another option at checkout.`}
+                  {hasPreOrderItems ? ' Pre-order shipping shown is air cargo.' : ''}
+                </p>
               </div>
 
               <div className="border-t border-gray-200 pt-4 mb-6">

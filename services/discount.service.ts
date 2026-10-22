@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 
-export interface Discount {
+interface Discount {
   id: string;
   name: string;
   description?: string;

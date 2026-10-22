@@ -1,5 +1,6 @@
 'use client';
 
+import { authHeaders } from '@/lib/authHeaders';
 import { useState, useEffect } from 'react';
 import { X, Download, Mail, Package, User, MapPin, Calendar, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -78,6 +79,7 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
         const response = await fetch(`${API_URL}/api/orders/${orderId}`, {
           method: 'GET',
           headers: {
+            ...(await authHeaders()),
             'Content-Type': 'application/json',
           },
         });
@@ -154,6 +156,7 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
             const itemsResponse = await fetch(`${API_URL}/api/orders/${orderId}/items`, {
               method: 'GET',
               headers: {
+                ...(await authHeaders()),
                 'Content-Type': 'application/json',
               },
             });
@@ -237,6 +240,7 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
       const response = await fetch(`${API_URL}/api/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: {
+          ...(await authHeaders()),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ status: newStatus }),
@@ -279,6 +283,7 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
       const response = await fetch(pdfUrl, {
         method: 'GET',
         headers: {
+          ...(await authHeaders()),
           'Accept': 'application/pdf',
         },
       }).catch((fetchError) => {

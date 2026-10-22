@@ -1,3 +1,5 @@
+import { authHeaders } from '@/lib/authHeaders';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 export interface MediaFile {
@@ -7,7 +9,7 @@ export interface MediaFile {
   lastModified?: Date;
 }
 
-export interface MediaListResponse {
+interface MediaListResponse {
   success: boolean;
   files?: MediaFile[];
   count?: number;
@@ -25,7 +27,7 @@ export const mediaService = {
       const url = `${API_URL}/api/upload/list?${params.toString()}`;
       console.log(`📡 Fetching media files from: ${url}`);
       
-      const response = await fetch(url);
+      const response = await fetch(url, { headers: await authHeaders() });
       
       if (!response.ok) {
         const errorText = await response.text().catch(() => 'Unknown error');
@@ -60,6 +62,7 @@ export const mediaService = {
 
       const response = await fetch(`${API_URL}/api/upload?folder=${encodeURIComponent(folder)}`, {
         method: 'POST',
+        headers: await authHeaders(),
         body: formData,
       });
 
@@ -81,11 +84,12 @@ export const mediaService = {
     try {
       const formData = new FormData();
       files.forEach((file) => {
-        formData.append('files', file);
+        formData.append('images', file);
       });
 
       const response = await fetch(`${API_URL}/api/upload/multiple?folder=${encodeURIComponent(folder)}`, {
         method: 'POST',
+        headers: await authHeaders(),
         body: formData,
       });
 
@@ -108,6 +112,7 @@ export const mediaService = {
       const response = await fetch(`${API_URL}/api/upload`, {
         method: 'DELETE',
         headers: {
+          ...(await authHeaders()),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ url }),

@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 
-export interface Notification {
+interface Notification {
   id: string;
   type: 'order' | 'stock' | 'user' | 'alert' | 'success';
   title: string;
