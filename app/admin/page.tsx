@@ -17,6 +17,9 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
+import { useAppSelector } from '@/store';
+import { isAdminRole } from '@/lib/roles';
+import { useAccess } from '@/context/AccessContext';
 
 interface DashboardStats {
   totalRevenue: number;
@@ -44,6 +47,9 @@ interface TopProduct {
 }
 
 export default function AdminDashboard() {
+  const { user } = useAppSelector((state) => state.auth);
+  const { access } = useAccess();
+  const showAnalytics = isAdminRole(access?.role || user?.role);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats>({
     totalRevenue: 0,
@@ -581,6 +587,8 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6">
+      {showAnalytics && (
+      <>
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {statCards.map((card) => (
@@ -630,6 +638,8 @@ export default function AdminDashboard() {
           </Link>
         ))}
       </div>
+      </>
+      )}
 
       {/* Recent Transactions & Top Products */}
       <div className="grid lg:grid-cols-2 gap-6">

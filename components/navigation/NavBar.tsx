@@ -13,12 +13,12 @@ import {
   X,
   LogOut,
   Package,
-  Settings,
   Mail,
   Phone,
   ChevronDown,
 } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '@/store';
+import { AreaSwitcher } from './AreaSwitcher';
 import { logout as logoutAction } from '@/store/authSlice';
 import { Button } from '../ui/Button';
 import { MegaMenu } from './MegaMenu';
@@ -206,6 +206,7 @@ export const NavBar = () => {
                   </Button>
                 </Link>
 
+                <AreaSwitcher />
                 <div className="relative group">
                   <Link href="/orders" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors">
                     <User size={18} className="text-[#3A3A3A]" />
@@ -232,12 +233,6 @@ export const NavBar = () => {
                       <Heart size={16} />
                       <span>Wishlist</span>
                     </Link>
-                    {user?.role === 'admin' && (
-                      <Link href="/admin" className="flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 text-[#FF7A19] text-sm">
-                        <Settings size={16} />
-                        <span>Admin Panel</span>
-                      </Link>
-                    )}
                     <button 
                       onClick={handleLogout}
                       className="flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 rounded-b-lg text-red-600 w-full text-left text-sm"
@@ -456,16 +451,7 @@ export const NavBar = () => {
                   <Package size={16} className="inline mr-2" />
                   My Orders
                 </Link>
-                {user?.role === 'admin' && (
-                  <Link
-                    href="/admin"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="block px-4 py-2.5 text-sm text-[#FF7A19] hover:bg-orange-50 transition-colors font-medium"
-                  >
-                    <Settings size={16} className="inline mr-2" />
-                    Admin Panel
-                  </Link>
-                )}
+                <AreaSwitcher variant="list" onNavigate={() => setIsMobileMenuOpen(false)} />
               </div>
 
               {/* Quick Actions */}

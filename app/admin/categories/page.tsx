@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { CategoryModal } from '@/components/admin/CategoryModal';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
+import { useAccess } from '@/context/AccessContext';
 
 interface Category {
   id: string;
@@ -21,6 +22,8 @@ interface Category {
 }
 
 export default function AdminCategoriesPage() {
+  const { canEdit } = useAccess();
+  const canEditProducts = canEdit('products');
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -114,6 +117,7 @@ export default function AdminCategoriesPage() {
             Organize products into categories and manage mega menu
           </p>
         </div>
+        {canEditProducts && (
         <Button
           variant="primary"
           icon={<Plus size={18} />}
@@ -121,6 +125,7 @@ export default function AdminCategoriesPage() {
         >
           Add Category
         </Button>
+        )}
       </div>
 
       {/* Stats */}
@@ -206,6 +211,7 @@ export default function AdminCategoriesPage() {
                   <span className="text-sm text-[#3A3A3A]">
                     <strong>{category.product_count}</strong> products
                   </span>
+                  {canEditProducts && (
                   <button
                     onClick={() => toggleMegaMenu(category.id)}
                     className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -221,9 +227,10 @@ export default function AdminCategoriesPage() {
                       <EyeOff size={18} className="text-gray-400" />
                     )}
                   </button>
+                  )}
                 </div>
 
-                {/* Actions */}
+                {canEditProducts && (
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
@@ -244,6 +251,7 @@ export default function AdminCategoriesPage() {
                     Delete
                   </Button>
                 </div>
+                )}
               </div>
             </div>
           ))

@@ -26,10 +26,16 @@ import {
   Percent,
   Star,
   Clock,
+  Shield,
+  FileText,
 } from 'lucide-react';
 import Link from 'next/link';
 import { signOut } from '@/services/auth.service';
 import { supabase } from '@/lib/supabase';
+import { hasAdminEntry } from '@/lib/roles';
+import { canOpenAdminPath, canViewModule, isFullAdmin } from '@/lib/access';
+import { useAccess } from '@/context/AccessContext';
+import { AreaSwitcher } from '@/components/navigation/AreaSwitcher';
 import toast from 'react-hot-toast';
 
 interface MenuItem {
@@ -49,6 +55,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [mounted, setMounted] = useState(false);
   const [pendingOrdersCount, setPendingOrdersCount] = useState<number | undefined>(undefined);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState<number | undefined>(undefined);
+  const { access, loading: accessLoading } = useAccess();
 
   useEffect(() => {
     // Mark as mounted to prevent hydration mismatch
@@ -57,18 +64,27 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   // Fetch badge counts
   useEffect(() => {
-    if (!isAuthenticated || !user || user.role !== 'admin') return;
+    if (!access) return;
+    const includeOrders = canViewModule(access, 'orders');
+    const includeNotifications = isFullAdmin(access.role);
+    if (!includeOrders && !includeNotifications) return;
 
     const fetchBadgeCounts = async () => {
       try {
-        // Fetch pending orders count
-        const { count: pendingCount, error: ordersError } = await supabase
-          .from('orders')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'pending');
+        if (includeOrders) {
+          const { count: pendingCount, error: ordersError } = await supabase
+            .from('orders')
+            .select('*', { count: 'exact', head: true })
+            .eq('status', 'pending');
 
-        if (!ordersError) {
-          setPendingOrdersCount(pendingCount || 0);
+          if (!ordersError) {
+            setPendingOrdersCount(pendingCount || 0);
+          }
+        }
+
+        if (!includeNotifications) {
+          setUnreadNotificationsCount(0);
+          return;
         }
 
         // Fetch unread notifications count
@@ -110,7 +126,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     // Refresh counts every 30 seconds
     const interval = setInterval(fetchBadgeCounts, 30000);
     return () => clearInterval(interval);
-  }, [isAuthenticated, user]);
+  }, [access]);
 
   useEffect(() => {
     // Wait for component to mount and auth state to finish loading before checking
@@ -146,7 +162,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         return;
       }
       
-      if (user.role !== 'admin') {
+      if (!hasAdminEntry(user.role)) {
         // User is authenticated but not admin
         if (pathname !== '/') {
           router.replace('/');
@@ -221,6 +237,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       href: '/admin/users',
     },
     {
+      icon: Shield,
+      label: 'Staff',
+      href: '/admin/staff',
+    },
+    {
       icon: CreditCard,
       label: 'Transactions',
       href: '/admin/transactions',
@@ -255,6 +276,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       ],
     },
     {
+      icon: FileText,
+      label: 'Audit log',
+      href: '/admin/audit-log',
+    },
+    {
       icon: Bell,
       label: 'Notifications',
       href: '/admin/notifications',
@@ -270,6 +296,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       ],
     },
   ];
+
+  const visibleMenuItems = !access
+    ? menuItems.filter((item) => item.href === '/admin')
+    : menuItems
+    .map((item) => {
+      if (!item.children) return item;
+      return {
+        ...item,
+        children: item.children.filter((child) => child.href && canOpenAdminPath(child.href, access)),
+      };
+    })
+    .filter((item) => {
+      if (item.children) return item.children.length > 0;
+      return !!item.href && canOpenAdminPath(item.href, access);
+    });
 
   const isActive = (href?: string) => {
     if (!href) return false;
@@ -304,7 +345,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   // After loading is complete, check if user is authenticated and is admin
   // Only render if authenticated as admin, otherwise useEffect will handle redirect
-  if (!isAuthenticated || !user || user.role !== 'admin') {
+  if (!isAuthenticated || !user || !hasAdminEntry(user.role)) {
     // Don't render anything while redirect is happening
     // This prevents flash of content
     return null;
@@ -354,7 +395,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Navigation Menu */}
         <nav className="flex-1 overflow-y-auto py-4">
-          {menuItems.map((item) => (
+          {visibleMenuItems.map((item) => (
             <div key={item.label}>
               {item.children ? (
                 // Expandable menu item
@@ -456,6 +497,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </p>
             </div>
             <div className="flex items-center gap-4">
+              <AreaSwitcher />
               <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
                 <Bell size={20} />
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
@@ -471,7 +513,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         {/* Page Content */}
-        <div className="p-8">{children}</div>
+        <div className="p-8">
+          {accessLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF7A19]" />
+            </div>
+          ) : !access ? (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-10 text-center">
+              <h2 className="text-xl font-bold text-[#1A1A1A]">Could not confirm your access</h2>
+              <p className="text-sm text-[#3A3A3A] mt-2">Refresh the page and try again.</p>
+            </div>
+          ) : canOpenAdminPath(pathname, access) ? (
+            children
+          ) : (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-10 text-center">
+              <h2 className="text-xl font-bold text-[#1A1A1A]">You do not have access to this section</h2>
+              <p className="text-sm text-[#3A3A3A] mt-2">Choose a section from the sidebar.</p>
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );

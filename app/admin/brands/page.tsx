@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { BrandModal } from '@/components/admin/BrandModal';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
+import { useAccess } from '@/context/AccessContext';
 
 interface Brand {
   id: string;
@@ -20,6 +21,8 @@ interface Brand {
 }
 
 export default function BrandsPage() {
+  const { canEdit } = useAccess();
+  const canEditProducts = canEdit('products');
   const [loading, setLoading] = useState(true);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -113,6 +116,7 @@ export default function BrandsPage() {
             Manage product brands and manufacturers
           </p>
         </div>
+        {canEditProducts && (
         <Button
           variant="primary"
           icon={<Plus size={18} />}
@@ -120,6 +124,7 @@ export default function BrandsPage() {
         >
           Add Brand
         </Button>
+        )}
       </div>
 
       {/* Stats */}
@@ -215,6 +220,7 @@ export default function BrandsPage() {
                   <span className="text-sm text-[#3A3A3A]">
                     <strong>{brand.product_count}</strong> products
                   </span>
+                  {canEditProducts && (
                   <button
                     onClick={() => toggleFeatured(brand.id)}
                     className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -226,9 +232,10 @@ export default function BrandsPage() {
                       <EyeOff size={18} className="text-gray-400" />
                     )}
                   </button>
+                  )}
                 </div>
 
-                {/* Actions */}
+                {canEditProducts && (
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
@@ -249,6 +256,7 @@ export default function BrandsPage() {
                     Delete
                   </Button>
                 </div>
+                )}
               </div>
             </div>
           ))

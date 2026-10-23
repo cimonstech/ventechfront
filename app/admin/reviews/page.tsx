@@ -14,6 +14,8 @@ import {
 import { reviewsService } from '@/services/reviews.service';
 import { Review } from '@/types/review';
 import { useAppSelector } from '@/store';
+import { hasAdminEntry } from '@/lib/roles';
+import { useAccess } from '@/context/AccessContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -39,13 +41,15 @@ interface ReviewWithDetails extends Omit<Review, 'user'> {
 export default function AdminReviewsPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+  const { canEdit } = useAccess();
+  const canEditProducts = canEdit('products');
   const [reviews, setReviews] = useState<ReviewWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterApproved, setFilterApproved] = useState<'all' | 'approved' | 'unapproved'>('all');
 
   useEffect(() => {
-    if (isAuthenticated && user?.role !== 'admin') {
+    if (isAuthenticated && !hasAdminEntry(user?.role)) {
       router.push('/');
       return;
     }
@@ -236,6 +240,7 @@ export default function AdminReviewsPage() {
                       )}
 
                       {/* Actions */}
+                      {canEditProducts && (
                       <div className="flex items-center gap-2">
                         <Button
                           variant="outline"
@@ -247,6 +252,7 @@ export default function AdminReviewsPage() {
                           Delete
                         </Button>
                       </div>
+                      )}
                     </div>
                   </div>
                 </div>

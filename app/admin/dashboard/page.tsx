@@ -13,15 +13,19 @@ import {
   Eye
 } from 'lucide-react';
 import { useAppSelector } from '@/store';
+import { hasAdminEntry, isAdminRole } from '@/lib/roles';
+import { useAccess } from '@/context/AccessContext';
 import { useRouter } from 'next/navigation';
 
 export default function AdminDashboardPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+  const { access } = useAccess();
+  const showAnalytics = isAdminRole(access?.role || user?.role);
 
   useEffect(() => {
     // Redirect if not admin
-    if (isAuthenticated && user?.role !== 'admin') {
+    if (isAuthenticated && !hasAdminEntry(user?.role)) {
       router.push('/');
     }
   }, [isAuthenticated, user, router]);
@@ -85,7 +89,7 @@ export default function AdminDashboardPage() {
 
       {/* Admin Content */}
       <div className="container mx-auto px-4 py-8">
-        {/* Stats Grid */}
+        {showAnalytics && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {stats.map((stat, index) => (
             <div key={index} className="bg-white rounded-xl shadow-sm p-6">
@@ -102,6 +106,7 @@ export default function AdminDashboardPage() {
             </div>
           ))}
         </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Recent Orders */}

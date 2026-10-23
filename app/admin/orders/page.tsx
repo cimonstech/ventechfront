@@ -20,6 +20,8 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { useAppSelector } from '@/store';
+import { hasAdminEntry } from '@/lib/roles';
+import { useAccess } from '@/context/AccessContext';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 import { CSVExporter, OrderColumns } from '@/lib/csvExport';
@@ -43,6 +45,8 @@ interface Order {
 export default function AdminOrdersPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+  const { canEdit } = useAccess();
+  const canEditOrders = canEdit('orders');
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -53,7 +57,7 @@ export default function AdminOrdersPage() {
   const [isSelectMode, setIsSelectMode] = useState(false);
 
   useEffect(() => {
-    if (isAuthenticated && user?.role !== 'admin') {
+    if (isAuthenticated && !hasAdminEntry(user?.role)) {
       router.push('/');
       return;
     }
@@ -471,7 +475,7 @@ export default function AdminOrdersPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {isSelectMode && selectedOrders.size > 0 && (
+              {canEditOrders && isSelectMode && selectedOrders.size > 0 && (
                 <div className="flex items-center gap-2">
                   <select
                     onChange={(e) => bulkUpdateStatus(e.target.value)}
@@ -501,6 +505,7 @@ export default function AdminOrdersPage() {
                   </span>
                 </div>
               )}
+              {canEditOrders && (
               <Button
                 variant="outline"
                 onClick={() => {
@@ -510,6 +515,7 @@ export default function AdminOrdersPage() {
               >
                 {isSelectMode ? 'Cancel' : 'Select'}
               </Button>
+              )}
               <Button 
                 variant="outline" 
                 icon={<Download size={18} />}
@@ -658,7 +664,7 @@ export default function AdminOrdersPage() {
                         {getStatusBadge(order.status)}
                       </td>
                       <td className="px-6 py-4">
-                        {/* Payment status dropdown - always editable */}
+                        {canEditOrders ? (
                         <select
                           value={order.payment_status}
                           onChange={(e) => updatePaymentStatus(order.id, e.target.value)}
@@ -669,6 +675,9 @@ export default function AdminOrdersPage() {
                           <option value="failed">Failed</option>
                           <option value="refunded">Refunded</option>
                         </select>
+                        ) : (
+                          <span className="text-xs text-[#3A3A3A] capitalize">{order.payment_status}</span>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
@@ -693,7 +702,7 @@ export default function AdminOrdersPage() {
                             <FileText size={16} />
                           </Button>
                           
-                          {/* Status Update Dropdown */}
+                          {canEditOrders && (
                           <select
                             value={order.status}
                             onChange={(e) => updateOrderStatus(order.id, e.target.value)}
@@ -706,6 +715,7 @@ export default function AdminOrdersPage() {
                             <option value="delivered">Delivered</option>
                             <option value="cancelled">Cancelled</option>
                           </select>
+                          )}
                         </div>
                       </td>
                     </tr>

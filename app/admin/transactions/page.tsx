@@ -13,6 +13,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { useAccess } from '@/context/AccessContext';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 
@@ -30,6 +31,8 @@ interface Transaction {
 }
 
 export default function TransactionsPage() {
+  const { canEdit } = useAccess();
+  const canEditFinance = canEdit('finance');
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -378,7 +381,7 @@ export default function TransactionsPage() {
           </select>
 
           {/* Bulk Actions */}
-          {selectedTransactions.size > 0 && (
+          {canEditFinance && selectedTransactions.size > 0 && (
             <Button 
               variant="outline" 
               icon={<RotateCcw size={18} />}
@@ -402,6 +405,7 @@ export default function TransactionsPage() {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
+                {canEditFinance && (
                 <th className="px-6 py-3 text-left text-xs font-semibold text-[#1A1A1A] uppercase">
                   <input
                     type="checkbox"
@@ -410,6 +414,7 @@ export default function TransactionsPage() {
                     className="rounded border-gray-300 text-[#FF7A19] focus:ring-[#FF7A19]"
                   />
                 </th>
+                )}
                 <th className="px-6 py-3 text-left text-xs font-semibold text-[#1A1A1A] uppercase">
                   Order ID
                 </th>
@@ -436,13 +441,14 @@ export default function TransactionsPage() {
             <tbody className="divide-y divide-gray-200">
               {filteredTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-[#3A3A3A]">
+                  <td colSpan={canEditFinance ? 8 : 7} className="px-6 py-12 text-center text-[#3A3A3A]">
                     No transactions found
                   </td>
                 </tr>
               ) : (
                 filteredTransactions.map((transaction) => (
                   <tr key={transaction.id} className="hover:bg-gray-50 transition-colors">
+                    {canEditFinance && (
                     <td className="px-6 py-4">
                       <input
                         type="checkbox"
@@ -451,6 +457,7 @@ export default function TransactionsPage() {
                         className="rounded border-gray-300 text-[#FF7A19] focus:ring-[#FF7A19]"
                       />
                     </td>
+                    )}
                     <td className="px-6 py-4">
                       <span className="font-mono text-sm font-semibold text-[#1A1A1A]">
                         {transaction.order_number}
@@ -492,7 +499,7 @@ export default function TransactionsPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      {transaction.status === 'completed' ? (
+                      {canEditFinance && transaction.status === 'completed' ? (
                         <button
                           onClick={() => handleSingleRefund(transaction)}
                           disabled={isRefunding}
