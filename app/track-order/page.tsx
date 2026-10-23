@@ -53,13 +53,14 @@ export default function TrackOrderPage() {
         setOrder(orderData);
         toast.success('Order found!');
       } else {
-        setError('Order not found. Please check your order number and email address and try again.');
-        toast.error('Order not found');
+        const message = "We couldn't find an order with that number. Check the number and the email you used at checkout.";
+        setError(message);
+        toast.error(message);
       }
     } catch (err: any) {
-      console.error('Error tracking order:', err);
-      setError(err.message || 'Failed to track order. Please try again.');
-      toast.error('Failed to track order');
+      const message = err.message || 'Something went wrong. Please try again in a moment.';
+      setError(message);
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -176,7 +177,6 @@ export default function TrackOrderPage() {
           <div className="max-w-2xl mx-auto">
             <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
               <XCircle className="mx-auto mb-4 text-red-500" size={48} />
-              <h3 className="text-lg font-semibold text-red-900 mb-2">Order Not Found</h3>
               <p className="text-red-700">{error}</p>
             </div>
           </div>
