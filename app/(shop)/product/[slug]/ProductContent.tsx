@@ -68,19 +68,6 @@ export function ProductContent({ product }: ProductContentProps) {
   const basePrice = product.discount_price || product.original_price || 0;
   const finalPrice = variantPrice > 0 ? variantPrice : basePrice;
 
-  // Debug: Log price values to identify doubling issue
-  if (process.env.NODE_ENV === 'development') {
-    console.log('Product price debug:', {
-      productId: product.id,
-      productName: product.name,
-      discount_price: product.discount_price,
-      original_price: product.original_price,
-      basePrice,
-      variantPrice,
-      finalPrice,
-      hasVariants: variantPrice > 0,
-    });
-  }
   const productImages = product.images && product.images.length > 0 ? product.images : [product.thumbnail || '/placeholders/placeholder-product.webp'];
 
   useEffect(() => {

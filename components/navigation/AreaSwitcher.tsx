@@ -6,6 +6,7 @@ import { ChevronDown } from 'lucide-react';
 import { useAppSelector } from '@/store';
 import { useAccess } from '@/context/AccessContext';
 import { PROGRAM_AREAS, hasAdminEntry } from '@/lib/access';
+import { getRoleLabel } from '@/lib/roles';
 
 interface AreaLink {
   id: string;
@@ -31,7 +32,7 @@ export function AreaSwitcher({
   ];
 
   if (hasAdminEntry(access?.role || user.role)) {
-    areas.push({ id: 'admin', label: 'Admin', href: '/admin' });
+    areas.push({ id: 'admin', label: 'Admin panel', href: '/admin' });
   }
 
   for (const area of PROGRAM_AREAS) {
@@ -42,7 +43,8 @@ export function AreaSwitcher({
     areas.push({ id: area.role, label: area.label, href: area.href });
   }
 
-  const current = pathname.startsWith('/admin') ? 'Admin' : 'My account';
+  const current = pathname.startsWith('/admin') ? 'Admin panel' : 'My account';
+  const buttonLabel = hasAdminEntry(user.role) ? getRoleLabel(user.role) : current;
 
   if (variant === 'list') {
     return (
@@ -77,7 +79,7 @@ export function AreaSwitcher({
         type="button"
         className="flex items-center gap-1 px-3 py-2 rounded-lg hover:bg-gray-50 text-sm font-medium text-[#1A1A1A]"
       >
-        {current}
+        {buttonLabel}
         <ChevronDown size={14} className="text-[#3A3A3A]" />
       </button>
       <div className="absolute right-0 mt-2 w-44 bg-white rounded-lg shadow-xl border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">

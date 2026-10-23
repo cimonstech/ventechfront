@@ -32,7 +32,7 @@ import {
 import Link from 'next/link';
 import { signOut } from '@/services/auth.service';
 import { supabase } from '@/lib/supabase';
-import { hasAdminEntry } from '@/lib/roles';
+import { getRoleLabel, hasAdminEntry } from '@/lib/roles';
 import { canOpenAdminPath, canViewModule, isFullAdmin } from '@/lib/access';
 import { useAccess } from '@/context/AccessContext';
 import { AreaSwitcher } from '@/components/navigation/AreaSwitcher';
@@ -386,7 +386,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 {user?.full_name?.charAt(0) || 'A'}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold truncate">{user?.full_name || 'Admin'}</p>
+                <div className="flex items-center gap-2 min-w-0">
+                  <p className="font-semibold truncate">{user?.full_name || 'Admin'}</p>
+                  <span className="shrink-0 text-[10px] leading-none px-1.5 py-1 rounded bg-white/10 text-gray-200">
+                    {getRoleLabel(user?.role)}
+                  </span>
+                </div>
                 <p className="text-xs text-gray-400 truncate">{user?.email}</p>
               </div>
             </div>

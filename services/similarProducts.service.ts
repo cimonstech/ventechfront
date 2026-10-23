@@ -20,7 +20,7 @@ const getSimilarProducts = async (
           .eq('category_id', categoryId)
           .eq('brand_id', brandId)
           .neq('id', productId)
-          .eq('is_active', true)
+          .eq('in_stock', true)
           .limit(limit);
 
         if (error1) {
@@ -46,7 +46,7 @@ const getSimilarProducts = async (
           .select('*')
           .eq('category_id', categoryId)
           .neq('id', productId)
-          .eq('is_active', true)
+          .eq('in_stock', true)
           .limit(limit);
 
         if (error2) {
@@ -69,7 +69,7 @@ const getSimilarProducts = async (
           .select('*')
           .eq('brand_id', brandId)
           .neq('id', productId)
-          .eq('is_active', true)
+          .eq('in_stock', true)
           .limit(limit - combined.length);
 
         if (error3) {
@@ -90,7 +90,7 @@ const getSimilarProducts = async (
           .from('products')
           .select('*')
           .neq('id', productId)
-          .eq('is_active', true)
+          .eq('in_stock', true)
           .limit(limit - combined.length);
 
         if (error4) {

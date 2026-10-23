@@ -312,11 +312,8 @@ export const orderService = {
 
   async getOrderByNumberAndEmail(orderNumberOrId: string, email: string): Promise<Order | null> {
     try {
-      // Use backend API to bypass RLS and verify email
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      
-      try {
-        const response = await fetch(`${API_URL}/api/orders/track`, {
+      const response = await fetch(`${API_URL}/api/orders/track`, {
           method: 'POST',
           headers: {
             ...(await authHeaders()),
@@ -365,130 +362,19 @@ export const orderService = {
               delivered_at: data.delivered_at,
             };
             return order;
-          } else {
-            // Order not found or email doesn't match
-            return null;
           }
-        } else if (response.status === 404) {
-          // Order not found
-          return null;
-        } else {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || 'Failed to fetch order');
-        }
-      } catch (apiError: any) {
-        console.warn('Backend API failed, trying Supabase fallback:', apiError);
-        
-        // Fallback to Supabase direct query
-        // First, try to find order by order_number
-        let { data, error } = await supabase
-          .from('orders')
-          .select(`
-            *,
-            items:order_items(*),
-            user:users!orders_user_id_fkey(id, email)
-          `)
-          .eq('order_number', orderNumberOrId)
-          .maybeSingle();
-
-        // If not found by order_number, try by id
-        if (error || !data) {
-          const { data: dataById, error: errorById } = await supabase
-            .from('orders')
-            .select(`
-              *,
-              items:order_items(*),
-              user:users!orders_user_id_fkey(id, email)
-            `)
-            .eq('id', orderNumberOrId)
-            .maybeSingle();
-          
-          data = dataById;
-          error = errorById;
-        }
-
-        if (error) {
-          console.error('Supabase query error:', {
-            code: error.code,
-            message: error.message,
-            details: error.details,
-            hint: error.hint,
-          });
-          
-          // If order not found, return null instead of throwing
-          if (error.code === 'PGRST116' || error.message?.includes('No rows')) {
-            return null;
-          }
-          throw new Error(`Database error: ${error.message || 'Unknown error'}`);
-        }
-
-        if (!data) return null;
-
-        // Check if email matches
-        // Email can be in:
-        // 1. user.email (if order has a user_id)
-        // 2. delivery_address.email or shipping_address.email (for guest orders)
-        const userEmail = data.user?.email?.toLowerCase();
-        const deliveryEmail = (data.delivery_address?.email || data.shipping_address?.email)?.toLowerCase();
-        const providedEmail = email.toLowerCase().trim();
-
-        const emailMatches = 
-          userEmail === providedEmail || 
-          deliveryEmail === providedEmail;
-
-        if (!emailMatches) {
-          // Email doesn't match - return null for security
           return null;
         }
 
-        // Transform the data to match Order interface
-        const order: Order = {
-          id: data.id,
-          user_id: data.user_id,
-          order_number: data.order_number,
-          status: data.status,
-          items: (data.items || []).map((item: any) => ({
-            id: item.id,
-            order_id: item.order_id,
-            product_id: item.product_id,
-            product_name: item.product_name,
-            product_image: item.product_image,
-            quantity: item.quantity,
-            unit_price: item.unit_price,
-            subtotal: item.subtotal || (item.unit_price * item.quantity),
-            selected_variants: item.selected_variants || {},
-          })),
-          subtotal: data.subtotal || 0,
-          discount: data.discount || 0,
-          delivery_fee: data.delivery_fee || data.shipping_fee || 0,
-          tax: data.tax || 0,
-          total: data.total || 0,
-          payment_method: data.payment_method,
-          payment_status: data.payment_status,
-          delivery_address: data.delivery_address || data.shipping_address || {},
-          delivery_option: data.delivery_option || {},
-          tracking_number: data.tracking_number,
-          notes: data.notes,
-          created_at: data.created_at,
-          updated_at: data.updated_at,
-          delivered_at: data.delivered_at,
-        };
+        if (response.status === 404) return null;
 
-        return order;
-      }
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Something went wrong. Please try again in a moment.');
     } catch (error: any) {
-      console.error('Error fetching order by number and email:', {
-        message: error?.message || 'Unknown error',
-        code: error?.code,
-        details: error?.details,
-        hint: error?.hint,
-        error: error,
-      });
-      
-      // Return null if order not found, throw for other errors
-      if (error?.code === 'PGRST116' || error?.message?.includes('No rows') || error?.message?.includes('not found')) {
-        return null;
+      if (error instanceof TypeError) {
+        throw new Error('Something went wrong. Please try again in a moment.');
       }
+      console.error('Error fetching order by number and email:', error?.message || error);
       throw error;
     }
   },

@@ -85,9 +85,8 @@ const getProducts = async (params: GetProductsParams = {}): Promise<Product[]> =
 
     if (error) {
       console.error('Error fetching products with relations:', error);
-      
+
       // Fallback: Try fetching without explicit foreign key
-      console.log('Attempting to fetch products with simple relations...');
       let fallbackQuery = supabase
         .from('products')
         .select(`
@@ -194,7 +193,6 @@ const getProducts = async (params: GetProductsParams = {}): Promise<Product[]> =
         });
       }
       
-      console.log('Fetched products with simple relations:', productsOnly?.length || 0);
       const transformedProducts = (productsOnly || []).map((p: any) => ({
         ...p,
         // Always use 'price' field from DB as original_price (source of truth)
@@ -322,7 +320,6 @@ const getProducts = async (params: GetProductsParams = {}): Promise<Product[]> =
       };
     });
     
-    console.log('Successfully fetched products with relations:', productsWithRanges.length);
     return productsWithRanges;
   } catch (error) {
     console.error('Error fetching products:', error);
