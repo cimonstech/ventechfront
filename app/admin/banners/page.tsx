@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import toast from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 import { MediaPicker } from '@/components/admin/MediaPicker';
+import { useAccess } from '@/context/AccessContext';
 
 interface Banner {
   id: string;
@@ -20,6 +21,8 @@ interface Banner {
 }
 
 export default function BannersPage() {
+  const { canEdit } = useAccess();
+  const canEditContent = canEdit('content');
   const [banners, setBanners] = useState<Banner[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -299,6 +302,7 @@ export default function BannersPage() {
             <h1 className="text-3xl font-bold text-[#1A1A1A]">Homepage Hero Sliders</h1>
             <p className="text-[#3A3A3A] mt-2">Manage banner images for the homepage carousel</p>
           </div>
+          {canEditContent && (
           <Button
             variant="primary"
             icon={<Plus size={20} />}
@@ -313,10 +317,11 @@ export default function BannersPage() {
           >
             {showForm ? 'Cancel' : 'Add New Banner'}
           </Button>
+          )}
         </div>
 
         {/* Add/Edit Banner Form */}
-        {showForm && (
+        {canEditContent && showForm && (
           <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
             <h2 className="text-xl font-bold text-[#1A1A1A] mb-6">
               {editingBanner ? 'Edit Hero Slider' : 'Add New Hero Slider'}
@@ -544,6 +549,7 @@ export default function BannersPage() {
                     </div>
 
                     {/* Actions */}
+                    {canEditContent && (
                     <div className="flex flex-col gap-2">
                       <button
                         onClick={() => handleEdit(banner)}
@@ -567,6 +573,7 @@ export default function BannersPage() {
                         <Trash2 size={20} />
                       </button>
                     </div>
+                    )}
                   </div>
                 </div>
               ))}

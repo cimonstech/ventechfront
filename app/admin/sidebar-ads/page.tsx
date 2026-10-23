@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { SidebarAdModal } from '@/components/admin/SidebarAdModal';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
+import { useAccess } from '@/context/AccessContext';
 
 interface SidebarAd {
   id: string;
@@ -20,6 +21,8 @@ interface SidebarAd {
 }
 
 export default function SidebarAdsPage() {
+  const { canEdit } = useAccess();
+  const canEditContent = canEdit('content');
   const [loading, setLoading] = useState(true);
   const [ads, setAds] = useState<SidebarAd[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -122,6 +125,7 @@ export default function SidebarAdsPage() {
             Manage promotional ads displayed in the right sidebar
           </p>
         </div>
+        {canEditContent && (
         <Button
           variant="primary"
           icon={<Plus size={18} />}
@@ -129,6 +133,7 @@ export default function SidebarAdsPage() {
         >
           Add New Ad
         </Button>
+        )}
       </div>
 
       {/* Stats */}
@@ -238,6 +243,7 @@ export default function SidebarAdsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
+                      {canEditContent ? (
                       <button
                         onClick={() => toggleActive(ad.id)}
                         className={`px-3 py-1 rounded-full text-xs font-semibold ${
@@ -248,11 +254,17 @@ export default function SidebarAdsPage() {
                       >
                         {ad.active ? '✓ Active' : 'Inactive'}
                       </button>
+                      ) : (
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${ad.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                          {ad.active ? '✓ Active' : 'Inactive'}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-sm text-[#3A3A3A]">{ad.sort_order}</span>
                     </td>
                     <td className="px-6 py-4">
+                      {canEditContent && (
                       <div className="flex gap-2">
                         <button 
                           onClick={() => setEditingAd(ad)}
@@ -267,6 +279,7 @@ export default function SidebarAdsPage() {
                           <Trash2 size={18} className="text-red-600" />
                         </button>
                       </div>
+                      )}
                     </td>
                   </tr>
                 ))

@@ -18,6 +18,7 @@ import {
 import { deliveryOptionsService } from '@/services/deliveryOptions.service';
 import { formatCurrency } from '@/lib/helpers';
 import { useAppSelector } from '@/store';
+import { hasAdminEntry } from '@/lib/roles';
 import toast from 'react-hot-toast';
 
 interface DeliveryOption {
@@ -51,7 +52,7 @@ export default function AdminSettingsPage() {
   });
 
   useEffect(() => {
-    if (isAuthenticated && user?.role !== 'admin') {
+    if (isAuthenticated && !hasAdminEntry(user?.role)) {
       router.push('/');
       return;
     }

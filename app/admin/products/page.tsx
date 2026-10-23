@@ -19,6 +19,8 @@ import { Product } from '@/types/product';
 import { productService } from '@/services/product.service';
 import { formatCurrency } from '@/lib/helpers';
 import { useAppSelector } from '@/store';
+import { hasAdminEntry } from '@/lib/roles';
+import { useAccess } from '@/context/AccessContext';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
@@ -27,6 +29,8 @@ import { CSVExporter, ProductColumns } from '@/lib/csvExport';
 export default function AdminProductsPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+  const { canEdit } = useAccess();
+  const canEditProducts = canEdit('products');
 
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -42,7 +46,7 @@ export default function AdminProductsPage() {
   });
 
   useEffect(() => {
-    if (isAuthenticated && user?.role !== 'admin') {
+    if (isAuthenticated && !hasAdminEntry(user?.role)) {
       router.push('/');
       return;
     }
@@ -222,6 +226,7 @@ export default function AdminProductsPage() {
                   Back to Dashboard
                 </Button>
               </Link>
+              {canEditProducts && (
               <Button 
                 variant="primary" 
                 size="sm" 
@@ -230,6 +235,7 @@ export default function AdminProductsPage() {
               >
                 Add Product
               </Button>
+              )}
               <Button 
                 variant="outline" 
                 size="sm"
@@ -282,11 +288,13 @@ export default function AdminProductsPage() {
             <Package className="mx-auto mb-4 text-gray-400" size={48} />
             <h3 className="text-xl font-semibold text-gray-900 mb-2">No products found</h3>
             <p className="text-gray-600 mb-6">Get started by adding your first product</p>
+            {canEditProducts && (
             <Link href="/admin/products/new">
               <Button variant="primary" icon={<Plus size={16} />}>
                 Add Product
               </Button>
             </Link>
+            )}
           </div>
         ) : (
           <>
@@ -389,6 +397,8 @@ export default function AdminProductsPage() {
                                 <Eye size={16} />
                               </button>
                             </Link>
+                            {canEditProducts && (
+                            <>
                             <button 
                               onClick={() => setEditingProduct(product)}
                               className="text-gray-600 hover:text-blue-600 p-1"
@@ -401,6 +411,8 @@ export default function AdminProductsPage() {
                             >
                               <Trash2 size={16} />
                             </button>
+                            </>
+                            )}
                           </div>
                         </td>
                       </tr>

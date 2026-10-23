@@ -18,6 +18,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { useAppSelector } from '@/store';
+import { hasAdminEntry, isAdminRole } from '@/lib/roles';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 import { CSVExporter, CustomerColumns } from '@/lib/csvExport';
@@ -42,7 +43,7 @@ export default function AdminUsersPage() {
   const [roleFilter, setRoleFilter] = useState<string>('all');
 
   useEffect(() => {
-    if (isAuthenticated && user?.role !== 'admin') {
+    if (isAuthenticated && !hasAdminEntry(user?.role)) {
       router.push('/');
       return;
     }
@@ -203,7 +204,7 @@ export default function AdminUsersPage() {
   };
 
   const getRoleBadge = (role: string) => {
-    return role === 'admin' ? (
+    return isAdminRole(role) ? (
       <Badge variant="error" className="flex items-center gap-1">
         <Shield size={12} />
         Admin

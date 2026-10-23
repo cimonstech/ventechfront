@@ -19,6 +19,8 @@ import { Product } from '@/types/product';
 import { productService } from '@/services/product.service';
 import { formatCurrency } from '@/lib/helpers';
 import { useAppSelector } from '@/store';
+import { hasAdminEntry } from '@/lib/roles';
+import { useAccess } from '@/context/AccessContext';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
@@ -26,6 +28,8 @@ import toast from 'react-hot-toast';
 export default function AdminPreOrdersPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+  const { canEdit } = useAccess();
+  const canEditOrders = canEdit('orders');
 
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -35,7 +39,7 @@ export default function AdminPreOrdersPage() {
   const [isNewPreOrder, setIsNewPreOrder] = useState(false);
 
   useEffect(() => {
-    if (isAuthenticated && user?.role !== 'admin') {
+    if (isAuthenticated && !hasAdminEntry(user?.role)) {
       router.push('/');
       return;
     }
@@ -147,6 +151,7 @@ export default function AdminPreOrdersPage() {
                   Back to Dashboard
                 </Button>
               </Link>
+              {canEditOrders && (
               <Button 
                 variant="primary" 
                 size="sm" 
@@ -158,6 +163,7 @@ export default function AdminPreOrdersPage() {
               >
                 Add Pre-Order Product
               </Button>
+              )}
             </div>
           </div>
         </div>
@@ -295,6 +301,8 @@ export default function AdminPreOrdersPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex items-center justify-end gap-2">
+                            {canEditOrders && (
+                            <>
                             <button
                               onClick={() => handleEdit(product)}
                               className="text-blue-600 hover:text-blue-900 p-2 hover:bg-blue-50 rounded-lg transition-colors"
@@ -309,6 +317,8 @@ export default function AdminPreOrdersPage() {
                             >
                               <Trash2 size={18} />
                             </button>
+                            </>
+                            )}
                           </div>
                         </td>
                       </tr>

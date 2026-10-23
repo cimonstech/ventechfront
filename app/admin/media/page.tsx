@@ -5,11 +5,14 @@ import { Upload, Trash2, Search, Grid, List, Image as ImageIcon, X, Loader2, Che
 import { Button } from '@/components/ui/Button';
 import { mediaService, MediaFile } from '@/services/media.service';
 import toast from 'react-hot-toast';
+import { useAccess } from '@/context/AccessContext';
 
 type ViewMode = 'grid' | 'list';
 type FolderFilter = 'all' | 'products' | 'categories' | 'banners' | 'brands' | 'uploads';
 
 export default function MediaLibraryPage() {
+  const { canEdit } = useAccess();
+  const canEditProducts = canEdit('products');
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -162,6 +165,8 @@ export default function MediaLibraryPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {canEditProducts && (
+          <>
           <Button
             variant="outline"
             icon={syncing ? <Loader2 className="animate-spin" size={18} /> : <RefreshCw size={18} />}
@@ -191,6 +196,8 @@ export default function MediaLibraryPage() {
               {uploading ? 'Uploading...' : 'Upload Media'}
             </Button>
           </label>
+          </>
+          )}
         </div>
       </div>
 
@@ -273,7 +280,7 @@ export default function MediaLibraryPage() {
           <p className="text-[#3A3A3A] mb-6">
             {searchQuery ? 'Try adjusting your search filters' : 'Upload your first media file to get started'}
           </p>
-          {!searchQuery && (
+          {canEditProducts && !searchQuery && (
             <label htmlFor="media-upload">
               <Button variant="primary" icon={<Upload size={18} />} className="cursor-pointer">
                 Upload Media
@@ -314,6 +321,7 @@ export default function MediaLibraryPage() {
                       <ImageIcon size={18} className="text-[#FF7A19]" />
                     )}
                   </button>
+                  {canEditProducts && (
                   <button
                     onClick={() => handleDelete(file)}
                     disabled={deleting === file.url}
@@ -326,6 +334,7 @@ export default function MediaLibraryPage() {
                       <Trash2 size={18} className="text-red-600" />
                     )}
                   </button>
+                  )}
                 </div>
               </div>
 
@@ -400,6 +409,7 @@ export default function MediaLibraryPage() {
                           <ImageIcon size={16} className="text-[#FF7A19]" />
                         )}
                       </button>
+                      {canEditProducts && (
                       <button
                         onClick={() => handleDelete(file)}
                         disabled={deleting === file.url}
@@ -412,6 +422,7 @@ export default function MediaLibraryPage() {
                           <Trash2 size={16} className="text-red-600" />
                         )}
                       </button>
+                      )}
                     </div>
                   </td>
                 </tr>

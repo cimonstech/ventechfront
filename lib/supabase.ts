@@ -26,6 +26,8 @@ export const supabasePublic = createClient(buildSafeUrl, buildSafeKey, {
   auth: {
     persistSession: false,
     autoRefreshToken: false,
+    detectSessionInUrl: false,
+    storageKey: 'ventech-public',
   },
 });
 

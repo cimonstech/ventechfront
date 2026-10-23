@@ -6,6 +6,7 @@ import { X, Upload, Loader2, Plus, Trash2, ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import toast from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
+import { authHeaders } from '@/lib/authHeaders';
 import { MediaPicker } from './MediaPicker';
 import { ProductVariantManager } from './ProductVariantManager';
 import { notificationService } from '@/services/notification.service';
@@ -416,91 +417,30 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
         updated_at: new Date().toISOString(),
       };
 
-      let productId = product?.id;
-
-      if (product) {
-        // Update existing product
-        const { error } = await supabase
-          .from('products')
-          .update(productData)
-          .eq('id', product.id);
-
-        if (error) throw error;
-        toast.success('Product updated successfully');
-      } else {
-        // Create new product
-        const { data, error } = await supabase
-          .from('products')
-          .insert(productData)
-          .select()
-          .single();
-
-        if (error) throw error;
-        productId = data.id;
-        toast.success('Product created successfully');
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(
+        product ? `${apiUrl}/api/products/${product.id}` : `${apiUrl}/api/products`,
+        {
+          method: product ? 'PUT' : 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(await authHeaders()),
+          },
+          body: JSON.stringify({ ...productData, variants: productVariants }),
+        }
+      );
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.success === false) {
+        throw new Error(payload.message || 'Failed to save product');
       }
+
+      const productId = payload.data?.id || product?.id;
+      toast.success(product ? 'Product updated successfully' : 'Product created successfully');
 
       // Check for low stock and create notifications (for both create and update)
       const stockQuantity = parseInt(formData.stock_quantity) || 0;
       if (productId && stockQuantity >= 0) {
         await notificationService.checkLowStock(productId, stockQuantity, formData.name);
-      }
-
-      // Save product variants/attributes
-      if (productId) {
-        // Delete existing mappings and selected options
-        await supabase
-          .from('product_attribute_mappings')
-          .delete()
-          .eq('product_id', productId);
-        
-        await supabase
-          .from('product_selected_options')
-          .delete()
-          .eq('product_id', productId);
-
-        // Insert new mappings and selected options
-        if (productVariants.length > 0) {
-          // Save attribute mappings
-          const mappings = productVariants.map((variant, index) => ({
-            product_id: productId,
-            attribute_id: variant.attribute_id,
-            is_required: variant.is_required,
-            display_order: index,
-          }));
-
-          const { error: mappingError } = await supabase
-            .from('product_attribute_mappings')
-            .insert(mappings);
-
-          if (mappingError) throw mappingError;
-
-          // Save selected options for each variant
-          console.log('Saving productVariants:', productVariants);
-          const selectedOptions = productVariants.flatMap(variant =>
-            variant.selected_options.map((optionId: string) => ({
-              product_id: productId,
-              attribute_id: variant.attribute_id,
-              option_id: optionId,
-            }))
-          );
-
-          console.log('Saving selectedOptions:', selectedOptions);
-
-          if (selectedOptions.length > 0) {
-            const { error: optionsError } = await supabase
-              .from('product_selected_options')
-              .insert(selectedOptions);
-
-            if (optionsError) {
-              console.error('Error saving selected options:', optionsError);
-              throw optionsError;
-            }
-            console.log('Successfully saved selected options');
-          } else {
-            console.warn('No selected options to save');
-          }
-        }
       }
 
       // Close modal first to prevent any visual glitches

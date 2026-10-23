@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
+import { useAccess } from '@/context/AccessContext';
 
 interface OrderItem {
   id: string;
@@ -59,6 +60,8 @@ interface OrderDetailModalProps {
 }
 
 export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: OrderDetailModalProps) {
+  const { canEdit } = useAccess();
+  const canEditOrders = canEdit('orders');
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -435,6 +438,7 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
                   </div>
                   <div className="flex items-center gap-2">
                     {getStatusBadge(order.status)}
+                    {canEditOrders && (
                     <select
                       value={order.status}
                       onChange={(e) => handleStatusUpdate(e.target.value)}
@@ -447,6 +451,7 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
                       <option value="delivered">Delivered</option>
                       <option value="cancelled">Cancelled</option>
                     </select>
+                    )}
                   </div>
                 </div>
 

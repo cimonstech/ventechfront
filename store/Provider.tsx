@@ -7,6 +7,7 @@ import { loadCartFromStorage } from './cartSlice';
 import { setUser, setLoading } from './authSlice';
 import { onAuthStateChange, getUserProfile } from '@/services/auth.service';
 import { supabase } from '@/lib/supabase';
+import { AccessProvider } from '@/context/AccessContext';
 
 export function ReduxProvider({ children }: { children: React.ReactNode }) {
   useLayoutEffect(() => {
@@ -116,7 +117,11 @@ export function ReduxProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  return <Provider store={store}>{children}</Provider>;
+  return (
+    <Provider store={store}>
+      <AccessProvider>{children}</AccessProvider>
+    </Provider>
+  );
 }
 
 

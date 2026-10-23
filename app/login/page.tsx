@@ -10,6 +10,7 @@ import { signIn, signOut, getUserProfile } from '@/services/auth.service';
 import { useAppDispatch } from '@/store';
 import { setUser } from '@/store/authSlice';
 import { supabase } from '@/lib/supabase';
+import { hasAdminEntry } from '@/lib/roles';
 import toast from 'react-hot-toast';
 
 export default function LoginPage() {
@@ -96,7 +97,7 @@ export default function LoginPage() {
           toast.success(`Welcome back, ${firstName || fullName.split(' ')[0] || 'User'}!`);
           
           // Redirect based on role
-          if (profileData.role === 'admin') {
+          if (hasAdminEntry(profileData.role)) {
             router.push('/admin');
           } else {
             router.push('/');
