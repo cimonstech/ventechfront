@@ -69,6 +69,10 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: '**.r2.cloudflarestorage.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'staging-images.ventechgadgets.com',
+      },
     ],
     // Increase cache time for external images
     minimumCacheTTL: 60,
