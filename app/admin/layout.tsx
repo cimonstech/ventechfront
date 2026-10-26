@@ -267,6 +267,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       href: '/admin/media',
     },
     {
+      icon: FileText,
+      label: 'Content',
+      href: '/admin/content',
+    },
+    {
+      icon: FileText,
+      label: 'FAQs',
+      href: '/admin/faqs',
+    },
+    {
+      icon: FileText,
+      label: 'Pages',
+      href: '/admin/pages',
+    },
+    {
       icon: Image,
       label: 'Marketing',
       children: [
