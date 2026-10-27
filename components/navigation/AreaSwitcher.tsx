@@ -43,7 +43,11 @@ export function AreaSwitcher({
     areas.push({ id: area.role, label: area.label, href: area.href });
   }
 
-  const current = pathname.startsWith('/admin') ? 'Admin panel' : 'My account';
+  const current = pathname.startsWith('/admin')
+    ? 'Admin panel'
+    : pathname.startsWith('/affiliate')
+      ? 'Affiliate'
+      : 'My account';
   const buttonLabel = hasAdminEntry(user.role) ? getRoleLabel(user.role) : current;
 
   if (variant === 'list') {

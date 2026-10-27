@@ -13,6 +13,7 @@ import { formatCurrency } from '@/lib/helpers';
 import { orderService } from '@/services/order.service';
 import { deliveryOptionsService } from '@/services/deliveryOptions.service';
 import { paymentService } from '@/services/payment.service';
+import { referralFromCookie } from '@/lib/referralCookie';
 import { couponService } from '@/services/coupon.service';
 import { DeliveryOption } from '@/types/order';
 import { supabase } from '@/lib/supabase';
@@ -436,6 +437,11 @@ export default function CheckoutPage() {
         checkoutData.estimated_arrival_date = estimatedArrival.date.toISOString();
       }
 
+      const referral = referralFromCookie();
+      if (referral) {
+        checkoutData.referral = { click_id: referral.click_id };
+      }
+
       // Store checkout data in sessionStorage for order creation after payment
       sessionStorage.setItem('order_access_email', customerBio.email);
       sessionStorage.setItem('pending_checkout_data', JSON.stringify(checkoutData));
@@ -548,6 +554,11 @@ export default function CheckoutPage() {
             total: regularSubtotal + regularDeliveryFee - couponDiscount,
           };
 
+          const referral = referralFromCookie();
+          if (referral) {
+            (regularCheckoutData as { referral?: { click_id: string } }).referral = { click_id: referral.click_id };
+          }
+
           const regularOrder = await orderService.createOrder(regularCheckoutData, userId);
           orders.push({ type: 'regular', order: regularOrder });
           console.log('✅ Regular order created:', regularOrder.id);
@@ -606,6 +617,11 @@ export default function CheckoutPage() {
             tax: 0,
             total: preOrderSubtotal + preOrderDeliveryFee - (hasRegularItems ? 0 : couponDiscount),
           };
+
+          const referral = referralFromCookie();
+          if (referral) {
+            (preOrderCheckoutData as { referral?: { click_id: string } }).referral = { click_id: referral.click_id };
+          }
 
           const preOrder = await orderService.createOrder(preOrderCheckoutData, userId);
           orders.push({ type: 'pre-order', order: preOrder });

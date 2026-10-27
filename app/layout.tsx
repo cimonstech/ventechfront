@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import "./globals.css";
 import { ReduxProvider } from "@/store/Provider";
 import { LayoutWrapper } from "@/components/LayoutWrapper";
+import { ReferralCapture } from "@/components/ReferralCapture";
 import { Toaster } from "react-hot-toast";
 import { seoConfig } from "@/lib/seo.config";
 
@@ -74,6 +76,9 @@ export default function RootLayout({
       </head>
       <body className="font-sans antialiased bg-gray-50" suppressHydrationWarning>
         <ReduxProvider>
+          <Suspense fallback={null}>
+            <ReferralCapture />
+          </Suspense>
           <div className="min-h-screen flex flex-col">
             <LayoutWrapper>{children}</LayoutWrapper>
           </div>

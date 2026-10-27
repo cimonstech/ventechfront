@@ -82,6 +82,7 @@ export interface CheckoutData {
   pre_order_shipping_option?: string;
   coupon_id?: string;
   coupon_code?: string;
+  referral?: { click_id: string };
 }
 
 

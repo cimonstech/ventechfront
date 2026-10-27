@@ -30,6 +30,7 @@ import {
   FileText,
   Laptop,
   Wrench,
+  Handshake,
 } from 'lucide-react';
 import Link from 'next/link';
 import { signOut } from '@/services/auth.service';
@@ -40,6 +41,7 @@ import { useAccess } from '@/context/AccessContext';
 import { AreaSwitcher } from '@/components/navigation/AreaSwitcher';
 import { AdminHeadingProvider, useAdminHeadingValue } from '@/components/admin/AdminHeading';
 import { deviceRequest, type TicketSummary } from '@/lib/ticketsAdmin';
+import { affiliateQueueBadge } from '@/lib/affiliatesAdmin';
 import toast from 'react-hot-toast';
 
 interface MenuItem {
@@ -60,6 +62,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [pendingOrdersCount, setPendingOrdersCount] = useState<number | undefined>(undefined);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState<number | undefined>(undefined);
   const [submittedTickets, setSubmittedTickets] = useState<number | undefined>(undefined);
+  const [affiliateQueue, setAffiliateQueue] = useState<number | undefined>(undefined);
   const { access, loading: accessLoading } = useAccess();
 
   useEffect(() => {
@@ -73,7 +76,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const includeOrders = canViewModule(access, 'orders');
     const includeNotifications = isFullAdmin(access.role);
     const includeTickets = canViewModule(access, 'tickets');
-    if (!includeOrders && !includeNotifications && !includeTickets) return;
+    const includeAffiliates = canViewModule(access, 'affiliates');
+    if (!includeOrders && !includeNotifications && !includeTickets && !includeAffiliates) return;
 
     const fetchBadgeCounts = async () => {
       try {
@@ -94,6 +98,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             setSubmittedTickets(result.data.counts?.submitted || 0);
           } catch (error) {
             console.error('service request badge', error);
+          }
+        }
+
+        if (includeAffiliates) {
+          try {
+            setAffiliateQueue(await affiliateQueueBadge());
+          } catch (error) {
+            console.error('affiliate queue badge', error);
           }
         }
 
@@ -242,6 +254,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       label: 'Service requests',
       href: '/admin/tickets',
       badge: submittedTickets !== undefined ? (submittedTickets > 0 ? submittedTickets : undefined) : undefined,
+    },
+    {
+      icon: Handshake,
+      label: 'Affiliates',
+      href: '/admin/affiliates',
+      badge: affiliateQueue !== undefined ? (affiliateQueue > 0 ? affiliateQueue : undefined) : undefined,
     },
     {
       icon: Package,

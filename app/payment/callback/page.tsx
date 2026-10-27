@@ -192,6 +192,7 @@ export default function PaymentCallbackPage() {
                   delivery_fee: regularDeliveryFee,
                   tax: checkoutData.tax || 0,
                   total: regularTotal, // Already includes discount subtraction
+                  referral: checkoutData.referral || undefined,
                 };
 
                 const regularOrder = await orderService.createOrder(regularCheckoutData, userId);
@@ -265,6 +266,7 @@ export default function PaymentCallbackPage() {
                   delivery_fee: preOrderDeliveryFee,
                   tax: checkoutData.tax || 0,
                   total: preOrderTotal, // Already includes discount subtraction
+                  referral: checkoutData.referral || undefined,
                 };
 
                 const preOrder = await orderService.createOrder(preOrderCheckoutData, userId);

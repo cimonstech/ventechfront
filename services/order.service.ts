@@ -1,4 +1,5 @@
 import { authHeaders } from '@/lib/authHeaders';
+import { referralFromCookie } from '@/lib/referralCookie';
 import { supabase } from '@/lib/supabase';
 import { CheckoutData, Order } from '@/types/order';
 
@@ -66,6 +67,7 @@ export const orderService = {
 
     // Try to call backend API first, fallback to Supabase if it fails
     try {
+      const referral = checkoutData.referral || referralFromCookie();
       const orderPayload = {
         user_id: userId,
         // order_number not provided - backend will generate sequential number
@@ -86,6 +88,7 @@ export const orderService = {
         is_pre_order: (checkoutData as any).is_pre_order || false,
         pre_order_shipping_option: (checkoutData as any).pre_order_shipping_option || null,
         estimated_arrival_date: (checkoutData as any).estimated_arrival_date || null,
+        ...(referral ? { referral: { click_id: referral.click_id } } : {}),
       };
       
       console.log('Creating order via backend API:', {
