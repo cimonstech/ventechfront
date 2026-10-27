@@ -4,7 +4,7 @@ import { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { FileText, Film, ImagePlus, X } from 'lucide-react';
+import { ArrowLeft, Check, FileText, Film, ImagePlus, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { DeviceWarrantyBadge } from '@/components/admin/DeviceWarrantyBadge';
 import { useAppSelector } from '@/store';
@@ -319,7 +319,7 @@ function NewServiceRequest() {
 
   if (isLoading || !isAuthenticated || !ready) {
     return (
-      <div className="min-h-[50vh] flex items-center justify-center bg-gray-50 px-4">
+      <div className="min-h-[50vh] flex items-center justify-center bg-[#F4F1EC] px-4">
         <p className="text-sm text-[#3A3A3A]">Loading…</p>
       </div>
     );
@@ -327,16 +327,24 @@ function NewServiceRequest() {
 
   if (created) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8 px-4">
-        <div className="max-w-lg mx-auto bg-white border border-gray-200 rounded-2xl p-6 text-center space-y-4">
-          <p className="text-sm font-semibold text-[#3A3A3A]">Service request</p>
-          <p className="text-3xl font-bold text-[#1A1A1A] break-all">{created}</p>
-          <p className="text-sm text-[#1A1A1A]">We&apos;ve emailed you a copy</p>
-          <div className="flex flex-col gap-3">
-            <Link href={`/account/service/${encodeURIComponent(created)}`} className="inline-flex items-center justify-center rounded-lg bg-[#FF7A19] px-4 py-2 font-medium text-white">
+      <div className="min-h-screen bg-[#F4F1EC] overflow-x-clip">
+        <div className="max-w-3xl mx-auto min-w-0 px-4 py-6 sm:py-10 space-y-6">
+          <div className="rounded-2xl bg-[#1A1A1A] text-white px-5 py-8 sm:px-8 text-center">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#FF7A19]">Service request</p>
+            <p className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight break-words">{created}</p>
+            <p className="mt-3 text-sm text-white/80">We&apos;ve emailed you a copy</p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Link
+              href={`/account/service/${encodeURIComponent(created)}`}
+              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-[#FF7A19] px-4 py-2 font-medium text-white hover:bg-[#E66600] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A19]"
+            >
               View request
             </Link>
-            <Link href="/account/devices" className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-4 py-2 font-medium text-[#1A1A1A]">
+            <Link
+              href="/account/devices"
+              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-white px-4 py-2 font-medium text-[#1A1A1A] hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A19]"
+            >
               Back to my devices
             </Link>
           </div>
@@ -347,158 +355,187 @@ function NewServiceRequest() {
 
   const showOther = source === 'other';
   const listed = devices;
+  const fieldClass =
+    'mt-1 w-full min-w-0 rounded-xl border border-gray-300 bg-[#F4F1EC] px-3 py-3 text-sm text-[#1A1A1A] focus:outline-none focus:ring-2 focus:ring-[#FF7A19] focus:border-[#FF7A19]';
+  const labelClass = 'text-[11px] font-semibold uppercase tracking-wide text-[#3A3A3A]';
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    <div className="min-h-screen bg-[#F4F1EC] overflow-x-clip">
       <form
-        className="max-w-lg mx-auto space-y-4"
+        className="max-w-3xl mx-auto min-w-0 px-4 py-6 sm:py-10 space-y-6"
         onSubmit={(event) => {
           event.preventDefault();
           void submit();
         }}
       >
-        <h1 className="text-2xl font-bold text-[#1A1A1A]">Request service</h1>
+        <Link
+          href="/account/service"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#FF7A19] hover:text-[#E66600] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A19] rounded"
+        >
+          <ArrowLeft size={16} aria-hidden />
+          Back to service requests
+        </Link>
 
-        {source === 'device' && linked && (
-          <section className="bg-white border border-gray-200 rounded-xl p-4 space-y-2">
-            <p className="font-semibold text-[#1A1A1A]">{linked.model_name}</p>
-            <p className="text-sm font-mono text-[#3A3A3A]">{linked.serial_number || '—'}</p>
-            <DeviceWarrantyBadge warranty={linked.warranty} />
-          </section>
-        )}
+        <header className="rounded-2xl bg-[#1A1A1A] text-white px-5 py-6 sm:px-7 sm:py-8">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#FF7A19]">Service</p>
+          <h1 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight">Request service</h1>
+          <p className="mt-2 text-sm text-white/80">Tell us what is going wrong. We will email you a copy of the request.</p>
+        </header>
 
-        {source !== 'device' && (
-          <section className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-            <p className="font-semibold text-[#1A1A1A]">Which laptop?</p>
-            {listed.map((device) => (
-              <label key={device.qr_token} className="flex items-start gap-3 text-sm">
-                <input
-                  type="radio"
-                  name="laptop"
-                  checked={source === 'listed' && selectedToken === device.qr_token}
-                  onChange={() => {
-                    setSource('listed');
-                    setSelectedToken(device.qr_token || '');
-                  }}
-                />
-                <span>
-                  <span className="block font-medium text-[#1A1A1A]">{device.model_name}</span>
-                  <span className="block font-mono text-[#3A3A3A]">{device.serial_number}</span>
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_17.5rem] gap-6 items-start">
+          <div className="min-w-0 space-y-6 order-2 lg:order-1">
+            <section className="rounded-2xl bg-white px-4 py-5 sm:px-6 space-y-4">
+              <h2 className="text-base font-semibold text-[#1A1A1A]">The problem</h2>
+              <label className="block min-w-0">
+                <span className={labelClass}>Issue</span>
+                <select value={issueId} onChange={(event) => setIssueId(event.target.value)} className={fieldClass}>
+                  <option value="">Choose an issue</option>
+                  {issues.map((issue) => (
+                    <option key={issue.id} value={issue.id}>{issue.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block min-w-0">
+                <span className={labelClass}>Date the problem started</span>
+                <input type="date" value={started} max={todayInput()} onChange={(event) => setStarted(event.target.value)} className={fieldClass} />
+              </label>
+              <label className="block min-w-0">
+                <span className={labelClass}>Description</span>
+                <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={6} maxLength={3000} className={fieldClass} />
+                <span className={`mt-1 block text-xs ${description.trim().length > 0 && description.trim().length < 20 ? 'text-red-700' : 'text-[#3A3A3A]'}`}>
+                  {description.length} / 3000 · 20 to 3000 characters
                 </span>
               </label>
-            ))}
-            <label className="flex items-center gap-3 text-sm font-medium text-[#1A1A1A]">
-              <input
-                type="radio"
-                name="laptop"
-                checked={showOther}
-                onChange={() => {
-                  setSource('other');
-                  setSelectedToken('');
+            </section>
+
+            <section className="rounded-2xl bg-white px-4 py-5 sm:px-6 space-y-4">
+              <div className="flex items-end justify-between gap-3">
+                <h2 className="text-base font-semibold text-[#1A1A1A]">Photos and video</h2>
+                <p className="text-xs font-semibold text-[#3A3A3A]">{files.filter((file) => file.status !== 'error').length} of 5</p>
+              </div>
+              <DropZone
+                multiple
+                full={attachedCount >= 5}
+                accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.mp4,.mov,image/jpeg,image/png,image/webp,video/mp4,video/quicktime"
+                title={attachedCount >= 5 ? '5 files added' : 'Add photos or a video'}
+                hint={attachedCount >= 5 ? 'Remove one to add another' : 'Tap to choose, or drop files here'}
+                onFiles={(list) => {
+                  if (attachedCount >= 5) {
+                    toast.error('You can attach up to 5 files.');
+                    return;
+                  }
+                  addFiles(list);
                 }}
               />
-              A laptop not listed here
-            </label>
-            {showOther && (
-              <div className="space-y-3 pt-2">
-                <label className="block text-sm">
-                  <span className="font-medium text-[#1A1A1A]">Laptop model</span>
-                  <input value={model} onChange={(event) => setModel(event.target.value)} className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg" />
-                </label>
-                <label className="block text-sm">
-                  <span className="font-medium text-[#1A1A1A]">Serial (optional)</span>
-                  <input value={serial} onChange={(event) => setSerial(event.target.value)} className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg" />
-                </label>
-                <label className="block text-sm">
-                  <span className="font-medium text-[#1A1A1A]">Order number (optional)</span>
-                  <input value={orderNumber} onChange={(event) => setOrderNumber(event.target.value)} className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg" />
-                </label>
-                <div className="space-y-3">
-                  <p className="text-sm font-medium text-[#1A1A1A]">Receipt</p>
-                  {!receipt && (
-                    <DropZone
-                      accept="image/*,.pdf,application/pdf"
-                      title="Add a receipt"
-                      hint="A photo or PDF, up to 10 MB"
-                      onFiles={addReceipt}
-                    />
-                  )}
-                  {receipt && <FileTile row={receipt} onRemove={() => void removeFile(receipt, 'receipt')} />}
-                </div>
-              </div>
+              <p className="text-xs leading-relaxed text-[#3A3A3A]">Photos up to 10 MB each (JPG, PNG, WebP, HEIC). One video up to 50 MB (MP4 or MOV).</p>
+              {files.length > 0 && (
+                <ul className="grid grid-cols-2 gap-3">
+                  {files.map((file) => (
+                    <li key={file.key} className="min-w-0">
+                      <FileTile row={file} onRemove={() => void removeFile(file)} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
+
+          <aside className="min-w-0 space-y-6 order-1 lg:order-2">
+            {source === 'device' && linked && (
+              <section className="rounded-2xl bg-white px-5 py-5 space-y-3">
+                <p className={labelClass}>Laptop</p>
+                <p className="text-base font-semibold text-[#1A1A1A] break-words">{linked.model_name}</p>
+                <p className="text-sm font-mono text-[#3A3A3A] break-words">{linked.serial_number || '—'}</p>
+                <DeviceWarrantyBadge warranty={linked.warranty} />
+              </section>
             )}
-          </section>
-        )}
 
-        <label className="block text-sm bg-white border border-gray-200 rounded-xl p-4">
-          <span className="font-medium text-[#1A1A1A]">Issue</span>
-          <select value={issueId} onChange={(event) => setIssueId(event.target.value)} className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg">
-            <option value="">Choose an issue</option>
-            {issues.map((issue) => (
-              <option key={issue.id} value={issue.id}>{issue.name}</option>
-            ))}
-          </select>
-        </label>
+            {source !== 'device' && (
+              <section className="rounded-2xl bg-white px-5 py-5 space-y-3">
+                <p className="text-base font-semibold text-[#1A1A1A]">Which laptop?</p>
+                {listed.map((device) => {
+                  const selected = source === 'listed' && selectedToken === device.qr_token;
+                  return (
+                    <button
+                      key={device.qr_token}
+                      type="button"
+                      onClick={() => {
+                        setSource('listed');
+                        setSelectedToken(device.qr_token || '');
+                      }}
+                      className={`w-full min-w-0 rounded-xl px-3 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A19] ${
+                        selected ? 'bg-[#1A1A1A] text-white' : 'bg-[#F4F1EC] text-[#1A1A1A] hover:bg-orange-50'
+                      }`}
+                    >
+                      <span className="flex items-start justify-between gap-2">
+                        <span className="min-w-0">
+                          <span className="block font-semibold break-words">{device.model_name}</span>
+                          <span className={`block font-mono text-xs mt-1 break-words ${selected ? 'text-white/70' : 'text-[#3A3A3A]'}`}>{device.serial_number}</span>
+                        </span>
+                        {selected && <Check size={16} className="shrink-0 text-[#FF7A19] mt-0.5" aria-hidden />}
+                      </span>
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSource('other');
+                    setSelectedToken('');
+                  }}
+                  className={`w-full min-h-11 rounded-xl px-3 py-3 text-left text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A19] ${
+                    showOther ? 'bg-[#FF7A19] text-white' : 'bg-[#F4F1EC] text-[#1A1A1A] hover:bg-orange-50'
+                  }`}
+                >
+                  A laptop not listed here
+                </button>
+                {showOther && (
+                  <div className="space-y-3 pt-1">
+                    <label className="block min-w-0">
+                      <span className={labelClass}>Laptop model</span>
+                      <input value={model} onChange={(event) => setModel(event.target.value)} className={fieldClass} />
+                    </label>
+                    <label className="block min-w-0">
+                      <span className={labelClass}>Serial (optional)</span>
+                      <input value={serial} onChange={(event) => setSerial(event.target.value)} className={fieldClass} />
+                    </label>
+                    <label className="block min-w-0">
+                      <span className={labelClass}>Order number (optional)</span>
+                      <input value={orderNumber} onChange={(event) => setOrderNumber(event.target.value)} className={fieldClass} />
+                    </label>
+                    <div className="space-y-3">
+                      <p className={labelClass}>Receipt</p>
+                      {!receipt && (
+                        <DropZone
+                          accept="image/*,.pdf,application/pdf"
+                          title="Add a receipt"
+                          hint="A photo or PDF, up to 10 MB"
+                          onFiles={addReceipt}
+                        />
+                      )}
+                      {receipt && <FileTile row={receipt} onRemove={() => void removeFile(receipt, 'receipt')} />}
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
 
-        <label className="block text-sm bg-white border border-gray-200 rounded-xl p-4">
-          <span className="font-medium text-[#1A1A1A]">Date the problem started</span>
-          <input type="date" value={started} max={todayInput()} onChange={(event) => setStarted(event.target.value)} className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg" />
-        </label>
-
-        <label className="block text-sm bg-white border border-gray-200 rounded-xl p-4">
-          <span className="font-medium text-[#1A1A1A]">Description</span>
-          <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={5} maxLength={3000} className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg" />
-          <span className={`mt-1 block text-xs ${description.trim().length > 0 && description.trim().length < 20 ? 'text-red-600' : 'text-[#3A3A3A]'}`}>
-            {description.length} / 3000 · 20 to 3000 characters
-          </span>
-        </label>
-
-        <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-          <label className="block text-sm">
-            <span className="font-medium text-[#1A1A1A]">Contact name</span>
-            <input value={contactName} onChange={(event) => setContactName(event.target.value)} className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg" />
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium text-[#1A1A1A]">Phone</span>
-            <input value={phone} onChange={(event) => setPhone(event.target.value)} className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg" />
-          </label>
+            <section className="rounded-2xl bg-white px-5 py-5 space-y-4">
+              <h2 className="text-base font-semibold text-[#1A1A1A]">Contact</h2>
+              <label className="block min-w-0">
+                <span className={labelClass}>Name</span>
+                <input value={contactName} onChange={(event) => setContactName(event.target.value)} className={fieldClass} />
+              </label>
+              <label className="block min-w-0">
+                <span className={labelClass}>Phone</span>
+                <input value={phone} onChange={(event) => setPhone(event.target.value)} className={fieldClass} />
+              </label>
+            </section>
+          </aside>
         </div>
 
-        <section className="bg-white border border-gray-200 rounded-2xl p-4 space-y-4">
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <h2 className="text-base font-semibold text-[#1A1A1A]">Photos and video</h2>
-              <p className="text-xs text-[#3A3A3A] mt-1">{files.filter((file) => file.status !== 'error').length} of 5</p>
-            </div>
-          </div>
-          <DropZone
-            multiple
-            full={attachedCount >= 5}
-            accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.mp4,.mov,image/jpeg,image/png,image/webp,video/mp4,video/quicktime"
-            title={attachedCount >= 5 ? '5 files added' : 'Add photos or a video'}
-            hint={attachedCount >= 5 ? 'Remove one to add another' : 'Tap to choose, or drop files here'}
-            onFiles={(list) => {
-              if (attachedCount >= 5) {
-                toast.error('You can attach up to 5 files.');
-                return;
-              }
-              addFiles(list);
-            }}
-          />
-          <p className="text-xs leading-relaxed text-[#3A3A3A]">Photos up to 10 MB each (JPG, PNG, WebP, HEIC). One video up to 50 MB (MP4 or MOV).</p>
-          {files.length > 0 && (
-            <ul className="grid grid-cols-2 gap-3">
-              {files.map((file) => (
-                <li key={file.key}>
-                  <FileTile row={file} onRemove={() => void removeFile(file)} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <Button type="submit" className="w-full" disabled={busy || submitting} isLoading={submitting}>
-          Submit request
+        <Button type="submit" className="w-full min-h-12 text-base" disabled={busy || submitting} isLoading={submitting}>
+          {busy ? 'Waiting for uploads…' : 'Submit request'}
         </Button>
       </form>
     </div>

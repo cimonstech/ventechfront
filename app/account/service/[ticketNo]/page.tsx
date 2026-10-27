@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { ArrowLeft, Check, FileText, Film, Phone, Send, X } from 'lucide-react';
+import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useAppSelector } from '@/store';
 import { safeRedirectPath } from '@/lib/safeRedirect';
@@ -12,6 +14,7 @@ import {
   deviceRequest,
   formatDeviceDate,
   formatTicketWhen,
+  statusVariant,
   STATUS_LABEL,
   TICKET_STAGES,
 } from '@/lib/ticketsAdmin';
@@ -47,6 +50,15 @@ interface CustomerTicket {
   events: CustomerEvent[];
   media: CustomerMedia[];
 }
+
+const STAGE_SHORT: Record<string, string> = {
+  submitted: 'Submitted',
+  under_review: 'Review',
+  diagnosing: 'Diagnose',
+  repair_resolution: 'Repair',
+  ready: 'Ready',
+  completed: 'Done',
+};
 
 export default function ServiceRequestPage() {
   const params = useParams<{ ticketNo: string }>();
@@ -101,7 +113,7 @@ export default function ServiceRequestPage() {
 
   if (isLoading || !isAuthenticated || (!ticket && !failed)) {
     return (
-      <div className="min-h-[50vh] flex items-center justify-center bg-gray-50 px-4">
+      <div className="min-h-[50vh] flex items-center justify-center bg-[#F4F1EC] px-4">
         <p className="text-sm text-[#3A3A3A]">Loading request…</p>
       </div>
     );
@@ -109,8 +121,8 @@ export default function ServiceRequestPage() {
 
   if (!ticket) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8 px-4">
-        <div className="max-w-lg mx-auto space-y-4">
+      <div className="min-h-screen bg-[#F4F1EC] py-8 px-4">
+        <div className="max-w-3xl mx-auto min-w-0 space-y-4">
           <p className="text-sm text-[#3A3A3A]">Could not load this request.</p>
           <Link href="/account/service" className="text-sm font-semibold text-[#FF7A19]">Back to service requests</Link>
         </div>
@@ -120,118 +132,271 @@ export default function ServiceRequestPage() {
 
   const stageIndex = TICKET_STAGES.indexOf(ticket.status as (typeof TICKET_STAGES)[number]);
   const closed = ticket.status === 'completed' || ticket.status === 'closed';
+  const currentLabel = STATUS_LABEL[ticket.status] || ticket.status;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-lg mx-auto space-y-4">
-        <Link href="/account/service" className="text-sm font-semibold text-[#FF7A19]">Back to service requests</Link>
-        <h1 className="text-2xl font-bold text-[#1A1A1A] break-all">{ticket.ticket_no}</h1>
+    <div className="min-h-screen bg-[#F4F1EC] overflow-x-clip">
+      <div className="max-w-3xl mx-auto min-w-0 px-4 py-6 sm:py-10 space-y-6">
+        <Link
+          href="/account/service"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#FF7A19] hover:text-[#E66600] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A19] rounded"
+        >
+          <ArrowLeft size={16} aria-hidden />
+          Back to service requests
+        </Link>
+
+        <header className="rounded-2xl bg-[#1A1A1A] text-white px-5 py-6 sm:px-7 sm:py-8">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#FF7A19]">Service request</p>
+              <h1 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight break-words">{ticket.ticket_no}</h1>
+              <p className="mt-2 text-sm text-white/80 min-w-0 break-words">{ticket.laptop_model}</p>
+            </div>
+            <Badge size="lg" variant={statusVariant(ticket.status)} className="shrink-0">
+              {currentLabel}
+            </Badge>
+          </div>
+        </header>
 
         {ticket.status === 'closed' && (
-          <section className="bg-gray-100 border border-gray-200 rounded-xl p-4">
+          <section className="rounded-2xl border border-[#1A1A1A] bg-white px-5 py-5">
             <p className="text-lg font-bold text-[#1A1A1A]">Closed</p>
-            <p className="text-sm text-[#1A1A1A] mt-2 whitespace-pre-wrap">{ticket.closed_reason || 'This request was closed.'}</p>
-          </section>
-        )}
-        <ol className="flex gap-2 overflow-x-auto pb-1">
-          {TICKET_STAGES.map((stage, index) => {
-            const current = ticket.status === stage;
-            const passed = stageIndex > index;
-            return (
-              <li
-                key={stage}
-                className={`min-w-[96px] flex-1 rounded-lg px-2 py-2 text-center text-[11px] font-semibold ${
-                  current ? 'bg-[#FF7A19] text-white' : passed ? 'bg-orange-50 text-[#FF7A19]' : 'bg-white text-[#3A3A3A] border border-gray-200'
-                }`}
-              >
-                {index + 1}. {STATUS_LABEL[stage]}
-              </li>
-            );
-          })}
-        </ol>
-
-        <section className="bg-white border border-gray-200 rounded-xl p-4 space-y-2 text-sm">
-          <h2 className="font-semibold text-[#1A1A1A]">Submitted details</h2>
-          <p><span className="text-[#3A3A3A]">Laptop: </span>{ticket.laptop_model}</p>
-          <p><span className="text-[#3A3A3A]">Serial: </span><span className="font-mono">{ticket.serial_number || '—'}</span></p>
-          <p><span className="text-[#3A3A3A]">Issue: </span>{ticket.issue?.name || '—'}</p>
-          <p><span className="text-[#3A3A3A]">Started: </span>{formatDeviceDate(ticket.date_started) || '—'}</p>
-          <p className="whitespace-pre-wrap text-[#1A1A1A]">{ticket.description}</p>
-          <p><span className="text-[#3A3A3A]">Warranty at submit: </span><span className="capitalize">{ticket.warranty_status_at_submit || '—'}</span></p>
-          {ticket.order_number ? <p><span className="text-[#3A3A3A]">Order: </span>{ticket.order_number}</p> : null}
-          <p><span className="text-[#3A3A3A]">Contact: </span>{ticket.contact_name} · {ticket.contact_phone}</p>
-        </section>
-
-        {ticket.media?.length > 0 && (
-          <section className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-            <h2 className="font-semibold text-[#1A1A1A]">Files</h2>
-            <div className="grid grid-cols-2 gap-3">
-              {ticket.media.map((file) => (
-                file.kind === 'video' ? (
-                  <video key={file.id} src={file.previewUrl} controls className="w-full rounded-lg bg-black" />
-                ) : file.kind === 'receipt' ? (
-                  <a key={file.id} href={file.previewUrl} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center h-28 rounded-lg border border-gray-200 text-sm font-semibold text-[#FF7A19]">
-                    Open receipt
-                  </a>
-                ) : (
-                  <button key={file.id} type="button" onClick={() => setLightbox(file.previewUrl)} className="block">
-                    <img src={file.previewUrl} alt="" className="h-28 w-full object-cover rounded-lg bg-gray-100" />
-                  </button>
-                )
-              ))}
-            </div>
+            <p className="mt-2 text-sm leading-relaxed text-[#3A3A3A] whitespace-pre-wrap">{ticket.closed_reason || 'This request was closed.'}</p>
           </section>
         )}
 
-        <section className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-          <h2 className="font-semibold text-[#1A1A1A]">Updates</h2>
-          {(ticket.events || []).length === 0 ? (
-            <p className="text-sm text-[#3A3A3A]">No updates yet.</p>
-          ) : (
-            <ol className="space-y-3">
-              {ticket.events.map((event) => (
-                <li key={event.id} className="rounded-lg bg-orange-50 p-3 text-sm">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-[#1A1A1A]">{event.actor_role === 'customer' ? 'You' : 'VENTECH Support'}</span>
-                    {event.to_status ? <span className="text-[#3A3A3A]">{STATUS_LABEL[event.to_status] || event.to_status}</span> : null}
-                    <span className="text-xs text-[#3A3A3A] ml-auto">{formatTicketWhen(event.created_at)}</span>
-                  </div>
-                  {event.body ? <p className="mt-2 whitespace-pre-wrap text-[#1A1A1A]">{event.body}</p> : null}
+        <section className="rounded-2xl bg-white px-4 py-5 sm:px-6">
+          <p className="text-sm font-semibold text-[#1A1A1A]">
+            {ticket.status === 'closed' ? 'This request is closed' : currentLabel}
+            {stageIndex >= 0 && ticket.status !== 'closed' ? (
+              <span className="font-normal text-[#3A3A3A]"> · step {stageIndex + 1} of {TICKET_STAGES.length}</span>
+            ) : null}
+          </p>
+          <ol className="mt-4 grid grid-cols-3 sm:grid-cols-6 gap-2">
+            {TICKET_STAGES.map((stage, index) => {
+              const current = ticket.status === stage;
+              const passed = stageIndex > index;
+              return (
+                <li
+                  key={stage}
+                  className={`min-w-0 rounded-xl px-2 py-3 text-center ${
+                    current
+                      ? 'bg-[#FF7A19] text-white'
+                      : passed
+                        ? 'bg-[#1A1A1A] text-white'
+                        : 'bg-[#F4F1EC] text-[#3A3A3A]'
+                  }`}
+                >
+                  <span className={`mx-auto mb-1 flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${
+                    current ? 'bg-white text-[#FF7A19]' : passed ? 'bg-[#FF7A19] text-white' : 'bg-white text-[#3A3A3A]'
+                  }`}>
+                    {passed ? <Check size={12} aria-hidden /> : index + 1}
+                  </span>
+                  <span className="block text-[11px] font-semibold leading-tight">{STAGE_SHORT[stage]}</span>
                 </li>
-              ))}
-            </ol>
-          )}
+              );
+            })}
+          </ol>
         </section>
 
-        {closed ? (
-          <section className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-            <p className="text-sm text-[#1A1A1A]">This request is closed. Please open a new one.</p>
-            <Link href="/account/service/new" className="inline-flex items-center justify-center rounded-lg bg-[#FF7A19] px-4 py-2 text-sm font-medium text-white">
-              Start a new request
-            </Link>
-          </section>
-        ) : (
-          <section className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-            <h2 className="font-semibold text-[#1A1A1A]">Send a message to VENTECH</h2>
-            <textarea
-              value={message}
-              onChange={(event) => setMessage(event.target.value)}
-              rows={4}
-              maxLength={2000}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-            />
-            <Button className="w-full" disabled={sending || !message.trim()} isLoading={sending} onClick={() => void send()}>
-              Send
-            </Button>
-          </section>
-        )}
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_17.5rem] gap-6 items-start">
+          <div className="min-w-0 space-y-6 order-2 lg:order-1">
+            <section className="rounded-2xl bg-white px-4 py-5 sm:px-6">
+              <h2 className="text-base font-semibold text-[#1A1A1A]">Updates</h2>
+              {(ticket.events || []).length === 0 ? (
+                <p className="mt-4 text-sm text-[#3A3A3A]">No updates yet.</p>
+              ) : (
+                <ol className="mt-5 space-y-4">
+                  {ticket.events.map((event) => (
+                    <TimelineItem key={event.id} event={event} />
+                  ))}
+                </ol>
+              )}
+            </section>
+
+            {closed ? (
+              <section className="rounded-2xl bg-white px-5 py-6 space-y-3">
+                <p className="text-sm text-[#1A1A1A]">This request is closed. Please open a new one.</p>
+                <Link
+                  href="/account/service/new"
+                  className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#FF7A19] px-4 py-2 text-sm font-medium text-white hover:bg-[#E66600] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A19] focus-visible:ring-offset-2"
+                >
+                  Start a new request
+                </Link>
+              </section>
+            ) : (
+              <section className="rounded-2xl bg-white px-4 py-5 sm:px-6 space-y-3">
+                <h2 className="text-base font-semibold text-[#1A1A1A]">Send a message to VENTECH</h2>
+                <textarea
+                  value={message}
+                  onChange={(event) => setMessage(event.target.value)}
+                  rows={4}
+                  maxLength={2000}
+                  placeholder="Ask a question or add more detail"
+                  className="w-full min-w-0 rounded-xl border border-gray-300 bg-[#F4F1EC] px-3 py-3 text-sm text-[#1A1A1A] placeholder:text-[#3A3A3A]/70 focus:outline-none focus:ring-2 focus:ring-[#FF7A19] focus:border-[#FF7A19]"
+                />
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-xs text-[#3A3A3A]">{message.length} / 2000</p>
+                  <Button
+                    type="button"
+                    className="min-h-11"
+                    disabled={sending || !message.trim()}
+                    isLoading={sending}
+                    icon={!sending ? <Send size={16} aria-hidden /> : undefined}
+                    onClick={() => void send()}
+                  >
+                    Send
+                  </Button>
+                </div>
+              </section>
+            )}
+          </div>
+
+          <aside className="min-w-0 space-y-6 order-1 lg:order-2">
+            <section className="rounded-2xl bg-white px-5 py-5">
+              <h2 className="text-base font-semibold text-[#1A1A1A]">Submitted details</h2>
+              <dl className="mt-4 space-y-3 text-sm">
+                <Fact label="Laptop" value={ticket.laptop_model} />
+                <Fact label="Serial" value={ticket.serial_number || '—'} mono />
+                <Fact label="Issue" value={ticket.issue?.name || '—'} />
+                <Fact label="Started" value={formatDeviceDate(ticket.date_started) || '—'} />
+                <Fact label="Warranty at submit" value={ticket.warranty_status_at_submit || '—'} capitalize />
+                {ticket.order_number ? <Fact label="Order" value={ticket.order_number} /> : null}
+                <div>
+                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-[#3A3A3A]">Contact</dt>
+                  <dd className="mt-1 font-medium text-[#1A1A1A] break-words">{ticket.contact_name}</dd>
+                  <a
+                    href={`tel:${ticket.contact_phone}`}
+                    className="mt-1 inline-flex items-center gap-1.5 text-sm font-semibold text-[#FF7A19] hover:text-[#E66600]"
+                  >
+                    <Phone size={14} aria-hidden />
+                    {ticket.contact_phone}
+                  </a>
+                </div>
+              </dl>
+              <p className="mt-5 text-sm leading-relaxed text-[#1A1A1A] whitespace-pre-wrap border-t border-gray-100 pt-4">
+                {ticket.description}
+              </p>
+            </section>
+
+            {ticket.media?.length > 0 && (
+              <section className="rounded-2xl bg-white px-5 py-5">
+                <h2 className="text-base font-semibold text-[#1A1A1A]">Files</h2>
+                <ul className="mt-4 grid grid-cols-2 gap-3">
+                  {ticket.media.map((file) => (
+                    <li key={file.id} className="min-w-0">
+                      {file.kind === 'video' ? (
+                        <video src={file.previewUrl} controls className="w-full aspect-[4/3] rounded-xl bg-black object-cover" />
+                      ) : file.kind === 'receipt' ? (
+                        <a
+                          href={file.previewUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded-xl bg-[#F4F1EC] text-sm font-semibold text-[#FF7A19] hover:bg-orange-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A19]"
+                        >
+                          <FileText size={22} aria-hidden />
+                          Open receipt
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setLightbox(file.previewUrl)}
+                          className="group relative block w-full overflow-hidden rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A19]"
+                        >
+                          <img src={file.previewUrl} alt="" className="aspect-[4/3] w-full object-cover bg-gray-100" />
+                          <span className="pointer-events-none absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                        </button>
+                      )}
+                      {file.kind === 'video' && (
+                        <p className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-[#3A3A3A]">
+                          <Film size={12} aria-hidden /> Video
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+          </aside>
+        </div>
       </div>
 
       {lightbox && (
-        <button type="button" className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setLightbox(null)}>
-          <img src={lightbox} alt="Attachment" className="max-h-[90vh] max-w-full object-contain" />
-        </button>
+        <div className="fixed inset-0 z-50 bg-black/85 p-4 flex items-center justify-center">
+          <button
+            type="button"
+            aria-label="Close photo"
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#1A1A1A] hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A19]"
+            onClick={() => setLightbox(null)}
+          >
+            <X size={18} aria-hidden />
+          </button>
+          <button type="button" className="max-h-[90vh] max-w-full" onClick={() => setLightbox(null)}>
+            <img src={lightbox} alt="Attachment" className="max-h-[90vh] max-w-full object-contain" />
+          </button>
+        </div>
       )}
     </div>
+  );
+}
+
+function Fact({
+  label,
+  value,
+  mono,
+  capitalize,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  capitalize?: boolean;
+}) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[11px] font-semibold uppercase tracking-wide text-[#3A3A3A]">{label}</dt>
+      <dd className={`mt-0.5 font-medium text-[#1A1A1A] break-words ${mono ? 'font-mono text-[13px]' : ''} ${capitalize ? 'capitalize' : ''}`}>
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+function TimelineItem({ event }: { event: CustomerEvent }) {
+  const fromYou = event.actor_role === 'customer';
+  const when = formatTicketWhen(event.created_at);
+  if (event.type === 'reply') {
+    return (
+      <li className={`flex ${fromYou ? 'justify-end' : 'justify-start'}`}>
+        <div className={`max-w-[92%] min-w-0 rounded-2xl px-4 py-3 ${fromYou ? 'bg-[#1A1A1A] text-white rounded-br-sm' : 'bg-[#FFF4EB] text-[#1A1A1A] rounded-bl-sm'}`}>
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span className={`text-xs font-semibold ${fromYou ? 'text-[#FF7A19]' : 'text-[#FF7A19]'}`}>
+              {fromYou ? 'You' : 'VENTECH Support'}
+            </span>
+            <span className={`text-[11px] ${fromYou ? 'text-white/60' : 'text-[#3A3A3A]'}`}>{when}</span>
+          </div>
+          {event.body ? <p className="mt-2 text-sm leading-relaxed whitespace-pre-wrap break-words">{event.body}</p> : null}
+        </div>
+      </li>
+    );
+  }
+
+  const heading = event.type === 'created'
+    ? 'Request submitted'
+    : event.to_status
+      ? STATUS_LABEL[event.to_status] || event.to_status
+      : event.type.replace('_', ' ');
+
+  return (
+    <li className="flex justify-center">
+      <div className="w-full rounded-xl border border-dashed border-gray-200 px-4 py-3 text-center">
+        <p className="text-xs font-semibold uppercase tracking-wide text-[#3A3A3A]">
+          {fromYou ? 'You' : 'VENTECH Support'} · {when}
+        </p>
+        <p className="mt-1 text-sm font-semibold text-[#1A1A1A]">{heading}</p>
+        {event.type !== 'created' && event.body ? (
+          <p className="mt-1 text-sm text-[#3A3A3A] whitespace-pre-wrap break-words">{event.body}</p>
+        ) : null}
+      </div>
+    </li>
   );
 }
