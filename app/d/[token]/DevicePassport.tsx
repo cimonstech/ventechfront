@@ -262,10 +262,12 @@ export function DevicePassport() {
           <div className="p-4 space-y-3">
             <p className="text-xs font-bold tracking-wide text-[#FF7A19]">VENTECH</p>
             <h1 className="text-2xl font-bold text-[#1A1A1A] leading-tight">{device.model_name}</h1>
-            <DeviceWarrantyBadge warranty={device.warranty} />
-            {device.warranty.endsOn ? (
-              <p className="text-sm text-[#3A3A3A]">Warranty ends {formatDeviceDate(device.warranty.endsOn)}</p>
-            ) : null}
+            <DeviceWarrantyBadge warranty={device.warranty} showDate={false} />
+            <p className="text-sm text-[#3A3A3A]">
+              {device.warranty.endsOn
+                ? `Warranty ends ${formatDeviceDate(device.warranty.endsOn)}`
+                : 'No warranty recorded'}
+            </p>
 
             {device.view === 'owner' && device.ownership === 'transferred' && (
               <dl className="grid grid-cols-1 gap-2 text-sm border-t border-gray-100 pt-3">
