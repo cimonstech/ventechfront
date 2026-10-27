@@ -1,3 +1,4 @@
+import { authHeaders } from '@/lib/authHeaders';
 import { apiMessage, deviceRequest, formatDeviceDate } from '@/lib/devicesAdmin';
 
 export { apiMessage, deviceRequest, formatDeviceDate };
@@ -98,6 +99,10 @@ export interface TicketDetail {
   resolution: string | null;
   repair_cost: number | string | null;
   repair_paid: boolean;
+  repair_paid_amount: number | string | null;
+  repair_paid_method: string | null;
+  repair_paid_reference: string | null;
+  repair_paid_at: string | null;
   order_number_text: string | null;
   issue_type: { id: string; name: string } | null;
   customer: { id: string; name: string | null; email: string | null } | null;
@@ -115,6 +120,44 @@ export function openTicketCount(summary: TicketSummary | null): number {
     (sum, status) => sum + (summary.counts[status] || 0),
     0
   );
+}
+
+export const PAYMENT_METHODS = [
+  { id: 'cash', label: 'Cash' },
+  { id: 'momo', label: 'MoMo' },
+  { id: 'card', label: 'Card' },
+  { id: 'bank_transfer', label: 'Bank transfer' },
+] as const;
+
+export interface RepairReceipt {
+  ticket_no: string;
+  laptop_model: string;
+  amount: number | null;
+  method: string | null;
+  method_label: string | null;
+  reference: string | null;
+  paid_at: string | null;
+  contact: { phone: string; email: string };
+}
+
+export async function downloadReceiptPdf(path: string, filename: string): Promise<void> {
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+  const response = await fetch(`${API_URL}${path}${path.includes('?') ? '&' : '?'}format=pdf`, {
+    headers: await authHeaders(),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(typeof body?.message === 'string' ? body.message : 'Could not download this receipt.');
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 export function formatTicketWhen(value: string | null | undefined): string {

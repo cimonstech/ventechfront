@@ -90,6 +90,12 @@ export default function AffiliateJoinPage() {
   };
 
   const payLabel = info ? `Pay ${formatGhs(info.fee_pesewas)}` : 'Pay application fee';
+  const formValid =
+    acceptTerms
+    && channels.length > 0
+    && (payoutMethod === 'momo'
+      ? momoNetwork.trim().length > 0 && momoNumber.trim().length >= 8
+      : bankName.trim().length > 0 && bankAccountName.trim().length > 0 && bankAccountNumber.trim().length >= 6);
 
   const resumePayment = async () => {
     setPaying(true);
@@ -341,7 +347,7 @@ export default function AffiliateJoinPage() {
 
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || !formValid}
               className="w-full rounded-lg bg-[#FF7A19] px-4 py-3 font-semibold text-white hover:bg-[#e66a0f] disabled:opacity-50"
             >
               {submitting ? 'Opening payment…' : payLabel}

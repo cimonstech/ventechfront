@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { useSetAdminHeading } from '@/components/admin/AdminHeading';
 import { useAccess } from '@/context/AccessContext';
 import {
+  PAYMENT_METHODS,
   TicketAssignee,
   TicketDetail,
   TicketStatus,
@@ -38,7 +39,10 @@ export default function ServiceRequestDetailPage() {
   const [warrantyJob, setWarrantyJob] = useState('');
   const [resolution, setResolution] = useState('');
   const [repairCost, setRepairCost] = useState('');
-  const [repairPaid, setRepairPaid] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
+  const [payAmount, setPayAmount] = useState('');
+  const [payMethod, setPayMethod] = useState<(typeof PAYMENT_METHODS)[number]['id']>('cash');
+  const [payReference, setPayReference] = useState('');
   const [working, setWorking] = useState(false);
   const [lightbox, setLightbox] = useState<string | null>(null);
   const mediaRefreshed = useRef(false);
@@ -50,7 +54,6 @@ export default function ServiceRequestDetailPage() {
     setWarrantyJob(row.is_warranty === null || row.is_warranty === undefined ? '' : row.is_warranty ? 'yes' : 'no');
     setResolution(row.resolution || '');
     setRepairCost(row.repair_cost === null || row.repair_cost === undefined ? '' : String(row.repair_cost));
-    setRepairPaid(Boolean(row.repair_paid));
   };
 
   const load = useCallback(async () => {
@@ -130,7 +133,6 @@ export default function ServiceRequestDetailPage() {
       const patch: Record<string, unknown> = {
         resolution: resolution.trim() ? resolution.trim() : null,
         repair_cost: cost,
-        repair_paid: repairPaid,
       };
       if (warrantyJob === 'yes' || warrantyJob === 'no') patch.is_warranty = warrantyJob === 'yes';
       const result = await deviceRequest(`/api/admin/tickets/${id}`, {
@@ -336,13 +338,36 @@ export default function ServiceRequestDetailPage() {
               <p className="mt-1 text-[#3A3A3A]">{ticket.repair_cost ?? '—'}</p>
             )}
           </label>
-          {editable ? (
-            <label className="flex items-center gap-2 text-sm text-[#1A1A1A]">
-              <input type="checkbox" checked={repairPaid} onChange={(event) => setRepairPaid(event.target.checked)} />
-              Repair paid
-            </label>
+          {ticket.repair_paid ? (
+            <div className="space-y-2 text-sm">
+              <p className="text-[#1A1A1A]">
+                Paid {ticket.repair_paid_amount === null || ticket.repair_paid_amount === undefined
+                  ? ''
+                  : `GHS ${Number(ticket.repair_paid_amount).toFixed(2)} `}
+                {ticket.repair_paid_method
+                  ? `by ${PAYMENT_METHODS.find((method) => method.id === ticket.repair_paid_method)?.label || ticket.repair_paid_method}`
+                  : ''}
+              </p>
+              <Link href={`/admin/tickets/${id}/receipt`} className="inline-flex w-full items-center justify-center rounded-lg bg-[#1A1A1A] px-4 py-2 font-medium text-white">
+                Receipt
+              </Link>
+            </div>
+          ) : editable ? (
+            <Button
+              className="w-full"
+              variant="secondary"
+              disabled={working}
+              onClick={() => {
+                setPayAmount(repairCost.trim() === '' ? (ticket.repair_cost === null || ticket.repair_cost === undefined ? '' : String(ticket.repair_cost)) : repairCost);
+                setPayMethod('cash');
+                setPayReference('');
+                setPayOpen(true);
+              }}
+            >
+              Record payment
+            </Button>
           ) : (
-            <p className="text-sm text-[#3A3A3A]">Repair paid: {ticket.repair_paid ? 'Yes' : 'No'}</p>
+            <p className="text-sm text-[#3A3A3A]">Repair paid: No</p>
           )}
           {editable && <Button className="w-full" isLoading={working} onClick={saveSide}>Save</Button>}
           <div>
@@ -362,6 +387,71 @@ export default function ServiceRequestDetailPage() {
           </div>
         </aside>
       </div>
+
+      {payOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-xl bg-white p-5 space-y-3">
+            <h3 className="font-semibold text-[#1A1A1A]">Record payment</h3>
+            <label className="block text-sm">
+              Amount
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={payAmount}
+                onChange={(event) => setPayAmount(event.target.value)}
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              />
+            </label>
+            <label className="block text-sm">
+              Method
+              <select
+                value={payMethod}
+                onChange={(event) => setPayMethod(event.target.value as typeof payMethod)}
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              >
+                {PAYMENT_METHODS.map((method) => (
+                  <option key={method.id} value={method.id}>{method.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-sm">
+              Reference {payMethod === 'cash' ? '(optional)' : ''}
+              <input
+                value={payReference}
+                onChange={(event) => setPayReference(event.target.value)}
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              />
+            </label>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setPayOpen(false)}>Cancel</Button>
+              <Button
+                className="flex-1"
+                isLoading={working}
+                onClick={async () => {
+                  const amount = Number(payAmount);
+                  if (!Number.isFinite(amount) || amount < 0) {
+                    toast.error('Enter a valid amount.');
+                    return;
+                  }
+                  if (payMethod !== 'cash' && !payReference.trim()) {
+                    toast.error('A reference is required for this payment method.');
+                    return;
+                  }
+                  const ok = await run(`/api/admin/tickets/${id}/payment`, {
+                    amount,
+                    method: payMethod,
+                    reference: payReference.trim() || undefined,
+                  }, 'Could not record this payment');
+                  if (ok) setPayOpen(false);
+                }}
+              >
+                Save payment
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {lightbox && (
         <button type="button" className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setLightbox(null)}>

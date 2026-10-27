@@ -47,6 +47,7 @@ interface CustomerTicket {
   warranty_status_at_submit: string | null;
   order_number: string | null;
   closed_reason: string | null;
+  repair_paid: boolean;
   events: CustomerEvent[];
   media: CustomerMedia[];
 }
@@ -152,9 +153,19 @@ export default function ServiceRequestPage() {
               <h1 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight break-words">{ticket.ticket_no}</h1>
               <p className="mt-2 text-sm text-white/80 min-w-0 break-words">{ticket.laptop_model}</p>
             </div>
-            <Badge size="lg" variant={statusVariant(ticket.status)} className="shrink-0">
-              {currentLabel}
-            </Badge>
+            <div className="flex flex-col items-end gap-2 shrink-0">
+              <Badge size="lg" variant={statusVariant(ticket.status)}>
+                {currentLabel}
+              </Badge>
+              {ticket.repair_paid ? (
+                <Link
+                  href={`/account/service/${ticket.ticket_no}/receipt`}
+                  className="inline-flex min-h-10 items-center rounded-lg bg-white px-3 py-1.5 text-sm font-semibold text-[#1A1A1A] hover:bg-orange-50"
+                >
+                  Receipt
+                </Link>
+              ) : null}
+            </div>
           </div>
         </header>
 
@@ -382,9 +393,11 @@ function TimelineItem({ event }: { event: CustomerEvent }) {
 
   const heading = event.type === 'created'
     ? 'Request submitted'
-    : event.to_status
-      ? STATUS_LABEL[event.to_status] || event.to_status
-      : event.type.replace('_', ' ');
+    : event.type === 'payment'
+      ? 'Payment received'
+      : event.to_status
+        ? STATUS_LABEL[event.to_status] || event.to_status
+        : event.type.replace('_', ' ');
 
   return (
     <li className="flex justify-center">
