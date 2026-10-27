@@ -17,6 +17,7 @@ import {
   Phone,
   ChevronDown,
   Laptop,
+  Wrench,
 } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '@/store';
 import { AreaSwitcher } from './AreaSwitcher';
@@ -233,6 +234,10 @@ export const NavBar = () => {
                     <Link href="/account/devices" className="flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 text-sm">
                       <Laptop size={16} />
                       <span>My devices</span>
+                    </Link>
+                    <Link href="/account/service" className="flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 text-sm">
+                      <Wrench size={16} />
+                      <span>Service requests</span>
                     </Link>
                     <Link href="/wishlist" className="flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 text-sm">
                       <Heart size={16} />
@@ -463,6 +468,14 @@ export const NavBar = () => {
                 >
                   <Laptop size={16} className="inline mr-2" />
                   My devices
+                </Link>
+                <Link
+                  href="/account/service"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="block px-4 py-2.5 text-sm text-[#3A3A3A] hover:bg-gray-50 hover:text-[#FF7A19] transition-colors"
+                >
+                  <Wrench size={16} className="inline mr-2" />
+                  Service requests
                 </Link>
                 <AreaSwitcher variant="list" onNavigate={() => setIsMobileMenuOpen(false)} />
               </div>

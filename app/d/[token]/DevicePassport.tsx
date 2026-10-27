@@ -342,10 +342,12 @@ export function DevicePassport() {
             )}
 
             {device.view === 'owner' && (
-              <div className="space-y-1">
-                <Button className="w-full" variant="secondary" disabled>Request service</Button>
-                <p className="text-center text-sm text-[#3A3A3A]">Coming soon</p>
-              </div>
+              <Link
+                href={`/account/service/new?device=${encodeURIComponent(token)}`}
+                className="inline-flex w-full items-center justify-center rounded-lg bg-[#1A1A1A] px-4 py-2 font-medium text-white"
+              >
+                Request service
+              </Link>
             )}
           </div>
         </section>

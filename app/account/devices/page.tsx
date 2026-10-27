@@ -69,12 +69,17 @@ export default function MyDevicesPage() {
                 <p className="font-semibold text-[#1A1A1A]">{device.model_name}</p>
                 <p className="text-sm font-mono text-[#3A3A3A] mt-1">{device.serial_number}</p>
                 <p className="text-xs text-[#3A3A3A] mt-1">Purchased {formatDeviceDate(device.purchase_date)}</p>
-                <div className="mt-3 flex items-center justify-between gap-3">
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                   <DeviceWarrantyBadge warranty={device.warranty} />
                   {device.qr_token ? (
-                    <Link href={`/d/${encodeURIComponent(device.qr_token)}`} className="text-sm font-semibold text-[#FF7A19]">
-                      View
-                    </Link>
+                    <div className="flex flex-wrap gap-3">
+                      <Link href={`/d/${encodeURIComponent(device.qr_token)}`} className="text-sm font-semibold text-[#FF7A19]">
+                        View
+                      </Link>
+                      <Link href={`/account/service/new?device=${encodeURIComponent(device.qr_token)}`} className="text-sm font-semibold text-[#FF7A19]">
+                        Request service
+                      </Link>
+                    </div>
                   ) : null}
                 </div>
               </li>
