@@ -55,6 +55,20 @@ if (typeof process !== 'undefined') {
 }
 
 const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      { source: '/profile', destination: '/account/profile', permanent: true },
+      { source: '/orders', destination: '/account/orders', permanent: true },
+      {
+        source: '/orders/:id((?!success$).*)',
+        destination: '/account/orders/:id',
+        permanent: true,
+        missing: [{ type: 'query', key: 'email' }],
+      },
+      { source: '/wishlist', destination: '/account/wishlist', permanent: true },
+      { source: '/affiliate/dashboard', destination: '/account/affiliate', permanent: true },
+    ];
+  },
   images: {
     remotePatterns: [
       {

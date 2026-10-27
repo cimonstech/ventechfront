@@ -28,7 +28,7 @@ export function AreaSwitcher({
   if (!isAuthenticated || !user) return null;
 
   const areas: AreaLink[] = [
-    { id: 'account', label: 'My account', href: '/profile' },
+    { id: 'account', label: 'My account', href: '/account' },
   ];
 
   if (hasAdminEntry(access?.role || user.role)) {
@@ -45,7 +45,7 @@ export function AreaSwitcher({
 
   const current = pathname.startsWith('/admin')
     ? 'Admin panel'
-    : pathname.startsWith('/affiliate')
+    : pathname.startsWith('/account/affiliate') || pathname.startsWith('/affiliate')
       ? 'Affiliate'
       : 'My account';
   const buttonLabel = hasAdminEntry(user.role) ? getRoleLabel(user.role) : current;

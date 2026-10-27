@@ -167,7 +167,7 @@ export default function OrdersPage() {
                     <div className="text-sm text-[#3A3A3A]">
                       <span className="font-medium">{(order.items || []).length} item(s)</span>
                     </div>
-                    <Link href={`/orders/${order.id}`}>
+                    <Link href={`/account/orders/${order.id}`}>
                       <Button variant="outline" size="sm">
                         <Eye size={16} className="mr-2" />
                         View Details

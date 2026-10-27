@@ -40,7 +40,7 @@ export const PROGRAM_AREAS: Array<{
   label: string;
   href: string | null;
 }> = [
-  { role: 'affiliate', label: 'Affiliate', href: '/affiliate/dashboard' },
+  { role: 'affiliate', label: 'Affiliate', href: '/account/affiliate' },
   { role: 'investor', label: 'Investor', href: null },
 ];
 

@@ -103,7 +103,7 @@ export default function AffiliateDashboardPage() {
   useEffect(() => {
     if (isLoading) return;
     if (!isAuthenticated) {
-      const next = safeRedirectPath('/affiliate/dashboard');
+      const next = safeRedirectPath('/account/affiliate');
       router.replace(next ? `/login?redirect=${encodeURIComponent(next)}` : '/login');
       return;
     }

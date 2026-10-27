@@ -65,7 +65,7 @@ export default function AffiliatePaymentCallbackPage() {
         <p className="mb-6 text-[#3A3A3A]">{message}</p>
         {status !== 'loading' && (
           <Link
-            href={status === 'success' ? '/affiliate/dashboard' : '/affiliate/join'}
+            href={status === 'success' ? '/account/affiliate' : '/affiliate/join'}
             className="inline-flex rounded-lg bg-[#FF7A19] px-4 py-2 font-medium text-white hover:bg-[#e66a0f]"
           >
             {status === 'success' ? 'Go to dashboard' : 'Back to application'}

@@ -184,7 +184,7 @@ export const NavBar = () => {
 
             {isAuthenticated ? (
               <>
-                <Link href="/wishlist">
+                <Link href="/account/wishlist">
                   <Button variant="ghost" size="sm" className="relative">
                     <Heart size={20} />
                     {wishlistCount > 0 && (
@@ -210,7 +210,7 @@ export const NavBar = () => {
 
                 <AreaSwitcher />
                 <div className="relative group">
-                  <Link href="/orders" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+                  <Link href="/account" className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors">
                     <User size={18} className="text-[#3A3A3A]" />
                     <div className="flex flex-col items-start">
                       <span className="text-xs font-medium text-[#3A3A3A]">Account</span>
@@ -223,11 +223,11 @@ export const NavBar = () => {
                   
                   {/* Dropdown Menu */}
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-                    <Link href="/profile" className="flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 rounded-t-lg text-sm">
+                    <Link href="/account/profile" className="flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 rounded-t-lg text-sm">
                       <User size={16} />
                       <span>My Profile</span>
                     </Link>
-                    <Link href="/orders" className="flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 text-sm">
+                    <Link href="/account/orders" className="flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 text-sm">
                       <Package size={16} />
                       <span>My Orders</span>
                     </Link>
@@ -239,7 +239,7 @@ export const NavBar = () => {
                       <Wrench size={16} />
                       <span>Service requests</span>
                     </Link>
-                    <Link href="/wishlist" className="flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 text-sm">
+                    <Link href="/account/wishlist" className="flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 text-sm">
                       <Heart size={16} />
                       <span>Wishlist</span>
                     </Link>
@@ -446,7 +446,7 @@ export const NavBar = () => {
                 </div>
 
                 <Link
-                  href="/profile"
+                  href="/account/profile"
                   onClick={() => setIsMobileMenuOpen(false)}
                   className="block px-4 py-2.5 text-sm text-[#3A3A3A] hover:bg-gray-50 hover:text-[#FF7A19] transition-colors"
                 >
@@ -454,7 +454,7 @@ export const NavBar = () => {
                   My Profile
                 </Link>
                 <Link
-                  href="/orders"
+                  href="/account/orders"
                   onClick={() => setIsMobileMenuOpen(false)}
                   className="block px-4 py-2.5 text-sm text-[#3A3A3A] hover:bg-gray-50 hover:text-[#FF7A19] transition-colors"
                 >
@@ -483,7 +483,7 @@ export const NavBar = () => {
               {/* Quick Actions */}
               <div className="border-t border-gray-200 px-4 py-4 space-y-2">
                 <Link
-                  href="/wishlist"
+                  href="/account/wishlist"
                   onClick={() => setIsMobileMenuOpen(false)}
                   className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:border-[#FF7A19] transition-colors"
                 >

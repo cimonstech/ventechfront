@@ -386,7 +386,7 @@ export default function PaymentCallbackPage() {
             <h1 className="text-2xl font-bold text-[#1A1A1A] mb-3">Payment Successful!</h1>
             <p className="text-[#3A3A3A] mb-6">{message}</p>
             <p className="text-sm text-[#3A3A3A] mb-6">Redirecting you to your order...</p>
-            <Link href="/orders">
+            <Link href="/account/orders">
               <Button variant="primary" className="w-full">
                 View My Orders
               </Button>

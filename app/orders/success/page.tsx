@@ -122,7 +122,7 @@ export default function OrderSuccessPage() {
 
         {/* Actions */}
         <div className="flex gap-4">
-          <Link href="/orders" className="flex-1">
+          <Link href="/account/orders" className="flex-1">
             <Button variant="outline" className="w-full">
               View My Orders
             </Button>

@@ -64,7 +64,7 @@ export default function AffiliateJoinPage() {
         if (cancelled) return;
         setInfo(publicInfo);
         if (me && me.status !== 'awaiting_payment') {
-          router.replace('/affiliate/dashboard');
+          router.replace('/account/affiliate');
           return;
         }
         setExisting(me);
@@ -149,7 +149,7 @@ export default function AffiliateJoinPage() {
     } catch (error) {
       const message = apiMessage(error, 'Could not save your application.');
       if (/already/i.test(message)) {
-        router.replace('/affiliate/dashboard');
+        router.replace('/account/affiliate');
         return;
       }
       toast.error(message);

@@ -140,7 +140,7 @@ export default function OrderDetailPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Order not found</h2>
-          <Link href="/orders">
+          <Link href="/account/orders">
             <Button variant="primary">Back to Orders</Button>
           </Link>
         </div>
@@ -153,7 +153,7 @@ export default function OrderDetailPage() {
       <div className="container mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
-          <Link href="/orders">
+          <Link href="/account/orders">
             <Button variant="ghost" size="sm" icon={<ChevronLeft size={16} />} className="mb-4">
               Back to Orders
             </Button>

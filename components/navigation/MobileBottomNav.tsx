@@ -31,14 +31,14 @@ export const MobileBottomNav = () => {
       exact: false,
     },
     {
-      href: '/wishlist',
+      href: '/account/wishlist',
       label: 'Wishlist',
       icon: Heart,
       exact: false,
       badge: wishlistCount > 0 ? wishlistCount : undefined,
     },
     {
-      href: isAuthenticated ? '/profile' : '/login',
+      href: isAuthenticated ? '/account' : '/login?redirect=%2Faccount',
       label: 'My Account',
       icon: User,
       exact: false,
@@ -46,6 +46,12 @@ export const MobileBottomNav = () => {
   ];
 
   const isActive = (item: typeof navItems[0]) => {
+    if (item.label === 'My Account') {
+      return pathname.startsWith('/account') && !pathname.startsWith('/account/wishlist');
+    }
+    if (item.label === 'Wishlist') {
+      return pathname.startsWith('/account/wishlist') || pathname.startsWith('/wishlist');
+    }
     if (item.exact) {
       return pathname === item.href;
     }
