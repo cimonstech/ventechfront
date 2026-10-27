@@ -47,7 +47,9 @@ export function AreaSwitcher({
     ? 'Admin panel'
     : pathname.startsWith('/account/affiliate') || pathname.startsWith('/affiliate')
       ? 'Affiliate'
-      : 'My account';
+      : pathname.startsWith('/account/investments')
+        ? 'Investor'
+        : 'My account';
   const buttonLabel = hasAdminEntry(user.role) ? getRoleLabel(user.role) : current;
 
   if (variant === 'list') {

@@ -19,7 +19,7 @@ const MODULES = [
   { id: 'devices', label: 'Devices' },
   { id: 'tickets', label: 'Tickets' },
   { id: 'affiliates', label: 'Affiliates' },
-  { id: 'vlb', label: 'VLB' },
+  { id: 'vlb', label: 'Laptop Banking' },
   { id: 'finance', label: 'Finance' },
 ] as const;
 

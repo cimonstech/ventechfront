@@ -8,6 +8,7 @@ import { ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { ContentHtml } from '@/components/content/ContentHtml';
 import { DeviceWarrantyBadge } from '@/components/admin/DeviceWarrantyBadge';
+import { OwnerQrCard } from '@/components/devices/OwnerQrCard';
 import { useAppSelector } from '@/store';
 import { authHeaders } from '@/lib/authHeaders';
 import { settingsService } from '@/lib/settings.service';
@@ -46,6 +47,7 @@ interface DevicePayload {
   linked_at?: string | null;
   order_number?: string | null;
   order_id?: string | null;
+  qr_token?: string;
 }
 
 interface StoreContact {
@@ -351,6 +353,15 @@ export function DevicePassport() {
             )}
           </div>
         </section>
+
+        {device.view === 'owner' && device.qr_token && device.serial_number ? (
+          <OwnerQrCard
+            qrToken={device.qr_token}
+            modelName={device.model_name}
+            serialNumber={device.serial_number}
+            phone={contact.phone}
+          />
+        ) : null}
 
         {groups.length > 0 && (
           <section className="bg-white border border-gray-200 rounded-2xl p-4 space-y-2">

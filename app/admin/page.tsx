@@ -22,6 +22,7 @@ import { isAdminRole } from '@/lib/roles';
 import { useAccess } from '@/context/AccessContext';
 import { canViewModule } from '@/lib/access';
 import { apiMessage, deviceRequest, openTicketCount, type TicketSummary } from '@/lib/ticketsAdmin';
+import { formatGhs } from '@/lib/vlb';
 
 interface DashboardStats {
   totalRevenue: number;
@@ -589,7 +590,10 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <OpenServiceRequestsCard />
+      <div className="flex flex-wrap gap-4">
+        <OpenServiceRequestsCard />
+        <VlbPayoutsDueCard />
+      </div>
       {showAnalytics && (
       <>
       {/* Stats Grid */}
@@ -768,6 +772,46 @@ function OpenServiceRequestsCard() {
     >
       <p className="text-3xl font-bold text-[#1A1A1A] mb-1">{count}</p>
       <p className="text-sm font-semibold text-[#1A1A1A]">Open service requests</p>
+    </Link>
+  );
+}
+
+function VlbPayoutsDueCard() {
+  const { access } = useAccess();
+  const allowed = canViewModule(access, 'vlb');
+  const [summary, setSummary] = useState<{ count: number; totalNet: number } | null>(null);
+
+  useEffect(() => {
+    if (!allowed) return;
+    let cancelled = false;
+    deviceRequest<Array<{ net_pesewas?: number }>>('/api/admin/vlb/payouts?range=this_week&limit=100')
+      .then((result) => {
+        if (cancelled) return;
+        const rows = result.data || [];
+        setSummary({
+          count: result.pagination?.total ?? rows.length,
+          totalNet: rows.reduce((sum, row) => sum + Number(row.net_pesewas || 0), 0),
+        });
+      })
+      .catch((error) => {
+        console.error('vlb payouts due this week', error);
+        if (!cancelled) toast.error(apiMessage(error, 'Could not load Laptop Banking payouts'));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [allowed]);
+
+  if (!allowed || !summary) return null;
+
+  return (
+    <Link
+      href="/admin/vlb/payouts"
+      className="block max-w-sm bg-orange-50 rounded-xl p-6 border-2 border-transparent hover:border-[#FF7A19] transition-all"
+    >
+      <p className="text-3xl font-bold text-[#1A1A1A] mb-1">{summary.count}</p>
+      <p className="text-sm font-semibold text-[#1A1A1A]">Laptop Banking payouts due this week</p>
+      <p className="mt-1 text-sm text-[#3A3A3A]">{formatGhs(summary.totalNet)} net</p>
     </Link>
   );
 }

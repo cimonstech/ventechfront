@@ -4,8 +4,11 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { QrCode, X } from 'lucide-react';
 import { DeviceWarrantyBadge } from '@/components/admin/DeviceWarrantyBadge';
+import { OwnerQrCard } from '@/components/devices/OwnerQrCard';
 import { useAppSelector } from '@/store';
+import { settingsService } from '@/lib/settings.service';
 import { apiMessage, deviceRequest, formatDeviceDate, type DeviceWarranty } from '@/lib/devicesAdmin';
 
 interface MineDevice {
@@ -16,11 +19,27 @@ interface MineDevice {
   qr_token?: string;
 }
 
+const FALLBACK_PHONE = '+233 55 134 4310';
+
 export default function MyDevicesPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAppSelector((state) => state.auth);
   const [devices, setDevices] = useState<MineDevice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [qrDevice, setQrDevice] = useState<MineDevice | null>(null);
+  const [phone, setPhone] = useState(FALLBACK_PHONE);
+
+  useEffect(() => {
+    let cancelled = false;
+    settingsService.getSettingsByCategory('store')
+      .then((settings) => {
+        if (!cancelled && settings.store_phone) setPhone(settings.store_phone);
+      })
+      .catch((error) => console.error('store phone', error));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (isLoading) return;
@@ -72,7 +91,15 @@ export default function MyDevicesPage() {
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                   <DeviceWarrantyBadge warranty={device.warranty} />
                   {device.qr_token ? (
-                    <div className="flex flex-wrap gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-[#FF7A19] hover:bg-orange-50"
+                        aria-label={`My QR code for ${device.serial_number}`}
+                        onClick={() => setQrDevice(device)}
+                      >
+                        <QrCode size={20} />
+                      </button>
                       <Link href={`/d/${encodeURIComponent(device.qr_token)}`} className="text-sm font-semibold text-[#FF7A19]">
                         View
                       </Link>
@@ -87,6 +114,32 @@ export default function MyDevicesPage() {
           </ul>
         )}
       </div>
+
+      {qrDevice?.qr_token ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-4"
+          onClick={() => setQrDevice(null)}
+        >
+          <div className="w-full max-w-sm" onClick={(event) => event.stopPropagation()}>
+            <div className="mb-2 flex justify-end">
+              <button
+                type="button"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full bg-white text-[#1A1A1A]"
+                aria-label="Close QR code"
+                onClick={() => setQrDevice(null)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <OwnerQrCard
+              qrToken={qrDevice.qr_token}
+              modelName={qrDevice.model_name}
+              serialNumber={qrDevice.serial_number}
+              phone={phone}
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

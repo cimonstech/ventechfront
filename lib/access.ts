@@ -41,7 +41,7 @@ export const PROGRAM_AREAS: Array<{
   href: string | null;
 }> = [
   { role: 'affiliate', label: 'Affiliate', href: '/account/affiliate' },
-  { role: 'investor', label: 'Investor', href: null },
+  { role: 'investor', label: 'Investor', href: '/account/investments' },
 ];
 
 const FULL_ADMIN_PREFIXES = [
@@ -72,6 +72,7 @@ const MODULE_PREFIXES: Array<{ prefix: string; module: AccessModule }> = [
   { prefix: '/admin/devices', module: 'devices' },
   { prefix: '/admin/tickets', module: 'tickets' },
   { prefix: '/admin/affiliates', module: 'affiliates' },
+  { prefix: '/admin/vlb', module: 'vlb' },
   { prefix: '/admin/content', module: 'content' },
   { prefix: '/admin/faqs', module: 'content' },
   { prefix: '/admin/pages', module: 'content' },

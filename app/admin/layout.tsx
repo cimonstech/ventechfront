@@ -31,6 +31,7 @@ import {
   Laptop,
   Wrench,
   Handshake,
+  Landmark,
 } from 'lucide-react';
 import Link from 'next/link';
 import { signOut } from '@/services/auth.service';
@@ -260,6 +261,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       label: 'Affiliates',
       href: '/admin/affiliates',
       badge: affiliateQueue !== undefined ? (affiliateQueue > 0 ? affiliateQueue : undefined) : undefined,
+    },
+    {
+      icon: Landmark,
+      label: 'Laptop Banking',
+      href: '/admin/vlb',
     },
     {
       icon: Package,
