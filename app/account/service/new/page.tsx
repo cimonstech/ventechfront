@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { FileText, Film, ImagePlus, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { DeviceWarrantyBadge } from '@/components/admin/DeviceWarrantyBadge';
 import { useAppSelector } from '@/store';
@@ -412,10 +413,17 @@ function NewServiceRequest() {
                   <span className="font-medium text-[#1A1A1A]">Order number (optional)</span>
                   <input value={orderNumber} onChange={(event) => setOrderNumber(event.target.value)} className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg" />
                 </label>
-                <div>
-                  <p className="text-sm font-medium text-[#1A1A1A] mb-1">Receipt</p>
-                  <input type="file" accept="image/*,.pdf,application/pdf" className="block w-full max-w-full text-sm" onChange={(event) => { addReceipt(event.target.files); event.target.value = ''; }} />
-                  {receipt && <FileRow row={receipt} onRemove={() => void removeFile(receipt, 'receipt')} />}
+                <div className="space-y-3">
+                  <p className="text-sm font-medium text-[#1A1A1A]">Receipt</p>
+                  {!receipt && (
+                    <DropZone
+                      accept="image/*,.pdf,application/pdf"
+                      title="Add a receipt"
+                      hint="A photo or PDF, up to 10 MB"
+                      onFiles={addReceipt}
+                    />
+                  )}
+                  {receipt && <FileTile row={receipt} onRemove={() => void removeFile(receipt, 'receipt')} />}
                 </div>
               </div>
             )}
@@ -456,23 +464,38 @@ function NewServiceRequest() {
           </label>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-          <p className="text-sm font-medium text-[#1A1A1A]">Photos and video</p>
-          <input
-            type="file"
+        <section className="bg-white border border-gray-200 rounded-2xl p-4 space-y-4">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold text-[#1A1A1A]">Photos and video</h2>
+              <p className="text-xs text-[#3A3A3A] mt-1">{files.filter((file) => file.status !== 'error').length} of 5</p>
+            </div>
+          </div>
+          <DropZone
             multiple
-            className="block w-full max-w-full text-sm"
+            full={attachedCount >= 5}
             accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.mp4,.mov,image/jpeg,image/png,image/webp,video/mp4,video/quicktime"
-            onChange={(event) => {
-              addFiles(event.target.files);
-              event.target.value = '';
+            title={attachedCount >= 5 ? '5 files added' : 'Add photos or a video'}
+            hint={attachedCount >= 5 ? 'Remove one to add another' : 'Tap to choose, or drop files here'}
+            onFiles={(list) => {
+              if (attachedCount >= 5) {
+                toast.error('You can attach up to 5 files.');
+                return;
+              }
+              addFiles(list);
             }}
           />
-          <p className="text-xs text-[#3A3A3A]">Photos up to 10 MB each (JPG, PNG, WebP, HEIC). One video up to 50 MB (MP4 or MOV).</p>
-          {files.map((file) => (
-            <FileRow key={file.key} row={file} onRemove={() => void removeFile(file)} />
-          ))}
-        </div>
+          <p className="text-xs leading-relaxed text-[#3A3A3A]">Photos up to 10 MB each (JPG, PNG, WebP, HEIC). One video up to 50 MB (MP4 or MOV).</p>
+          {files.length > 0 && (
+            <ul className="grid grid-cols-2 gap-3">
+              {files.map((file) => (
+                <li key={file.key}>
+                  <FileTile row={file} onRemove={() => void removeFile(file)} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
         <Button type="submit" className="w-full" disabled={busy || submitting} isLoading={submitting}>
           Submit request
@@ -482,23 +505,120 @@ function NewServiceRequest() {
   );
 }
 
-function FileRow({ row, onRemove }: { row: LocalFile; onRemove: () => void }) {
+function DropZone({
+  accept,
+  title,
+  hint,
+  onFiles,
+  multiple,
+  full,
+}: {
+  accept: string;
+  title: string;
+  hint: string;
+  onFiles: (list: FileList | null) => void;
+  multiple?: boolean;
+  full?: boolean;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [over, setOver] = useState(false);
   return (
-    <div className="flex items-center gap-3 border border-gray-200 rounded-lg p-2">
-      {row.kind === 'video' || isVideoName(row.name) ? (
-        row.preview ? <video src={row.preview} muted className="h-14 w-14 object-cover rounded bg-black" /> : <div className="h-14 w-14 rounded bg-gray-100 flex items-center justify-center text-[10px] font-semibold text-[#3A3A3A]">VIDEO</div>
-      ) : row.preview ? (
-        <img src={row.preview} alt="" className="h-14 w-14 object-cover rounded bg-gray-100" />
-      ) : (
-        <div className="h-14 w-14 rounded bg-gray-100 flex items-center justify-center text-[10px] font-semibold text-[#3A3A3A]">FILE</div>
-      )}
-      <div className="flex-1 min-w-0">
-        <p className="text-xs text-[#1A1A1A] truncate">{row.name}</p>
-        <div className="mt-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-          <div className="h-full bg-[#FF7A19]" style={{ width: `${row.status === 'error' ? 0 : row.progress}%` }} />
-        </div>
-      </div>
-      <button type="button" onClick={onRemove} className="text-xs font-semibold text-[#FF7A19]">Remove</button>
+    <div
+      onDragOver={(event) => {
+        event.preventDefault();
+        if (!full) setOver(true);
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(event) => {
+        event.preventDefault();
+        setOver(false);
+        if (full) {
+          onFiles(null);
+          return;
+        }
+        onFiles(event.dataTransfer.files);
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => {
+          if (full) {
+            onFiles(null);
+            return;
+          }
+          inputRef.current?.click();
+        }}
+        className={`w-full rounded-2xl border-2 border-dashed px-4 py-8 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A19] focus-visible:ring-offset-2 active:bg-orange-100 ${
+          full
+            ? 'border-gray-200 bg-gray-50 text-[#3A3A3A]'
+            : over
+              ? 'border-[#FF7A19] bg-orange-50'
+              : 'border-gray-300 bg-[#FFF8F3] hover:border-[#FF7A19] hover:bg-orange-50'
+        }`}
+      >
+        <span className={`mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full ${full ? 'bg-gray-200 text-[#3A3A3A]' : 'bg-white text-[#FF7A19] shadow-sm'}`}>
+          <ImagePlus size={22} aria-hidden />
+        </span>
+        <span className="block font-semibold text-[#1A1A1A]">{title}</span>
+        <span className="mt-1 block text-xs text-[#3A3A3A]">{hint}</span>
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        multiple={multiple}
+        accept={accept}
+        tabIndex={-1}
+        className="sr-only"
+        onChange={(event) => {
+          onFiles(event.target.files);
+          event.target.value = '';
+        }}
+      />
     </div>
+  );
+}
+
+function FileTile({ row, onRemove }: { row: LocalFile; onRemove: () => void }) {
+  const video = row.kind === 'video' || isVideoName(row.name);
+  return (
+    <figure className="min-w-0">
+      <div className={`relative aspect-[4/3] overflow-hidden rounded-xl bg-gray-100 ${row.status === 'error' ? 'ring-2 ring-red-500' : ''}`}>
+        {video && row.preview ? (
+          <video src={row.preview} muted className="h-full w-full object-cover" />
+        ) : row.preview ? (
+          <img src={row.preview} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center gap-1 text-[#3A3A3A]">
+            {video ? <Film size={22} aria-hidden /> : <FileText size={22} aria-hidden />}
+            <span className="text-[10px] font-semibold">{video ? 'Video' : 'File'}</span>
+          </div>
+        )}
+        {video && (
+          <span className="absolute left-2 top-2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white">Video</span>
+        )}
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={`Remove ${row.name}`}
+          className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white text-[#1A1A1A] shadow-sm hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A19]"
+        >
+          <X size={14} aria-hidden />
+        </button>
+        {row.status === 'uploading' && (
+          <div className="absolute inset-x-0 bottom-0 bg-black/60 px-2 py-2">
+            <div className="h-1.5 overflow-hidden rounded-full bg-white/30">
+              <div className="h-full bg-[#FF7A19]" style={{ width: `${row.progress}%` }} />
+            </div>
+            <p className="mt-1 text-[10px] font-medium text-white">{row.progress}%</p>
+          </div>
+        )}
+        {row.status === 'error' && (
+          <div className="absolute inset-x-0 bottom-0 bg-red-700/90 px-2 py-2">
+            <p className="text-[11px] font-semibold text-white">Could not store this file</p>
+          </div>
+        )}
+      </div>
+      <figcaption className="mt-1 truncate text-xs text-[#3A3A3A]">{row.name}</figcaption>
+    </figure>
   );
 }
