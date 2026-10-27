@@ -49,6 +49,7 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
     is_pre_order: false,
     pre_order_available: false,
     estimated_arrival_date: '',
+    warranty_months: '',
   });
   
   const [keySpecs, setKeySpecs] = useState<Array<{ label: string; color: string }>>([]);
@@ -107,6 +108,9 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
         is_pre_order: isPreOrder,
         pre_order_available: isPreOrder, // Auto-set based on is_pre_order
         estimated_arrival_date: estimatedDate,
+        warranty_months: product.warranty_months === null || product.warranty_months === undefined
+          ? ''
+          : String(product.warranty_months),
       });
       fetchProductAttributes(product.id);
       // Reset productVariants when opening a product - ProductVariantManager will fetch them
@@ -155,6 +159,7 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
       is_pre_order: isPreOrderPage,
       pre_order_available: isPreOrderPage, // Auto-set to true if on pre-orders page
       estimated_arrival_date: '',
+      warranty_months: '',
     });
     setSelectedAttributes([]);
     setKeySpecs([]);
@@ -365,6 +370,16 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
       return;
     }
 
+    let warrantyMonths: number | null = null;
+    if (formData.warranty_months.trim() !== '') {
+      const months = Number(formData.warranty_months);
+      if (!Number.isInteger(months) || months < 0 || months > 120) {
+        toast.error('Warranty months must be between 0 and 120');
+        return;
+      }
+      warrantyMonths = months;
+    }
+
     setLoading(true);
     try {
       // Parse key_features (comma-separated string to JSON array)
@@ -414,6 +429,7 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
         is_pre_order: formData.is_pre_order,
         pre_order_available: formData.is_pre_order, // Auto-set to true if is_pre_order is true
         estimated_arrival_date: formData.estimated_arrival_date ? new Date(formData.estimated_arrival_date).toISOString() : null,
+        warranty_months: warrantyMonths,
         updated_at: new Date().toISOString(),
       };
 
@@ -518,6 +534,22 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
                 value={formData.sku}
                 onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                 placeholder="auto-generated"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-[#1A1A1A] mb-2">
+                Warranty (months)
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={120}
+                step={1}
+                value={formData.warranty_months}
+                onChange={(e) => setFormData({ ...formData, warranty_months: e.target.value })}
+                placeholder="Leave blank if none"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
               />
             </div>
