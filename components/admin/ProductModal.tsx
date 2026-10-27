@@ -540,7 +540,7 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
 
             <div>
               <label className="block text-sm font-semibold text-[#1A1A1A] mb-2">
-                Warranty (months)
+                Default warranty (months)
               </label>
               <input
                 type="number"

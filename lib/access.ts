@@ -69,6 +69,7 @@ const MODULE_PREFIXES: Array<{ prefix: string; module: AccessModule }> = [
   { prefix: '/admin/brands', module: 'products' },
   { prefix: '/admin/reviews', module: 'products' },
   { prefix: '/admin/media', module: 'products' },
+  { prefix: '/admin/devices', module: 'devices' },
   { prefix: '/admin/content', module: 'content' },
   { prefix: '/admin/faqs', module: 'content' },
   { prefix: '/admin/pages', module: 'content' },

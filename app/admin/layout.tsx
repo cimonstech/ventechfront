@@ -28,6 +28,7 @@ import {
   Clock,
   Shield,
   FileText,
+  Laptop,
 } from 'lucide-react';
 import Link from 'next/link';
 import { signOut } from '@/services/auth.service';
@@ -218,6 +219,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       badge: pendingOrdersCount !== undefined ? (pendingOrdersCount > 0 ? pendingOrdersCount : undefined) : undefined,
     },
     {
+      icon: Laptop,
+      label: 'Devices',
+      href: '/admin/devices',
+    },
+    {
       icon: Package,
       label: 'Products',
       children: [
@@ -367,12 +373,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 print:block print:h-auto print:bg-white">
       {/* Sidebar */}
       <aside
         className={`${
           sidebarOpen ? 'w-64' : 'w-20'
-        } bg-[#1A1A1A] text-white transition-all duration-300 flex flex-col fixed h-full z-50`}
+        } bg-[#1A1A1A] text-white transition-all duration-300 flex flex-col fixed h-full z-50 print:hidden`}
       >
         {/* Logo & Toggle */}
         <div className="p-4 flex items-center justify-between border-b border-gray-700">
@@ -501,10 +507,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Main Content */}
       <main
-        className={`flex-1 ${sidebarOpen ? 'ml-64' : 'ml-20'} transition-all duration-300`}
+        className={`flex-1 ${sidebarOpen ? 'ml-64' : 'ml-20'} transition-all duration-300 print:ml-0`}
       >
         {/* Top Bar */}
-        <div className="bg-white border-b border-gray-200 px-8 py-4 sticky top-0 z-40">
+        <div className="bg-white border-b border-gray-200 px-8 py-4 sticky top-0 z-40 print:hidden">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-[#1A1A1A]">
@@ -533,7 +539,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         {/* Page Content */}
-        <div className="p-8">
+        <div className="p-8 print:p-0">
           {accessLoading ? (
             <div className="flex items-center justify-center py-20">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF7A19]" />

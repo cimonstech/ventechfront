@@ -57,6 +57,13 @@ export default function AdminOrdersPage() {
   const [isSelectMode, setIsSelectMode] = useState(false);
 
   useEffect(() => {
+    const open = new URLSearchParams(window.location.search).get('open');
+    if (!open) return;
+    setSelectedOrderId(open);
+    setIsModalOpen(true);
+  }, []);
+
+  useEffect(() => {
     if (isAuthenticated && !hasAdminEntry(user?.role)) {
       router.push('/');
       return;
