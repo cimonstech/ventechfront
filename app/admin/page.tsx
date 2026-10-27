@@ -20,6 +20,8 @@ import toast from 'react-hot-toast';
 import { useAppSelector } from '@/store';
 import { isAdminRole } from '@/lib/roles';
 import { useAccess } from '@/context/AccessContext';
+import { canViewModule } from '@/lib/access';
+import { apiMessage, deviceRequest, openTicketCount, type TicketSummary } from '@/lib/ticketsAdmin';
 
 interface DashboardStats {
   totalRevenue: number;
@@ -587,6 +589,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6">
+      <OpenServiceRequestsCard />
       {showAnalytics && (
       <>
       {/* Stats Grid */}
@@ -732,5 +735,39 @@ export default function AdminDashboard() {
         </div>
       </div>
     </div>
+  );
+}
+
+function OpenServiceRequestsCard() {
+  const { access } = useAccess();
+  const allowed = canViewModule(access, 'tickets');
+  const [count, setCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!allowed) return;
+    let cancelled = false;
+    deviceRequest<TicketSummary>('/api/admin/tickets/summary')
+      .then((result) => {
+        if (!cancelled) setCount(openTicketCount(result.data));
+      })
+      .catch((error) => {
+        console.error('open service requests', error);
+        if (!cancelled) toast.error(apiMessage(error, 'Could not load service requests'));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [allowed]);
+
+  if (!allowed || count === null) return null;
+
+  return (
+    <Link
+      href="/admin/tickets"
+      className="block max-w-sm bg-orange-50 rounded-xl p-6 border-2 border-transparent hover:border-[#FF7A19] transition-all"
+    >
+      <p className="text-3xl font-bold text-[#1A1A1A] mb-1">{count}</p>
+      <p className="text-sm font-semibold text-[#1A1A1A]">Open service requests</p>
+    </Link>
   );
 }

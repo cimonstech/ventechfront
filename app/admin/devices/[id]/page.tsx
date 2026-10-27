@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { DeviceWarrantyBadge } from '@/components/admin/DeviceWarrantyBadge';
+import { useSetAdminHeading } from '@/components/admin/AdminHeading';
 import { useAccess } from '@/context/AccessContext';
 import { downloadBlob, qrDataUrl, qrSvg, safeFileName } from '@/lib/deviceQr';
 import {
@@ -66,6 +67,10 @@ export default function DeviceDetailPage() {
   }, [id]);
 
   const publicUrl = device ? devicePublicUrl(device.qr_token) : '';
+  useSetAdminHeading(
+    device ? `${device.model_name} · ${device.serial_number}` : 'Device',
+    id || null
+  );
 
   useEffect(() => {
     if (!publicUrl) {

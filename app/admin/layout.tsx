@@ -29,6 +29,7 @@ import {
   Shield,
   FileText,
   Laptop,
+  Wrench,
 } from 'lucide-react';
 import Link from 'next/link';
 import { signOut } from '@/services/auth.service';
@@ -37,6 +38,8 @@ import { getRoleLabel, hasAdminEntry } from '@/lib/roles';
 import { canOpenAdminPath, canViewModule, isFullAdmin } from '@/lib/access';
 import { useAccess } from '@/context/AccessContext';
 import { AreaSwitcher } from '@/components/navigation/AreaSwitcher';
+import { AdminHeadingProvider, useAdminHeadingValue } from '@/components/admin/AdminHeading';
+import { deviceRequest, type TicketSummary } from '@/lib/ticketsAdmin';
 import toast from 'react-hot-toast';
 
 interface MenuItem {
@@ -56,6 +59,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [mounted, setMounted] = useState(false);
   const [pendingOrdersCount, setPendingOrdersCount] = useState<number | undefined>(undefined);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState<number | undefined>(undefined);
+  const [submittedTickets, setSubmittedTickets] = useState<number | undefined>(undefined);
   const { access, loading: accessLoading } = useAccess();
 
   useEffect(() => {
@@ -68,7 +72,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     if (!access) return;
     const includeOrders = canViewModule(access, 'orders');
     const includeNotifications = isFullAdmin(access.role);
-    if (!includeOrders && !includeNotifications) return;
+    const includeTickets = canViewModule(access, 'tickets');
+    if (!includeOrders && !includeNotifications && !includeTickets) return;
 
     const fetchBadgeCounts = async () => {
       try {
@@ -80,6 +85,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
           if (!ordersError) {
             setPendingOrdersCount(pendingCount || 0);
+          }
+        }
+
+        if (includeTickets) {
+          try {
+            const result = await deviceRequest<TicketSummary>('/api/admin/tickets/summary');
+            setSubmittedTickets(result.data.counts?.submitted || 0);
+          } catch (error) {
+            console.error('service request badge', error);
           }
         }
 
@@ -222,6 +236,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       icon: Laptop,
       label: 'Devices',
       href: '/admin/devices',
+    },
+    {
+      icon: Wrench,
+      label: 'Service requests',
+      href: '/admin/tickets',
+      badge: submittedTickets !== undefined ? (submittedTickets > 0 ? submittedTickets : undefined) : undefined,
     },
     {
       icon: Package,
@@ -373,6 +393,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
+    <AdminHeadingProvider>
     <div className="flex h-screen bg-gray-50 print:block print:h-auto print:bg-white">
       {/* Sidebar */}
       <aside
@@ -512,16 +533,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* Top Bar */}
         <div className="bg-white border-b border-gray-200 px-8 py-4 sticky top-0 z-40 print:hidden">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-[#1A1A1A]">
-                {pathname === '/admin'
-                  ? 'Dashboard'
-                  : pathname.split('/').pop()?.replace('-', ' ').toUpperCase()}
-              </h1>
-              <p className="text-sm text-[#3A3A3A] mt-1">
-                Welcome back, {user?.full_name?.split(' ')[0] || 'Admin'}
-              </p>
-            </div>
+            <AdminPageTitle
+              pathname={pathname}
+              welcome={user?.full_name?.split(' ')[0] || 'Admin'}
+            />
             <div className="flex items-center gap-4">
               <AreaSwitcher />
               <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
@@ -559,6 +574,39 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           )}
         </div>
       </main>
+    </div>
+    </AdminHeadingProvider>
+  );
+}
+
+function AdminPageTitle({ pathname, welcome }: { pathname: string; welcome: string }) {
+  const heading = useAdminHeadingValue();
+  const fallback = pathname === '/admin'
+    ? 'Dashboard'
+    : pathname.split('/').pop()?.replace('-', ' ').toUpperCase();
+
+  const copyId = async () => {
+    if (!heading?.id) return;
+    try {
+      await navigator.clipboard.writeText(heading.id);
+      toast.success('Copied');
+    } catch {
+      toast.error('Could not copy');
+    }
+  };
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold text-[#1A1A1A]">{heading?.title || fallback}</h1>
+      {heading?.id ? (
+        <p className="mt-1 flex items-center gap-2 text-xs text-gray-500">
+          <span className="font-mono break-all">{heading.id}</span>
+          <button type="button" onClick={copyId} className="shrink-0 font-semibold text-[#FF7A19]">
+            Copy
+          </button>
+        </p>
+      ) : null}
+      <p className="text-sm text-[#3A3A3A] mt-1">Welcome back, {welcome}</p>
     </div>
   );
 }
