@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
@@ -8,6 +8,15 @@ import { Input } from '@/components/ui/Input';
 import { signUp } from '@/services/auth.service';
 import toast from 'react-hot-toast';
 import { Mail, Lock, User, Phone, ArrowRight, CheckCircle } from 'lucide-react';
+import { rememberRedirect, safeRedirectPath } from '@/lib/safeRedirect';
+
+function verifyEmailPath(email: string, redirect: string | null): string {
+  const params = new URLSearchParams();
+  if (email) params.set('email', email);
+  if (redirect) params.set('redirect', redirect);
+  const query = params.toString();
+  return query ? `/verify-email?${query}` : '/verify-email';
+}
 
 export function RegisterContent() {
   const router = useRouter();
@@ -21,6 +30,13 @@ export function RegisterContent() {
     confirmPassword: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [redirectTo, setRedirectTo] = useState<string | null>(null);
+
+  useEffect(() => {
+    const next = safeRedirectPath(new URLSearchParams(window.location.search).get('redirect'));
+    if (next) rememberRedirect(next);
+    setRedirectTo(next);
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -120,7 +136,7 @@ export function RegisterContent() {
             localStorage.setItem('pendingVerificationEmail', userEmail);
           }
           setTimeout(() => {
-            router.push(`/verify-email${userEmail ? `?email=${encodeURIComponent(userEmail)}` : ''}`);
+            router.push(verifyEmailPath(userEmail, redirectTo));
           }, 2000);
           return;
         }
@@ -168,7 +184,7 @@ export function RegisterContent() {
         });
         // Redirect to verification page
         setTimeout(() => {
-          router.push(`/verify-email${userEmail ? `?email=${encodeURIComponent(userEmail)}` : ''}`);
+          router.push(verifyEmailPath(userEmail, redirectTo));
         }, 2000);
       }
     } catch (error: any) {
@@ -292,7 +308,7 @@ export function RegisterContent() {
           {/* Login Link */}
           <div className="text-center">
             <Link
-              href="/login"
+              href={redirectTo ? `/login?redirect=${encodeURIComponent(redirectTo)}` : '/login'}
               className="text-[#FF7A19] hover:text-orange-600 font-medium inline-flex items-center gap-2"
             >
               Sign in to your account

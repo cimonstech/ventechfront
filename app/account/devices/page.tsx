@@ -1,0 +1,87 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
+import { DeviceWarrantyBadge } from '@/components/admin/DeviceWarrantyBadge';
+import { useAppSelector } from '@/store';
+import { apiMessage, deviceRequest, formatDeviceDate, type DeviceWarranty } from '@/lib/devicesAdmin';
+
+interface MineDevice {
+  model_name: string;
+  serial_number: string;
+  purchase_date: string;
+  warranty: DeviceWarranty;
+  qr_token?: string;
+}
+
+export default function MyDevicesPage() {
+  const router = useRouter();
+  const { isAuthenticated, isLoading } = useAppSelector((state) => state.auth);
+  const [devices, setDevices] = useState<MineDevice[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!isAuthenticated) {
+      router.replace('/login?redirect=%2Faccount%2Fdevices');
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const result = await deviceRequest<MineDevice[]>('/api/devices/mine');
+        if (!cancelled) setDevices(result.data || []);
+      } catch (error) {
+        if (!cancelled) toast.error(apiMessage(error, 'Could not load your laptops'));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, isLoading, router]);
+
+  if (isLoading || !isAuthenticated || loading) {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center bg-gray-50">
+        <p className="text-sm text-[#3A3A3A]">Loading your laptops…</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-8 px-4">
+      <div className="max-w-lg mx-auto">
+        <h1 className="text-2xl font-bold text-[#1A1A1A] mb-6">My devices</h1>
+        {devices.length === 0 ? (
+          <div className="bg-white border border-gray-200 rounded-xl p-6 text-sm text-[#3A3A3A]">
+            No laptops linked yet. Scan the QR sticker on your VENTECH laptop to add it.
+          </div>
+        ) : (
+          <ul className="space-y-3">
+            {devices.map((device) => (
+              <li key={`${device.serial_number}-${device.purchase_date}`} className="bg-white border border-gray-200 rounded-xl p-4">
+                <p className="font-semibold text-[#1A1A1A]">{device.model_name}</p>
+                <p className="text-sm font-mono text-[#3A3A3A] mt-1">{device.serial_number}</p>
+                <p className="text-xs text-[#3A3A3A] mt-1">Purchased {formatDeviceDate(device.purchase_date)}</p>
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <DeviceWarrantyBadge warranty={device.warranty} />
+                  {device.qr_token ? (
+                    <Link href={`/d/${encodeURIComponent(device.qr_token)}`} className="text-sm font-semibold text-[#FF7A19]">
+                      View
+                    </Link>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}

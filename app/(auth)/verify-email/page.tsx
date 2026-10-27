@@ -7,6 +7,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Mail, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { resendVerificationEmail } from '@/services/auth.service';
+import { safeRedirectPath } from '@/lib/safeRedirect';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 
@@ -14,6 +15,7 @@ export default function VerifyEmailPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const emailParam = searchParams.get('email');
+  const redirectTo = safeRedirectPath(searchParams.get('redirect'));
   const code = searchParams.get('code');
   const [email, setEmail] = useState(emailParam || '');
   const [isResending, setIsResending] = useState(false);
@@ -177,9 +179,15 @@ export default function VerifyEmailPage() {
 
         {/* Back to Home */}
         <div className="text-center mt-6">
-          <Link href="/" className="text-sm text-[#3A3A3A] hover:text-[#FF7A19]">
-            ← Back to Home
-          </Link>
+          {redirectTo ? (
+            <Link href={`/login?redirect=${encodeURIComponent(redirectTo)}`} className="text-sm text-[#FF7A19] hover:underline">
+              Sign in to continue
+            </Link>
+          ) : (
+            <Link href="/" className="text-sm text-[#3A3A3A] hover:text-[#FF7A19]">
+              ← Back to Home
+            </Link>
+          )}
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
   User, 
@@ -10,7 +11,8 @@ import {
   Shield, 
   Package,
   Heart,
-  LogOut 
+  LogOut,
+  Laptop,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { authService } from '@/services/auth.service';
@@ -231,6 +233,14 @@ export default function ProfilePage() {
                   );
                 })}
               </nav>
+
+              <Link
+                href="/account/devices"
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-[#3A3A3A] hover:bg-gray-100 transition-colors mt-2"
+              >
+                <Laptop className="w-5 h-5" />
+                <span className="text-sm font-medium">My devices</span>
+              </Link>
 
               <button
                 onClick={handleSignOut}

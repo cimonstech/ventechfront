@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -11,6 +11,7 @@ import { useAppDispatch } from '@/store';
 import { setUser } from '@/store/authSlice';
 import { supabase } from '@/lib/supabase';
 import { hasAdminEntry } from '@/lib/roles';
+import { clearRememberedRedirect, peekRememberedRedirect, rememberRedirect, safeRedirectPath } from '@/lib/safeRedirect';
 import toast from 'react-hot-toast';
 
 export default function LoginPage() {
@@ -24,6 +25,13 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<any>({});
+  const [redirectTo, setRedirectTo] = useState<string | null>(null);
+
+  useEffect(() => {
+    const next = safeRedirectPath(new URLSearchParams(window.location.search).get('redirect'));
+    if (next) rememberRedirect(next);
+    setRedirectTo(next || peekRememberedRedirect());
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -95,16 +103,17 @@ export default function LoginPage() {
           }));
           
           toast.success(`Welcome back, ${firstName || fullName.split(' ')[0] || 'User'}!`);
-          
-          // Redirect based on role
-          if (hasAdminEntry(profileData.role)) {
+          const next = redirectTo || peekRememberedRedirect();
+          clearRememberedRedirect();
+          if (next) {
+            router.push(next);
+          } else if (hasAdminEntry(profileData.role)) {
             router.push('/admin');
           } else {
             router.push('/');
           }
         } else {
-          // No profile found, redirect to home
-          router.push('/');
+          router.push(redirectTo || '/');
         }
       }
     } catch (error: any) {
@@ -155,7 +164,7 @@ export default function LoginPage() {
           <p className="mt-2 text-center text-sm text-gray-600">
             Or{' '}
             <Link
-              href="/register"
+              href={redirectTo ? `/register?redirect=${encodeURIComponent(redirectTo)}` : '/register'}
               className="font-medium text-[#FF7A19] hover:text-orange-600"
             >
               create a new account
