@@ -221,17 +221,30 @@ export default function DeviceDetailPage() {
               <span className="font-semibold text-[#1A1A1A]">Serial</span>
               <input className={fieldClass} value={serial} disabled={!editable} onChange={(event) => setSerial(event.target.value)} />
             </label>
-            <ReadOnly label="Customer" value={device.customer_name || '—'} />
-            <ReadOnly label="Email" value={device.customer_email || '—'} />
-            <ReadOnly label="Phone" value={device.customer_phone || '—'} />
-            <div className="text-sm">
-              <p className="font-semibold text-[#1A1A1A]">Order</p>
-              {orderId && orderNumber ? (
-                <Link href={`/admin/orders?open=${orderId}`} className="text-[#FF7A19] font-medium">{orderNumber}</Link>
-              ) : (
-                <p className="text-[#3A3A3A]">{orderNumber || '—'}</p>
-              )}
-            </div>
+            {ownersDiffer(device) ? (
+              <>
+                <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
+                  <p className="font-semibold text-[#1A1A1A]">Original buyer</p>
+                  <ReadOnly label="Name" value={device.customer_name || '—'} />
+                  <ReadOnly label="Email" value={device.customer_email || '—'} />
+                  <ReadOnly label="Phone" value={device.customer_phone || '—'} />
+                  <OrderLink orderId={orderId} orderNumber={orderNumber} />
+                </div>
+                <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
+                  <p className="font-semibold text-[#1A1A1A]">Current owner</p>
+                  <ReadOnly label="Name" value={device.owner?.full_name || '—'} />
+                  <ReadOnly label="Email" value={device.owner?.email || '—'} />
+                  <ReadOnly label="Linked on" value={formatDeviceDate(device.owner_linked_at) || '—'} />
+                </div>
+              </>
+            ) : (
+              <>
+                <ReadOnly label="Customer" value={device.customer_name || '—'} />
+                <ReadOnly label="Email" value={device.customer_email || '—'} />
+                <ReadOnly label="Phone" value={device.customer_phone || '—'} />
+                <OrderLink orderId={orderId} orderNumber={orderNumber} />
+              </>
+            )}
             <ReadOnly label="Purchase date" value={formatDeviceDate(device.purchase_date) || '—'} />
             <div className="text-sm">
               <p className="font-semibold text-[#1A1A1A]">Warranty</p>
@@ -261,10 +274,12 @@ export default function DeviceDetailPage() {
                 <option value="retired">Retired</option>
               </select>
             </label>
-            <ReadOnly
-              label="Linked owner"
-              value={device.owner ? `${device.owner.full_name || 'Account'} · ${device.owner.email || ''}` : 'Not linked'}
-            />
+            {!ownersDiffer(device) && (
+              <ReadOnly
+                label="Linked owner"
+                value={device.owner ? `${device.owner.full_name || 'Account'} · ${device.owner.email || ''}` : 'Not linked'}
+              />
+            )}
           </div>
           <label className="block text-sm">
             <span className="font-semibold text-[#1A1A1A]">Notes</span>
@@ -315,6 +330,28 @@ export default function DeviceDetailPage() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function ownersDiffer(device: DeviceRecord): boolean {
+  if (!device.user_id || !device.owner) return false;
+  if (device.order?.user_id && device.order.user_id === device.user_id) return false;
+  const ownerEmail = (device.owner.email || '').trim().toLowerCase();
+  const buyerEmail = (device.customer_email || '').trim().toLowerCase();
+  if (ownerEmail && buyerEmail && ownerEmail === buyerEmail) return false;
+  return true;
+}
+
+function OrderLink({ orderId, orderNumber }: { orderId: string | null; orderNumber: string | null }) {
+  return (
+    <div className="text-sm">
+      <p className="font-semibold text-[#1A1A1A]">Order</p>
+      {orderId && orderNumber ? (
+        <Link href={`/admin/orders?open=${orderId}`} className="text-[#FF7A19] font-medium">{orderNumber}</Link>
+      ) : (
+        <p className="text-[#3A3A3A]">{orderNumber || '—'}</p>
+      )}
     </div>
   );
 }

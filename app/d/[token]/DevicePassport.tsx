@@ -33,14 +33,17 @@ interface GuideArticle {
 
 interface DevicePayload {
   view: 'public' | 'owner';
+  ownership?: 'original' | 'transferred';
   claimable?: boolean;
   model_name: string;
   product: { slug: string | null; thumbnail: string | null };
   warranty: DeviceWarranty;
   guides?: Record<string, GuideArticle[]>;
   customer_name?: string | null;
+  owner_name?: string | null;
   serial_number?: string;
   purchase_date?: string;
+  linked_at?: string | null;
   order_number?: string | null;
   order_id?: string | null;
 }
@@ -264,7 +267,16 @@ export function DevicePassport() {
               <p className="text-sm text-[#3A3A3A]">Warranty ends {formatDeviceDate(device.warranty.endsOn)}</p>
             ) : null}
 
-            {device.view === 'owner' && (
+            {device.view === 'owner' && device.ownership === 'transferred' && (
+              <dl className="grid grid-cols-1 gap-2 text-sm border-t border-gray-100 pt-3">
+                <Detail label="Registered to" value={device.owner_name || '—'} />
+                <Detail label="Serial" value={device.serial_number || '—'} mono />
+                <Detail label="Purchased" value={formatDeviceDate(device.purchase_date) || '—'} />
+                <Detail label="Linked on" value={formatDeviceDate(device.linked_at) || '—'} />
+              </dl>
+            )}
+
+            {device.view === 'owner' && device.ownership !== 'transferred' && (
               <dl className="grid grid-cols-1 gap-2 text-sm border-t border-gray-100 pt-3">
                 <Detail label="Name" value={device.customer_name || '—'} />
                 <Detail label="Serial" value={device.serial_number || '—'} mono />

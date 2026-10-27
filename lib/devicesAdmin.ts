@@ -27,11 +27,12 @@ export interface DeviceRecord {
   qr_token: string;
   status: DeviceStatus;
   notes: string | null;
+  owner_linked_at?: string | null;
   created_at?: string;
   warranty: DeviceWarranty;
   order_number: string | null;
   product: { id: string; name: string; slug: string | null; thumbnail: string | null } | null;
-  order: { id: string; order_number: string } | null;
+  order: { id: string; order_number: string; user_id?: string | null } | null;
   owner: { id: string; full_name: string | null; email: string | null; phone: string | null } | null;
 }
 
