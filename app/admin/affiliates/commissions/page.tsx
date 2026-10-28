@@ -156,7 +156,7 @@ export default function AdminAffiliateCommissionsPage() {
           </thead>
           <tbody className="divide-y">
             {loading ? (
-              <tr><td colSpan={6} className="px-4 py-10 text-center text-[#3A3A3A]">Loading commissions…</td></tr>
+              <tr><td colSpan={6} className="px-4 py-10 text-center text-[#3A3A3A]">Loading commissionsâ€¦</td></tr>
             ) : rows.length === 0 ? (
               <tr><td colSpan={6} className="px-4 py-10 text-center text-[#3A3A3A]">No commissions in this list.</td></tr>
             ) : rows.map((row) => {
@@ -169,9 +169,9 @@ export default function AdminAffiliateCommissionsPage() {
                       <Link href={`/admin/affiliates/${row.affiliate_id}`} className="font-semibold text-[#FF7A19]">
                         {affiliate?.affiliate_no || 'Affiliate'}
                       </Link>
-                    ) : (affiliate?.affiliate_no || '—')}
+                    ) : (affiliate?.affiliate_no || 'â€”')}
                   </td>
-                  <td className="px-4 py-3">{order?.order_number || '—'}</td>
+                  <td className="px-4 py-3">{order?.order_number || 'â€”'}</td>
                   <td className="px-4 py-3">{formatGhs(row.amount_pesewas)}</td>
                   <td className="px-4 py-3">
                     <Badge size="sm" variant={affiliateStatusVariant(row.status)}>

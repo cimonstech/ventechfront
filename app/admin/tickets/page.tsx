@@ -31,7 +31,7 @@ const TABS: Array<{ id: Tab; label: string }> = [
 
 export default function ServiceRequestsPage() {
   return (
-    <Suspense fallback={<p className="text-sm text-[#3A3A3A]">Loading requests…</p>}>
+    <Suspense fallback={<p className="text-sm text-[#3A3A3A]">Loading requestsâ€¦</p>}>
       <ServiceRequestsList />
     </Suspense>
   );
@@ -146,12 +146,12 @@ function ServiceRequestsList() {
         ))}
         <div className="bg-white border border-gray-200 rounded-xl p-3">
           <p className="text-xs text-[#3A3A3A]">Older than 7 days</p>
-          <p className="text-2xl font-bold text-[#1A1A1A]">{summary?.open_older_than_7_days ?? '—'}</p>
+          <p className="text-2xl font-bold text-[#1A1A1A]">{summary?.open_older_than_7_days ?? 'â€”'}</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl p-3">
           <p className="text-xs text-[#3A3A3A]">Avg days to complete</p>
           <p className="text-2xl font-bold text-[#1A1A1A]">
-            {summary?.average_days_to_complete_90 ?? '—'}
+            {summary?.average_days_to_complete_90 ?? 'â€”'}
           </p>
         </div>
       </div>
@@ -238,7 +238,7 @@ function ServiceRequestsList() {
           </thead>
           <tbody className="divide-y">
             {loading ? (
-              <tr><td colSpan={8} className="px-4 py-10 text-center text-[#3A3A3A]">Loading requests…</td></tr>
+              <tr><td colSpan={8} className="px-4 py-10 text-center text-[#3A3A3A]">Loading requestsâ€¦</td></tr>
             ) : rows.length === 0 ? (
               <tr><td colSpan={8} className="px-4 py-10 text-center text-[#3A3A3A]">No service requests match.</td></tr>
             ) : rows.map((row) => (
@@ -247,14 +247,14 @@ function ServiceRequestsList() {
                   <Link href={`/admin/tickets/${row.id}`} className="font-semibold text-[#FF7A19]">{row.ticket_no}</Link>
                 </td>
                 <td className="px-4 py-3">
-                  <p className="text-[#1A1A1A]">{row.customer?.name || '—'}</p>
+                  <p className="text-[#1A1A1A]">{row.customer?.name || 'â€”'}</p>
                   <p className="text-xs text-[#3A3A3A]">{row.customer?.email || ''}</p>
                 </td>
                 <td className="px-4 py-3 text-[#1A1A1A]">{row.laptop_model}</td>
-                <td className="px-4 py-3">{row.issue?.name || '—'}</td>
+                <td className="px-4 py-3">{row.issue?.name || 'â€”'}</td>
                 <td className="px-4 py-3"><Badge size="sm" variant={statusVariant(row.status)}>{STATUS_LABEL[row.status] || row.status}</Badge></td>
                 <td className="px-4 py-3">{assigneeName(row.assigned_to)}</td>
-                <td className="px-4 py-3 capitalize">{row.warranty_status_at_submit || '—'}</td>
+                <td className="px-4 py-3 capitalize">{row.warranty_status_at_submit || 'â€”'}</td>
                 <td className="px-4 py-3 whitespace-nowrap">{formatTicketWhen(row.updated_at)}</td>
               </tr>
             ))}

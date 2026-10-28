@@ -204,7 +204,7 @@ export default function AdminVlbPlansPage() {
               <tr key={row.id} className="border-t">
                 <td className="px-4 py-3">
                   {row.name}
-                  <p className="text-xs text-[#3A3A3A]">{row.plan_group} · {row.version}</p>
+                  <p className="text-xs text-[#3A3A3A]">{row.plan_group} Â· {row.version}</p>
                 </td>
                 <td className="px-4 py-3">{formatGhs(row.principal_pesewas)}</td>
                 <td className="px-4 py-3">{(row.term_rates_percent || []).join('% / ')}%</td>

@@ -96,7 +96,7 @@ export default function AdminVlbInvestmentsPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td className="px-4 py-6" colSpan={6}>Loading…</td></tr>
+              <tr><td className="px-4 py-6" colSpan={6}>Loadingâ€¦</td></tr>
             ) : rows.length === 0 ? (
               <tr><td className="px-4 py-6 text-[#3A3A3A]" colSpan={6}>No investments.</td></tr>
             ) : rows.map((row) => (

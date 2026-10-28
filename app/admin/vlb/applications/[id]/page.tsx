@@ -83,7 +83,7 @@ export default function AdminVlbApplicationDetailPage() {
       .catch(() => setPreview(null));
   }, [planId, startDate, amount]);
 
-  if (!row) return <p className="text-sm text-[#3A3A3A]">Loading application…</p>;
+  if (!row) return <p className="text-sm text-[#3A3A3A]">Loading applicationâ€¦</p>;
 
   return (
     <div className="space-y-6">
@@ -93,11 +93,11 @@ export default function AdminVlbApplicationDetailPage() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold text-[#1A1A1A]">{row.full_name}</h1>
-            <p className="text-sm text-[#3A3A3A]">{row.email} · {row.phone}</p>
+            <p className="text-sm text-[#3A3A3A]">{row.email} Â· {row.phone}</p>
           </div>
           <Badge variant={payoutStatusVariant(row.status)}>{row.status}</Badge>
         </div>
-        <p className="mt-3 text-sm text-[#3A3A3A]">{nested(row.vlb_plans)?.name || 'No plan'} · {formatDeviceDate(row.created_at)}</p>
+        <p className="mt-3 text-sm text-[#3A3A3A]">{nested(row.vlb_plans)?.name || 'No plan'} Â· {formatDeviceDate(row.created_at)}</p>
         {row.message && <p className="mt-3 text-sm text-[#1A1A1A]">{row.message}</p>}
       </div>
 
@@ -226,7 +226,7 @@ export default function AdminVlbApplicationDetailPage() {
             <div className="overflow-x-auto sticky-first rounded-lg border border-gray-100 p-3">
               <p className="text-sm font-medium text-[#1A1A1A]">Schedule preview</p>
               <p className="text-xs text-[#3A3A3A]">
-                Total net {formatGhs(preview.totals.total_net)} · Scholar {formatGhs(preview.totals.scholar_fund_total)}
+                Total net {formatGhs(preview.totals.total_net)} Â· Scholar {formatGhs(preview.totals.scholar_fund_total)}
               </p>
               <table className="mt-2 min-w-[28rem] w-full text-left text-xs">
                 <thead>

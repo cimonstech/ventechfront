@@ -117,7 +117,7 @@ export default function AdminVlbPayoutsPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td className="px-4 py-6" colSpan={financeView ? 7 : 6}>Loading…</td></tr>
+              <tr><td className="px-4 py-6" colSpan={financeView ? 7 : 6}>Loadingâ€¦</td></tr>
             ) : rows.length === 0 ? (
               <tr><td className="px-4 py-6 text-[#3A3A3A]" colSpan={financeView ? 7 : 6}>No payouts.</td></tr>
             ) : rows.map((row) => {
@@ -125,16 +125,16 @@ export default function AdminVlbPayoutsPage() {
               const details = row.payout_details;
               return (
               <tr key={row.id} className="border-t">
-                <td className="px-4 py-3">{meta.investor_no || '—'}<p className="text-xs text-[#3A3A3A]">{meta.plan_name}</p></td>
+                <td className="px-4 py-3">{meta.investor_no || 'â€”'}<p className="text-xs text-[#3A3A3A]">{meta.plan_name}</p></td>
                 <td className="px-4 py-3">{row.type} {row.period_no}</td>
                 <td className="px-4 py-3">{formatDeviceDate(row.due_date)}</td>
                 <td className="px-4 py-3">{formatGhs(row.net_pesewas)}</td>
                 {financeView && (
                   <td className="px-4 py-3 text-xs text-[#3A3A3A]">
                     {details?.payout_method === 'momo'
-                      ? `${details.momo_network || 'MoMo'} · ${details.momo_number || '—'}`
+                      ? `${details.momo_network || 'MoMo'} Â· ${details.momo_number || 'â€”'}`
                       : details?.payout_method === 'bank'
-                        ? `${details.bank_name || 'Bank'} · ${details.bank_account_name || ''} · ${details.bank_account_number || '—'}`
+                        ? `${details.bank_name || 'Bank'} Â· ${details.bank_account_name || ''} Â· ${details.bank_account_number || 'â€”'}`
                         : 'Not set'}
                   </td>
                 )}

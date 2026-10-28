@@ -75,7 +75,7 @@ export default function AdminVlbInvestmentDetailPage() {
       .catch(() => undefined);
   }, [id]);
 
-  if (!row) return <p className="text-sm text-[#3A3A3A]">Loading investment…</p>;
+  if (!row) return <p className="text-sm text-[#3A3A3A]">Loading investmentâ€¦</p>;
 
   const run = async (path: string, body?: unknown, ok = 'Saved.') => {
     setBusy(true);
@@ -109,7 +109,7 @@ export default function AdminVlbInvestmentDetailPage() {
           <div>
             <h1 className="text-xl font-bold text-[#1A1A1A]">{row.plan_name}</h1>
             <p className="text-sm text-[#3A3A3A]">
-              {row.investor_no} · {formatGhs(row.principal_pesewas)} · term {row.current_term}
+              {row.investor_no} Â· {formatGhs(row.principal_pesewas)} Â· term {row.current_term}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -118,7 +118,7 @@ export default function AdminVlbInvestmentDetailPage() {
           </div>
         </div>
         <p className="mt-2 text-sm text-[#3A3A3A]">
-          {formatDeviceDate(row.start_date)} ? {formatDeviceDate(row.maturity_date)} · renewal {row.renewal_choice}
+          {formatDeviceDate(row.start_date)} ? {formatDeviceDate(row.maturity_date)} Â· renewal {row.renewal_choice}
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Button
@@ -174,7 +174,7 @@ export default function AdminVlbInvestmentDetailPage() {
                 <td className="py-2">{formatGhs(payout.net_pesewas)}</td>
                 <td className="py-2"><Badge size="sm" variant={payoutStatusVariant(payout.status)}>{payout.status}</Badge></td>
                 <td className="py-2">
-                  {payout.reference || '—'}
+                  {payout.reference || 'â€”'}
                   {payout.status === 'paid' && (
                     <button
                       type="button"
@@ -199,7 +199,7 @@ export default function AdminVlbInvestmentDetailPage() {
           <h2 className="font-semibold text-[#1A1A1A]">Premium Stars ({row.stars_used}/{row.stars_total})</h2>
           <ul className="text-sm text-[#3A3A3A]">
             {row.star_redemptions.map((item) => (
-              <li key={item.id}>{item.product_note} · {formatDeviceDate(item.created_at)}</li>
+              <li key={item.id}>{item.product_note} Â· {formatDeviceDate(item.created_at)}</li>
             ))}
           </ul>
           <form className="grid gap-2 sm:grid-cols-2" onSubmit={addStar}>
@@ -225,7 +225,7 @@ export default function AdminVlbInvestmentDetailPage() {
             <select className="min-w-[12rem] flex-1 rounded-lg border px-3 py-2 text-sm" value={referred} onChange={(e) => setReferred(e.target.value)}>
               <option value="">Referred investment</option>
               {others.map((item) => (
-                <option key={item.id} value={item.id}>{item.investor_no || item.id} · {item.plan_name}</option>
+                <option key={item.id} value={item.id}>{item.investor_no || item.id} Â· {item.plan_name}</option>
               ))}
             </select>
             <Button type="submit" disabled={busy || !referred}>Apply bonus</Button>

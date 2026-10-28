@@ -170,7 +170,7 @@ export default function AdminDevicesPage() {
           <tbody className="divide-y">
             {loading ? (
               <tr>
-                <td colSpan={8} className="px-4 py-12 text-center text-[#3A3A3A]">Loading devices…</td>
+                <td colSpan={8} className="px-4 py-12 text-center text-[#3A3A3A]">Loading devicesâ€¦</td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
@@ -193,7 +193,7 @@ export default function AdminDevicesPage() {
                 </td>
                 <td className="px-4 py-3 text-sm text-[#1A1A1A]">{device.model_name}</td>
                 <td className="px-4 py-3">
-                  <p className="text-sm text-[#1A1A1A]">{device.customer_name || '—'}</p>
+                  <p className="text-sm text-[#1A1A1A]">{device.customer_name || 'â€”'}</p>
                   <p className="text-xs text-[#3A3A3A]">{device.customer_email || ''}</p>
                 </td>
                 <td className="px-4 py-3 text-sm">
@@ -202,7 +202,7 @@ export default function AdminDevicesPage() {
                       {device.order_number}
                     </Link>
                   ) : (
-                    <span className="text-[#3A3A3A]">{device.order_number || '—'}</span>
+                    <span className="text-[#3A3A3A]">{device.order_number || 'â€”'}</span>
                   )}
                 </td>
                 <td className="px-4 py-3">

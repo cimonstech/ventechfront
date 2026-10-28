@@ -78,16 +78,16 @@ export default function AdminAffiliatesPage() {
   }, [tab, page, query]);
 
   const cards = [
-    { label: 'Total affiliates', value: metrics?.total_affiliates ?? '—' },
-    { label: 'Active', value: metrics?.active_affiliates ?? '—' },
-    { label: 'Fees paid', value: metrics ? formatGhs(metrics.total_fees_paid_pesewas) : '—' },
-    { label: 'Link clicks', value: metrics?.link_clicks ?? '—' },
-    { label: 'Referred customers', value: metrics?.referred_customers ?? '—' },
-    { label: 'Affiliate sales', value: metrics?.affiliate_sales ?? '—' },
-    { label: 'Commissions', value: metrics ? formatGhs(metrics.total_commissions_pesewas) : '—' },
-    { label: 'Pending commissions', value: metrics ? formatGhs(metrics.pending_pesewas) : '—' },
-    { label: 'Paid out', value: metrics ? formatGhs(metrics.paid_pesewas) : '—' },
-    { label: 'Open withdrawals', value: metrics?.open_withdrawal_requests ?? '—' },
+    { label: 'Total affiliates', value: metrics?.total_affiliates ?? 'â€”' },
+    { label: 'Active', value: metrics?.active_affiliates ?? 'â€”' },
+    { label: 'Fees paid', value: metrics ? formatGhs(metrics.total_fees_paid_pesewas) : 'â€”' },
+    { label: 'Link clicks', value: metrics?.link_clicks ?? 'â€”' },
+    { label: 'Referred customers', value: metrics?.referred_customers ?? 'â€”' },
+    { label: 'Affiliate sales', value: metrics?.affiliate_sales ?? 'â€”' },
+    { label: 'Commissions', value: metrics ? formatGhs(metrics.total_commissions_pesewas) : 'â€”' },
+    { label: 'Pending commissions', value: metrics ? formatGhs(metrics.pending_pesewas) : 'â€”' },
+    { label: 'Paid out', value: metrics ? formatGhs(metrics.paid_pesewas) : 'â€”' },
+    { label: 'Open withdrawals', value: metrics?.open_withdrawal_requests ?? 'â€”' },
   ];
 
   return (
@@ -175,7 +175,7 @@ export default function AdminAffiliatesPage() {
           </thead>
           <tbody className="divide-y">
             {loading ? (
-              <tr><td colSpan={5} className="px-4 py-10 text-center text-[#3A3A3A]">Loading affiliates…</td></tr>
+              <tr><td colSpan={5} className="px-4 py-10 text-center text-[#3A3A3A]">Loading affiliatesâ€¦</td></tr>
             ) : rows.length === 0 ? (
               <tr><td colSpan={5} className="px-4 py-10 text-center text-[#3A3A3A]">No affiliates in this list.</td></tr>
             ) : rows.map((row) => (
@@ -186,7 +186,7 @@ export default function AdminAffiliatesPage() {
                   </Link>
                 </td>
                 <td className="px-4 py-3">
-                  <p className="text-[#1A1A1A]">{row.user?.name || '—'}</p>
+                  <p className="text-[#1A1A1A]">{row.user?.name || 'â€”'}</p>
                   <p className="text-xs text-[#3A3A3A]">{row.user?.email || ''}</p>
                 </td>
                 <td className="px-4 py-3">
@@ -194,7 +194,7 @@ export default function AdminAffiliatesPage() {
                     {AFFILIATE_STATUS_LABEL[row.status] || row.status}
                   </Badge>
                 </td>
-                <td className="px-4 py-3">{row.fee_paid_at ? formatWhen(row.fee_paid_at) : '—'}</td>
+                <td className="px-4 py-3">{row.fee_paid_at ? formatWhen(row.fee_paid_at) : 'â€”'}</td>
                 <td className="px-4 py-3 whitespace-nowrap">{formatWhen(row.created_at)}</td>
               </tr>
             ))}

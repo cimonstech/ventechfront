@@ -102,7 +102,7 @@ export default function AdminVlbReportsPage() {
           <Button size="sm" variant="outline" onClick={() => csv('scholar-fund')}>Download CSV</Button>
         </div>
         <p className="mt-1 text-sm text-[#3A3A3A]">
-          Total {formatGhs(scholar?.totals.scholar_pesewas || 0)} · {scholar?.totals.count || 0} payouts
+          Total {formatGhs(scholar?.totals.scholar_pesewas || 0)} Â· {scholar?.totals.count || 0} payouts
         </p>
         <div className="mt-3 overflow-x-auto sticky-first">
           <table className="min-w-full text-left text-sm">
@@ -116,7 +116,7 @@ export default function AdminVlbReportsPage() {
             <tbody>
               {(scholar?.by_investor || []).map((row) => (
                 <tr key={row.investor_id} className="border-t">
-                  <td className="py-2">{row.investor_no || '—'}</td>
+                  <td className="py-2">{row.investor_no || 'â€”'}</td>
                   <td className="py-2">{row.count}</td>
                   <td className="py-2">{formatGhs(row.scholar_pesewas)}</td>
                 </tr>
@@ -147,9 +147,9 @@ export default function AdminVlbReportsPage() {
             <tbody>
               {(payouts?.rows || []).map((row, index) => (
                 <tr key={`${row.investor_no}-${row.period_no}-${index}`} className="border-t">
-                  <td className="py-2">{row.investor_no || '—'}</td>
+                  <td className="py-2">{row.investor_no || 'â€”'}</td>
                   <td className="py-2">{formatDeviceDate(row.due_date)}</td>
-                  <td className="py-2">{row.paid_at ? formatDeviceDate(row.paid_at) : '—'}</td>
+                  <td className="py-2">{row.paid_at ? formatDeviceDate(row.paid_at) : 'â€”'}</td>
                   <td className="py-2">{formatGhs(row.net_pesewas)}</td>
                 </tr>
               ))}

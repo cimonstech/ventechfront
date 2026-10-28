@@ -82,7 +82,7 @@ export default function AdminAffiliateDetailPage() {
   }
 
   if (!detail) {
-    return <p className="text-sm text-[#3A3A3A]">Loading affiliate…</p>;
+    return <p className="text-sm text-[#3A3A3A]">Loading affiliateâ€¦</p>;
   }
 
   const { profile, fee, clicks, orders, commissions, ledger, withdrawals } = detail;
@@ -101,16 +101,16 @@ export default function AdminAffiliateDetailPage() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold text-[#1A1A1A]">{profile.user?.name || 'Applicant'}</h2>
-            <p className="text-sm text-[#3A3A3A]">{profile.user?.email || '—'} {profile.user?.phone ? `· ${profile.user.phone}` : ''}</p>
+            <p className="text-sm text-[#3A3A3A]">{profile.user?.email || 'â€”'} {profile.user?.phone ? `Â· ${profile.user.phone}` : ''}</p>
           </div>
           <Badge variant={affiliateStatusVariant(profile.status)}>
             {AFFILIATE_STATUS_LABEL[profile.status] || profile.status}
           </Badge>
         </div>
         <div className="grid sm:grid-cols-2 gap-2 text-sm">
-          <p><span className="text-[#3A3A3A]">Number: </span>{profile.affiliate_no || '—'}</p>
-          <p><span className="text-[#3A3A3A]">Code: </span>{profile.referral_code || '—'}</p>
-          <p><span className="text-[#3A3A3A]">Withdrawal mode: </span>{profile.withdrawal_mode?.replace('_', ' ') || '—'}</p>
+          <p><span className="text-[#3A3A3A]">Number: </span>{profile.affiliate_no || 'â€”'}</p>
+          <p><span className="text-[#3A3A3A]">Code: </span>{profile.referral_code || 'â€”'}</p>
+          <p><span className="text-[#3A3A3A]">Withdrawal mode: </span>{profile.withdrawal_mode?.replace('_', ' ') || 'â€”'}</p>
           <p><span className="text-[#3A3A3A]">Applied: </span>{formatWhen(profile.created_at)}</p>
           {profile.links?.general ? (
             <p className="sm:col-span-2 break-all"><span className="text-[#3A3A3A]">Link: </span>{profile.links.general}</p>
@@ -140,11 +140,11 @@ export default function AdminAffiliateDetailPage() {
         <section className="bg-white border border-gray-200 rounded-xl p-5 space-y-2 text-sm">
           <h3 className="font-semibold text-[#1A1A1A]">Fee</h3>
           <p><span className="text-[#3A3A3A]">Status: </span>{feeLabel}</p>
-          <p><span className="text-[#3A3A3A]">Amount: </span>{fee.amount_pesewas != null ? formatGhs(fee.amount_pesewas) : '—'}</p>
+          <p><span className="text-[#3A3A3A]">Amount: </span>{fee.amount_pesewas != null ? formatGhs(fee.amount_pesewas) : 'â€”'}</p>
           <p><span className="text-[#3A3A3A]">Paid: </span>{formatWhen(fee.paid_at)}</p>
-          <p><span className="text-[#3A3A3A]">Paystack reference: </span>{fee.reference || '—'}</p>
+          <p><span className="text-[#3A3A3A]">Paystack reference: </span>{fee.reference || 'â€”'}</p>
           {fee.refunded_at ? (
-            <p><span className="text-[#3A3A3A]">Refunded: </span>{formatWhen(fee.refunded_at)} · {fee.refund_reference || '—'}</p>
+            <p><span className="text-[#3A3A3A]">Refunded: </span>{formatWhen(fee.refunded_at)} Â· {fee.refund_reference || 'â€”'}</p>
           ) : null}
           {finance && fee.refund_due && (
             <Button size="sm" disabled={busy} onClick={() => setPrompt({ kind: 'refund' })}>Record fee refund</Button>
@@ -153,17 +153,17 @@ export default function AdminAffiliateDetailPage() {
 
         <section className="bg-white border border-gray-200 rounded-xl p-5 space-y-2 text-sm">
           <h3 className="font-semibold text-[#1A1A1A]">Payout details</h3>
-          <p><span className="text-[#3A3A3A]">Method: </span>{payout.payout_method || '—'}</p>
+          <p><span className="text-[#3A3A3A]">Method: </span>{payout.payout_method || 'â€”'}</p>
           {payout.payout_method === 'momo' ? (
             <>
-              <p><span className="text-[#3A3A3A]">Network: </span>{payout.momo_network || '—'}</p>
-              <p><span className="text-[#3A3A3A]">Number: </span>{showPayout ? (payout.momo_number || '—') : maskTail(payout.momo_number)}</p>
+              <p><span className="text-[#3A3A3A]">Network: </span>{payout.momo_network || 'â€”'}</p>
+              <p><span className="text-[#3A3A3A]">Number: </span>{showPayout ? (payout.momo_number || 'â€”') : maskTail(payout.momo_number)}</p>
             </>
           ) : (
             <>
-              <p><span className="text-[#3A3A3A]">Bank: </span>{payout.bank_name || '—'}</p>
-              <p><span className="text-[#3A3A3A]">Account name: </span>{payout.bank_account_name || '—'}</p>
-              <p><span className="text-[#3A3A3A]">Account number: </span>{showPayout ? (payout.bank_account_number || '—') : maskTail(payout.bank_account_number)}</p>
+              <p><span className="text-[#3A3A3A]">Bank: </span>{payout.bank_name || 'â€”'}</p>
+              <p><span className="text-[#3A3A3A]">Account name: </span>{payout.bank_account_name || 'â€”'}</p>
+              <p><span className="text-[#3A3A3A]">Account number: </span>{showPayout ? (payout.bank_account_number || 'â€”') : maskTail(payout.bank_account_number)}</p>
             </>
           )}
           {!showPayout ? <p className="text-xs text-[#3A3A3A]">Full numbers are visible to finance staff only.</p> : null}
@@ -172,7 +172,7 @@ export default function AdminAffiliateDetailPage() {
 
       <section className="bg-white border border-gray-200 rounded-xl p-5 space-y-2 text-sm">
         <h3 className="font-semibold text-[#1A1A1A]">Clicks and orders</h3>
-        <p>{clicks.total} clicks{clicks.last_at ? ` · last ${formatWhen(clicks.last_at)}` : ''}</p>
+        <p>{clicks.total} clicks{clicks.last_at ? ` Â· last ${formatWhen(clicks.last_at)}` : ''}</p>
         {orders.length === 0 ? (
           <p className="text-[#3A3A3A]">No attributed orders.</p>
         ) : (
@@ -258,7 +258,7 @@ export default function AdminAffiliateDetailPage() {
                   <tr key={row.id}>
                     <td className="py-2 pr-3">{row.type.replace(/_/g, ' ')}</td>
                     <td className="py-2 pr-3">{formatGhs(row.amount_pesewas)}</td>
-                    <td className="py-2 pr-3">{row.note || '—'}</td>
+                    <td className="py-2 pr-3">{row.note || 'â€”'}</td>
                     <td className="py-2 whitespace-nowrap">{formatWhen(row.created_at)}</td>
                   </tr>
                 ))}

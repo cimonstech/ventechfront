@@ -79,10 +79,10 @@ export default function AuditLogPage() {
               {rows.map((row) => (
                 <tr key={row.id} className="hover:bg-gray-50">
                   <td className="px-6 py-3 text-sm text-[#3A3A3A]">{new Date(row.created_at).toLocaleString()}</td>
-                  <td className="px-6 py-3 text-sm text-[#1A1A1A]">{row.actor_role || '—'}</td>
+                  <td className="px-6 py-3 text-sm text-[#1A1A1A]">{row.actor_role || 'â€”'}</td>
                   <td className="px-6 py-3 text-sm text-[#1A1A1A]">{row.action}</td>
                   <td className="px-6 py-3 text-sm text-[#3A3A3A]">{row.entity}</td>
-                  <td className="px-6 py-3 text-sm text-[#3A3A3A]">{row.entity_id || '—'}</td>
+                  <td className="px-6 py-3 text-sm text-[#3A3A3A]">{row.entity_id || 'â€”'}</td>
                 </tr>
               ))}
             </tbody>
