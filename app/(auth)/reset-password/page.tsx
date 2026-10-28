@@ -7,6 +7,8 @@ import { Lock, Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
 import { updatePassword } from '@/services/auth.service';
+import { postSignInPath } from '@/lib/landing';
+import { clearRememberedRedirect, peekRememberedRedirect } from '@/lib/safeRedirect';
 import toast from 'react-hot-toast';
 
 export default function ResetPasswordPage() {
@@ -167,13 +169,10 @@ export default function ResetPasswordPage() {
       }
 
       toast.success('Password updated successfully!');
-      
-      // Sign out the recovery session and redirect to login
-      await supabase.auth.signOut();
-      
-      // Redirect to login after a short delay
+      const destination = await postSignInPath(peekRememberedRedirect());
+      clearRememberedRedirect();
       setTimeout(() => {
-        router.push('/login');
+        router.push(destination);
       }, 1500);
     } catch (error: any) {
       console.error('Password update error:', error);

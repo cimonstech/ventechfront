@@ -7,8 +7,10 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useAccess } from '@/context/AccessContext';
 import { hasActiveInvestorRole } from '@/lib/account';
+import { settingsService } from '@/lib/settings.service';
 import {
   apiMessage,
+  downloadAuthFile,
   formatDeviceDate,
   formatGhs,
   payoutStatusVariant,
@@ -17,6 +19,20 @@ import {
   type VlbMe,
   type VlbPublicPlan,
 } from '@/lib/vlb';
+
+const FALLBACK_PHONE = '+233 55 134 4310';
+
+function whatsappHref(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  if (!digits) return '';
+  const normalized = digits.startsWith('0') ? `233${digits.slice(1)}` : digits;
+  return `https://wa.me/${normalized}`;
+}
+
+function telHref(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  return digits ? `tel:+${digits.startsWith('0') ? `233${digits.slice(1)}` : digits}` : '';
+}
 
 export default function AccountInvestmentsPage() {
   const { access } = useAccess();
@@ -29,6 +45,9 @@ export default function AccountInvestmentsPage() {
   const [planId, setPlanId] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [phone, setPhone] = useState(FALLBACK_PHONE);
+  const [whatsapp, setWhatsapp] = useState('');
 
   const load = async () => {
     const [mine, documents] = await Promise.all([
@@ -58,6 +77,20 @@ export default function AccountInvestmentsPage() {
   }, [allowed]);
 
   useEffect(() => {
+    let cancelled = false;
+    settingsService.getSettingsByCategory('store')
+      .then((settings) => {
+        if (cancelled) return;
+        if (settings.store_phone) setPhone(settings.store_phone);
+        if (settings.store_whatsapp_number) setWhatsapp(settings.store_whatsapp_number);
+      })
+      .catch((error) => console.error('store contact', error));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!upgradeOpen) return;
     vlbRequest<VlbPublicPlan[]>('/api/vlb/plans')
       .then((result) => setPlans(result.data || []))
@@ -78,13 +111,97 @@ export default function AccountInvestmentsPage() {
   }
 
   const payout = me.payout;
+  const summary = me.summary;
+  const featured = summary?.featured;
+  const horizon = featured?.horizon_progress;
+  const horizonPct = horizon?.days_total
+    ? Math.min(100, Math.round((horizon.days_elapsed / horizon.days_total) * 100))
+    : 0;
+  const wa = whatsappHref(whatsapp);
+  const call = telHref(phone);
 
   return (
     <div className="space-y-4">
-      <div className="hidden md:block">
-        <h1 className="text-2xl font-bold text-[#1A1A1A]">Investments</h1>
-        <p className="mt-1 text-sm text-[#3A3A3A]">{me.investor_no || 'Laptop Banking'}</p>
-      </div>
+      <section className="rounded-xl bg-white p-4 shadow-sm sm:p-5">
+        <h1 className="text-xl font-bold text-[#1A1A1A] md:text-2xl">Laptop Banking</h1>
+        <p className="mt-1 text-sm text-[#3A3A3A]">{me.investor_no || 'Your investments'}</p>
+        <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <dt className="text-[#3A3A3A]">Total invested</dt>
+            <dd className="font-semibold text-[#1A1A1A]">{formatGhs(summary?.total_invested_pesewas || 0)}</dd>
+          </div>
+          <div>
+            <dt className="text-[#3A3A3A]">Next payout</dt>
+            <dd className="font-semibold text-[#1A1A1A]">
+              {summary?.next_payout
+                ? `${formatDeviceDate(summary.next_payout.date)} · ${formatGhs(summary.next_payout.net_pesewas)}`
+                : '—'}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-[#3A3A3A]">Received so far</dt>
+            <dd className="font-semibold text-[#1A1A1A]">{formatGhs(summary?.received_pesewas || 0)}</dd>
+          </div>
+          <div>
+            <dt className="text-[#3A3A3A]">Scholar Fund</dt>
+            <dd className="font-semibold text-[#1A1A1A]">{formatGhs(summary?.scholar_fund_pesewas || 0)}</dd>
+          </div>
+        </dl>
+        {featured && (
+          <div className="mt-4">
+            <p className="text-sm text-[#3A3A3A]">
+              {featured.horizon_months}-month progress · {featured.plan_name}
+            </p>
+            <div className="mt-2 h-2 rounded-full bg-gray-100">
+              <div className="h-2 rounded-full bg-[#FF7A19]" style={{ width: `${horizonPct}%` }} />
+            </div>
+          </div>
+        )}
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="min-h-11"
+            disabled={!featured || downloading}
+            isLoading={downloading}
+            onClick={async () => {
+              if (!featured) return;
+              setDownloading(true);
+              try {
+                await downloadAuthFile(
+                  `/api/vlb/me/investments/${featured.investment_id}/statement.pdf`,
+                  `vlb-statement-${me.investor_no || 'investment'}.pdf`
+                );
+              } catch (error) {
+                toast.error(apiMessage(error, 'Could not download this statement.'));
+              } finally {
+                setDownloading(false);
+              }
+            }}
+          >
+            Download statement
+          </Button>
+          <Button size="sm" className="min-h-11" onClick={() => setUpgradeOpen(true)}>Upgrade</Button>
+          {wa ? (
+            <a
+              href={wa}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-11 items-center justify-center rounded-lg border-2 border-[#FF7A19] px-3 text-sm font-medium text-[#FF7A19]"
+            >
+              WhatsApp
+            </a>
+          ) : null}
+          {call ? (
+            <a
+              href={call}
+              className="inline-flex min-h-11 items-center justify-center rounded-lg border-2 border-[#FF7A19] px-3 text-sm font-medium text-[#FF7A19]"
+            >
+              Call VENTECH
+            </a>
+          ) : null}
+        </div>
+      </section>
 
       {me.investments.length === 0 ? (
         <div className="rounded-xl bg-white p-5 shadow-sm">

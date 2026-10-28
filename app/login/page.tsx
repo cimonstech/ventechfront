@@ -10,7 +10,7 @@ import { signIn, signOut, getUserProfile } from '@/services/auth.service';
 import { useAppDispatch } from '@/store';
 import { setUser } from '@/store/authSlice';
 import { supabase } from '@/lib/supabase';
-import { hasAdminEntry } from '@/lib/roles';
+import { postSignInPath } from '@/lib/landing';
 import { clearRememberedRedirect, peekRememberedRedirect, rememberRedirect, safeRedirectPath } from '@/lib/safeRedirect';
 import toast from 'react-hot-toast';
 
@@ -103,17 +103,13 @@ export default function LoginPage() {
           }));
           
           toast.success(`Welcome back, ${firstName || fullName.split(' ')[0] || 'User'}!`);
-          const next = redirectTo || peekRememberedRedirect();
+          const remembered = redirectTo || peekRememberedRedirect();
           clearRememberedRedirect();
-          if (next) {
-            router.push(next);
-          } else if (hasAdminEntry(profileData.role)) {
-            router.push('/admin');
-          } else {
-            router.push('/');
-          }
+          router.push(await postSignInPath(remembered, profileData.role));
         } else {
-          router.push(redirectTo || '/');
+          const remembered = redirectTo || peekRememberedRedirect();
+          clearRememberedRedirect();
+          router.push(await postSignInPath(remembered));
         }
       }
     } catch (error: any) {

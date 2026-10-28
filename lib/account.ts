@@ -83,6 +83,10 @@ export function hasAffiliateRole(roles: ProgramRoleRow[] | undefined): boolean {
   return Boolean(roles?.some((row) => row.role === 'affiliate'));
 }
 
+export function hasActiveAffiliateRole(roles: ProgramRoleRow[] | undefined): boolean {
+  return Boolean(roles?.some((row) => row.role === 'affiliate' && row.status === 'active'));
+}
+
 export function hasActiveInvestorRole(roles: ProgramRoleRow[] | undefined): boolean {
   return Boolean(roles?.some((row) => row.role === 'investor' && row.status === 'active'));
 }

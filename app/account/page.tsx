@@ -9,15 +9,24 @@ import { useAccess } from '@/context/AccessContext';
 import {
   fetchAccountOverview,
   hasAffiliateRole,
+  hasActiveInvestorRole,
   type AccountOverview,
 } from '@/lib/account';
 import { formatGhs } from '@/lib/affiliates';
+import {
+  formatDeviceDate,
+  formatGhs as formatVlbGhs,
+  vlbRequest,
+  type VlbMe,
+} from '@/lib/vlb';
 import { formatCurrency, formatDate } from '@/lib/helpers';
 import { apiMessage, formatTicketWhen, STATUS_LABEL, statusVariant } from '@/lib/ticketsAdmin';
 
 export default function AccountOverviewPage() {
   const { access } = useAccess();
+  const investor = hasActiveInvestorRole(access?.programRoles);
   const [overview, setOverview] = useState<AccountOverview | null>(null);
+  const [vlb, setVlb] = useState<VlbMe | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -40,6 +49,24 @@ export default function AccountOverviewPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!investor) {
+      setVlb(null);
+      return;
+    }
+    let cancelled = false;
+    vlbRequest<VlbMe>('/api/vlb/me')
+      .then((result) => {
+        if (!cancelled) setVlb(result.data);
+      })
+      .catch((error) => {
+        if (!cancelled) toast.error(apiMessage(error, 'Could not load your investments'));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [investor]);
+
   if (!overview) {
     return (
       <p className="text-sm text-[#3A3A3A]">
@@ -56,6 +83,40 @@ export default function AccountOverviewPage() {
         <h1 className="text-2xl font-bold text-[#1A1A1A]">Overview</h1>
         <p className="mt-1 text-sm text-[#3A3A3A]">Your orders, laptops, and requests in one place.</p>
       </div>
+
+      {investor && vlb && (
+        <section className="rounded-xl bg-white p-4 shadow-sm sm:p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="font-semibold text-[#1A1A1A]">Laptop Banking</h2>
+              <p className="text-sm text-[#3A3A3A]">{vlb.investor_no || 'Investments'}</p>
+            </div>
+            <Link href="/account/investments" className="text-sm font-semibold text-[#FF7A19]">Open dashboard</Link>
+          </div>
+          <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <dt className="text-[#3A3A3A]">Total invested</dt>
+              <dd className="font-medium text-[#1A1A1A]">{formatVlbGhs(vlb.summary?.total_invested_pesewas || 0)}</dd>
+            </div>
+            <div>
+              <dt className="text-[#3A3A3A]">Next payout</dt>
+              <dd className="font-medium text-[#1A1A1A]">
+                {vlb.summary?.next_payout
+                  ? `${formatDeviceDate(vlb.summary.next_payout.date)} · ${formatVlbGhs(vlb.summary.next_payout.net_pesewas)}`
+                  : '—'}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[#3A3A3A]">Received so far</dt>
+              <dd className="font-medium text-[#1A1A1A]">{formatVlbGhs(vlb.summary?.received_pesewas || 0)}</dd>
+            </div>
+            <div>
+              <dt className="text-[#3A3A3A]">Scholar Fund</dt>
+              <dd className="font-medium text-[#1A1A1A]">{formatVlbGhs(vlb.summary?.scholar_fund_pesewas || 0)}</dd>
+            </div>
+          </dl>
+        </section>
+      )}
 
       <section className="rounded-xl bg-white p-4 shadow-sm sm:p-5">
         <div className="flex items-start justify-between gap-3">

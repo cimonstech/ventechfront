@@ -6,12 +6,15 @@ import { supabase } from '@/lib/supabase';
 import { CheckCircle, XCircle, Loader } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
+import { postSignInPath } from '@/lib/landing';
+import { peekRememberedRedirect, clearRememberedRedirect, safeRedirectPath } from '@/lib/safeRedirect';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Verifying your email...');
+  const [destination, setDestination] = useState('/account');
 
   // Helper function to handle user profile creation
   const handleUserProfile = async (user: any) => {
@@ -128,10 +131,15 @@ export default function AuthCallbackPage() {
             // Otherwise, proceed with email verification flow
             await handleUserProfile(session.user);
           setStatus('success');
-          setMessage('Email verified successfully!');
+          setMessage('Signed in successfully.');
             localStorage.removeItem('pendingVerificationEmail');
+            const next = await postSignInPath(
+              safeRedirectPath(searchParams.get('redirect')) || peekRememberedRedirect()
+            );
+            clearRememberedRedirect();
+            setDestination(next);
             setTimeout(() => {
-              router.push('/');
+              router.push(next);
             }, 2000);
             return;
           }
@@ -160,10 +168,15 @@ export default function AuthCallbackPage() {
             // Otherwise, proceed with email verification flow
             await handleUserProfile(data.user);
             setStatus('success');
-            setMessage('Email verified successfully!');
+            setMessage('Signed in successfully.');
           localStorage.removeItem('pendingVerificationEmail');
+          const next = await postSignInPath(
+            safeRedirectPath(searchParams.get('redirect')) || peekRememberedRedirect()
+          );
+          clearRememberedRedirect();
+          setDestination(next);
           setTimeout(() => {
-            router.push('/');
+            router.push(next);
           }, 2000);
             return;
           }
@@ -203,12 +216,12 @@ export default function AuthCallbackPage() {
             <div className="bg-green-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
               <CheckCircle className="w-10 h-10 text-green-600" />
             </div>
-            <h1 className="text-2xl font-bold text-[#1A1A1A] mb-3">Email Verified!</h1>
+            <h1 className="text-2xl font-bold text-[#1A1A1A] mb-3">You're signed in</h1>
             <p className="text-[#3A3A3A] mb-6">{message}</p>
-            <p className="text-sm text-[#3A3A3A] mb-6">Redirecting you to the homepage...</p>
-            <Link href="/">
+            <p className="text-sm text-[#3A3A3A] mb-6">Taking you to your account…</p>
+            <Link href={destination}>
               <Button variant="primary" className="w-full">
-                Go to Homepage
+                Continue
               </Button>
             </Link>
           </div>

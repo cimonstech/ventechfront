@@ -69,6 +69,8 @@ export interface VlbInvestmentSummary {
   renewal_open: boolean;
   stars_total: number;
   stars_used: number;
+  horizon_months?: number;
+  horizon_progress?: { days_elapsed: number; days_total: number };
 }
 
 export interface VlbPayoutRow {
@@ -110,10 +112,28 @@ export interface VlbPayoutDetails {
   payout_details_changed_at: string | null;
 }
 
+export interface VlbMeSummary {
+  total_invested_pesewas: number;
+  received_pesewas: number;
+  scholar_fund_pesewas: number;
+  next_payout: {
+    investment_id: string | null;
+    date: string;
+    net_pesewas: number;
+  } | null;
+  featured: {
+    investment_id: string;
+    plan_name: string;
+    horizon_months: number;
+    horizon_progress: { days_elapsed: number; days_total: number };
+  } | null;
+}
+
 export interface VlbMe {
   investor_no: string | null;
   payout: VlbPayoutDetails;
   investments: VlbInvestmentSummary[];
+  summary: VlbMeSummary;
 }
 
 export interface VlbDocument {
