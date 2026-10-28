@@ -26,6 +26,7 @@ import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 import { CSVExporter, ProductColumns } from '@/lib/csvExport';
 import { deviceRequest } from '@/lib/devicesAdmin';
+import { OPERATING_SYSTEMS, PRODUCT_CONDITIONS } from '@/lib/portalTargeting';
 
 export default function AdminProductsPage() {
   const router = useRouter();
@@ -40,7 +41,11 @@ export default function AdminProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [warrantyGaps, setWarrantyGaps] = useState<{ count: number; ids: string[] }>({ count: 0, ids: [] });
+  const [osGaps, setOsGaps] = useState<{ count: number; ids: string[] }>({ count: 0, ids: [] });
   const [missingWarrantyOnly, setMissingWarrantyOnly] = useState(false);
+  const [missingOsOnly, setMissingOsOnly] = useState(false);
+  const [osFilter, setOsFilter] = useState('');
+  const [conditionFilter, setConditionFilter] = useState('');
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
@@ -59,7 +64,7 @@ export default function AdminProductsPage() {
     }, 300);
     
     return () => clearTimeout(timeoutId);
-  }, [isAuthenticated, user, pagination.page, searchQuery, missingWarrantyOnly]);
+  }, [isAuthenticated, user, pagination.page, searchQuery, missingWarrantyOnly, missingOsOnly, osFilter, conditionFilter]);
 
   useEffect(() => {
     if (!isAuthenticated || !hasAdminEntry(user?.role)) return;
@@ -69,6 +74,11 @@ export default function AdminProductsPage() {
         if (!cancelled) setWarrantyGaps(result.data || { count: 0, ids: [] });
       })
       .catch((error) => console.error('laptop warranty gaps', error));
+    deviceRequest<{ count: number; ids: string[] }>('/api/admin/devices/laptop-os-gaps')
+      .then((result) => {
+        if (!cancelled) setOsGaps(result.data || { count: 0, ids: [] });
+      })
+      .catch((error) => console.error('laptop os gaps', error));
     return () => {
       cancelled = true;
     };
@@ -78,7 +88,8 @@ export default function AdminProductsPage() {
     try {
       setIsLoading(true);
       let productsData: Product[] = [];
-      if (missingWarrantyOnly && warrantyGaps.ids.length) {
+      const gapIds = missingOsOnly ? osGaps.ids : missingWarrantyOnly ? warrantyGaps.ids : [];
+      if (gapIds.length) {
         const { data, error } = await supabase
           .from('products')
           .select(`
@@ -86,7 +97,7 @@ export default function AdminProductsPage() {
             categories!products_category_id_fkey(id, name, slug),
             brands!products_brand_id_fkey(id, name, slug)
           `)
-          .in('id', warrantyGaps.ids)
+          .in('id', gapIds)
           .order('name');
         if (error) throw error;
         productsData = (data || []) as Product[];
@@ -106,6 +117,12 @@ export default function AdminProductsPage() {
           product.id.toLowerCase().includes(searchLower) ||
           product.description?.toLowerCase().includes(searchLower)
         );
+      }
+      if (osFilter) {
+        productsData = productsData.filter((product) => (product.operating_system || '') === osFilter);
+      }
+      if (conditionFilter) {
+        productsData = productsData.filter((product) => (product.condition || 'new') === conditionFilter);
       }
       
       setProducts(productsData);
@@ -291,11 +308,30 @@ export default function AdminProductsPage() {
               type="button"
               className="text-sm font-semibold text-[#FF7A19]"
               onClick={() => {
+                setMissingOsOnly(false);
                 setMissingWarrantyOnly((current) => !current);
                 setPagination((current) => ({ ...current, page: 1 }));
               }}
             >
               {missingWarrantyOnly ? 'Show all products' : 'Show them'}
+            </button>
+          </div>
+        ) : null}
+        {osGaps.count > 0 ? (
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-sm font-medium text-[#1A1A1A]">
+              {osGaps.count} laptop product{osGaps.count === 1 ? '' : 's'} have no operating system set
+            </p>
+            <button
+              type="button"
+              className="text-sm font-semibold text-[#FF7A19]"
+              onClick={() => {
+                setMissingWarrantyOnly(false);
+                setMissingOsOnly((current) => !current);
+                setPagination((current) => ({ ...current, page: 1 }));
+              }}
+            >
+              {missingOsOnly ? 'Show all products' : 'Show them'}
             </button>
           </div>
         ) : null}
@@ -312,6 +348,26 @@ export default function AdminProductsPage() {
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
+            <select
+              value={osFilter}
+              onChange={(event) => setOsFilter(event.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All operating systems</option>
+              {OPERATING_SYSTEMS.map((item) => (
+                <option key={item.value} value={item.value}>{item.label}</option>
+              ))}
+            </select>
+            <select
+              value={conditionFilter}
+              onChange={(event) => setConditionFilter(event.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All conditions</option>
+              {PRODUCT_CONDITIONS.map((item) => (
+                <option key={item.value} value={item.value}>{item.label}</option>
+              ))}
+            </select>
             <select className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option>All Categories</option>
               <option>Smartphones</option>

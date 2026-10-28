@@ -5,7 +5,7 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { apiMessage, contentRequest, type ContentPageRecord } from '@/lib/contentAdmin';
 
-const PAGE_ORDER = ['terms', 'privacy', 'returns', 'shipping', 'affiliate-terms', 'laptop-banking-terms'];
+const PAGE_ORDER = ['terms', 'privacy', 'returns', 'shipping', 'affiliate-terms', 'laptop-banking-terms', 'warranty'];
 
 export default function AdminPagesPage() {
   const [pages, setPages] = useState<ContentPageRecord[]>([]);

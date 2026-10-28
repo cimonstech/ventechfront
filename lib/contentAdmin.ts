@@ -36,6 +36,8 @@ export interface ArticleRecord {
   published_at?: string | null;
   updated_at: string;
   created_at?: string;
+  applies_to_os?: string[] | null;
+  applies_to_condition?: string[] | null;
   targets?: ContentTarget[];
 }
 
@@ -45,6 +47,7 @@ export interface FaqCategoryRecord {
   slug: string;
   sort_order: number;
   is_active: boolean;
+  audience?: 'store' | 'device_portal' | 'both';
 }
 
 export interface FaqRecord {

@@ -43,6 +43,10 @@ export default function AdminDevicesPage() {
   const [warrantyDrafts, setWarrantyDrafts] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  const [portalStats, setPortalStats] = useState<{
+    last_7_days: Record<string, number | null>;
+    last_30_days: Record<string, number | null>;
+  } | null>(null);
 
   useEffect(() => {
     const order = new URLSearchParams(window.location.search).get('order') || '';
@@ -99,6 +103,21 @@ export default function AdminDevicesPage() {
       cancelled = true;
     };
   }, [bootstrapped, search, status, warranty, page, reloadToken]);
+
+  useEffect(() => {
+    if (!bootstrapped) return;
+    let cancelled = false;
+    deviceRequest<{ last_7_days: Record<string, number | null>; last_30_days: Record<string, number | null> }>(
+      '/api/admin/devices/portal-stats'
+    )
+      .then((result) => {
+        if (!cancelled) setPortalStats(result.data);
+      })
+      .catch((error) => console.error('portal stats', error));
+    return () => {
+      cancelled = true;
+    };
+  }, [bootstrapped, reloadToken]);
 
   const pageIds = rows.map((row) => row.id);
   const allOnPage = pageIds.length > 0 && pageIds.every((id) => selected.includes(id));
@@ -157,8 +176,37 @@ export default function AdminDevicesPage() {
     }
   };
 
+  const waitingDays = (createdAt?: string) => {
+    if (!createdAt) return 0;
+    const started = Date.parse(createdAt);
+    if (!Number.isFinite(started)) return 0;
+    return Math.max(0, Math.floor((Date.now() - started) / (24 * 60 * 60 * 1000)));
+  };
+
   return (
     <div className="space-y-6">
+      {portalStats ? (
+        <section className="rounded-xl border border-gray-200 bg-white p-4">
+          <h2 className="mb-3 text-sm font-semibold text-[#1A1A1A]">Portal activity</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {([
+              ['Last 7 days', portalStats.last_7_days],
+              ['Last 30 days', portalStats.last_30_days],
+            ] as const).map(([label, counts]) => (
+              <div key={label} className="text-sm text-[#3A3A3A]">
+                <p className="font-medium text-[#1A1A1A]">{label}</p>
+                <p>Scans {counts.scan ?? 0} · Guides {counts.guide_open ?? 0} · FAQs {counts.faq_open ?? 0}</p>
+                <p>
+                  Claims {counts.claim_start ?? 0} started, {counts.claim_complete ?? 0} completed
+                  {counts.claim_completion_rate != null ? ` (${counts.claim_completion_rate}%)` : ''}
+                </p>
+                <p>Service {counts.service_start ?? 0}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-[#3A3A3A]">{total} device{total === 1 ? '' : 's'}</p>
         <div className="flex flex-wrap gap-2">
@@ -306,6 +354,9 @@ export default function AdminDevicesPage() {
                 </td>
                 <td className="px-4 py-3 text-sm text-[#1A1A1A]">{device.user_id ? 'Yes' : 'No'}</td>
                 <td className="px-4 py-3">
+                  {device.status === 'pending' ? (
+                    <p className="mb-1 text-xs text-amber-800">Waiting {waitingDays(device.created_at)} days</p>
+                  ) : null}
                   <Badge
                     size="sm"
                     variant={device.status === 'active' ? 'success' : device.status === 'transferred' ? 'warning' : device.status === 'pending' ? 'info' : 'default'}

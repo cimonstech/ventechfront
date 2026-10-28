@@ -49,6 +49,11 @@ export async function LegalDocument({
               contact={contact}
             />
           )}
+          {(slug === 'terms' || slug === 'returns') ? (
+            <p className="mt-8 text-sm text-[#3A3A3A]">
+              <Link href="/warranty" className="font-semibold text-[#FF7A19]">Warranty Policy</Link>
+            </p>
+          ) : null}
         </div>
       </div>
     </div>

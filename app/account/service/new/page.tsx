@@ -117,7 +117,7 @@ function NewServiceRequest() {
           try {
             const deviceResult = await deviceRequest<OwnerDevice>(`/api/devices/public/${encodeURIComponent(deviceToken)}`);
             if (cancelled) return;
-            if (deviceResult.data?.view === 'owner' && deviceResult.data.warranty && !deviceResult.data.registering) {
+            if (deviceResult.data?.view === 'owner') {
               setLinked(deviceResult.data);
             } else {
               toast.error('Device not found.');
@@ -132,7 +132,7 @@ function NewServiceRequest() {
         }
         if (showList) {
           const mine = await deviceRequest<MineDevice[]>('/api/devices/mine');
-          const rows = (mine.data || []).filter((device) => device.qr_token && device.status !== 'pending' && !device.registering);
+          const rows = (mine.data || []).filter((device) => device.qr_token);
           if (cancelled) return;
           setDevices(rows);
           if (!deviceToken && rows[0]?.qr_token) {

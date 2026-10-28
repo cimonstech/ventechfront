@@ -14,18 +14,39 @@ import { useAppSelector } from '@/store';
 import { authHeaders } from '@/lib/authHeaders';
 import { settingsService } from '@/lib/settings.service';
 import { apiMessage, deviceRequest, formatDeviceDate, type DeviceWarranty } from '@/lib/devicesAdmin';
+import { recordPortalEvent } from '@/lib/portalEvents';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
-const GUIDE_LABELS = [
+const GUIDE_LABELS: Array<[string, string]> = [
   ['user_guide', 'Basic setup'],
-  ['software', 'Windows and software'],
+  ['software', 'Software'],
   ['maintenance', 'Maintenance'],
   ['battery', 'Battery care'],
   ['hardware', 'Hardware'],
   ['warranty', 'Warranty'],
   ['troubleshooting', 'Troubleshooting'],
-] as const;
+];
+
+const SETUP_GUIDE_ORDER = [
+  'user_guide',
+  'maintenance',
+  'software',
+  'battery',
+  'hardware',
+  'warranty',
+  'troubleshooting',
+];
+
+const OWNER_GUIDE_ORDER = [
+  'troubleshooting',
+  'warranty',
+  'user_guide',
+  'maintenance',
+  'software',
+  'battery',
+  'hardware',
+];
 
 interface GuideArticle {
   id: string;
@@ -58,6 +79,7 @@ interface DevicePayload {
   order_number?: string | null;
   order_id?: string | null;
   qr_token?: string;
+  guide_order?: 'setup' | 'owner';
 }
 
 interface StoreContact {
@@ -65,12 +87,6 @@ interface StoreContact {
   email: string;
   whatsapp: string;
 }
-
-const FALLBACK_CONTACT: StoreContact = {
-  phone: '+233 55 134 4310',
-  email: 'ventechgadgets@gmail.com',
-  whatsapp: '',
-};
 
 function whatsappHref(value: string): string {
   const digits = value.replace(/\D/g, '');
@@ -86,7 +102,8 @@ export function DevicePassport() {
   const { isAuthenticated, isLoading } = useAppSelector((state) => state.auth);
   const [device, setDevice] = useState<DevicePayload | null>(null);
   const [phase, setPhase] = useState<'loading' | 'ready' | 'missing' | 'error'>('loading');
-  const [contact, setContact] = useState<StoreContact>(FALLBACK_CONTACT);
+  const [contact, setContact] = useState<StoreContact>({ phone: '', email: '', whatsapp: '' });
+  const scanned = useRef(false);
   const [openSlug, setOpenSlug] = useState<string | null>(null);
   const [openFaqId, setOpenFaqId] = useState<string | null>(null);
   const [bodies, setBodies] = useState<Record<string, string>>({});
@@ -117,8 +134,13 @@ export function DevicePassport() {
         setPhase('error');
         return;
       }
-      setDevice(body.data as DevicePayload);
+      const payload = body.data as DevicePayload;
+      setDevice(payload);
       setPhase('ready');
+      if (!scanned.current && token) {
+        scanned.current = true;
+        recordPortalEvent('scan', { token });
+      }
     } catch (error) {
       console.error('load device', error);
       setPhase('error');
@@ -133,8 +155,8 @@ export function DevicePassport() {
         const settings = await settingsService.getSettingsByCategory('store');
         if (cancelled) return;
         setContact({
-          phone: settings.store_phone || FALLBACK_CONTACT.phone,
-          email: settings.store_email || FALLBACK_CONTACT.email,
+          phone: settings.store_phone || '',
+          email: settings.store_email || '',
           whatsapp: settings.store_whatsapp_number || '',
         });
       } catch (error) {
@@ -170,6 +192,7 @@ export function DevicePassport() {
       setSentTo(result.data.sentTo);
       setCooldown(60);
       setCode('');
+      recordPortalEvent('claim_start', { token });
     } catch (error) {
       toast.error(apiMessage(error, 'Could not send the code'));
     } finally {
@@ -196,6 +219,7 @@ export function DevicePassport() {
         body: JSON.stringify({ code: code.trim() }),
       });
       toast.success('This laptop is now linked to your account');
+      recordPortalEvent('claim_complete', { token });
       setSentTo(null);
       setCode('');
       router.replace(`/d/${encodeURIComponent(token)}`);
@@ -213,6 +237,8 @@ export function DevicePassport() {
       return;
     }
     setOpenSlug(slug);
+    const article = Object.values(device?.guides || {}).flat().find((item) => item.slug === slug);
+    recordPortalEvent('guide_open', { token, article_id: article?.id });
     if (bodies[slug]) return;
     try {
       const response = await fetch(`${API_URL}/api/content/articles/${encodeURIComponent(slug)}`);
@@ -259,11 +285,19 @@ export function DevicePassport() {
   const claimHref = `/login?redirect=${encodeURIComponent(`${returnPath}?claim=1`)}`;
   const detailsHref = `/login?redirect=${encodeURIComponent(returnPath)}`;
   const warranty = device.warranty || { status: 'none' as const, endsOn: null };
-  const groups = GUIDE_LABELS.map(([key, label]) => ({
-    key,
-    label,
-    articles: device.guides?.[key] || [],
-  })).filter((group) => group.articles.length > 0);
+  const order = device.guide_order === 'setup' || registering ? SETUP_GUIDE_ORDER : OWNER_GUIDE_ORDER;
+  const groups = [...GUIDE_LABELS]
+    .sort((left, right) => {
+      const leftIndex = order.indexOf(left[0]);
+      const rightIndex = order.indexOf(right[0]);
+      return (leftIndex === -1 ? 99 : leftIndex) - (rightIndex === -1 ? 99 : rightIndex);
+    })
+    .map(([key, label]) => ({
+      key,
+      label,
+      articles: device.guides?.[key] || [],
+    }))
+    .filter((group) => group.articles.length > 0);
   const faqs = device.faqs || [];
 
   return (
@@ -295,17 +329,24 @@ export function DevicePassport() {
                   </p>
                 ) : null}
                 <p className="text-sm text-[#3A3A3A]">
-                  Serial number, warranty dates, and service requests appear once VENTECH registers this laptop. Setup, care, and support are already below.
+                  Serial number and warranty dates appear once VENTECH registers this laptop. Setup, care, and support are already below.
                 </p>
+                {warranty.status === 'starts_on_delivery' ? (
+                  <p className="text-sm text-[#3A3A3A]">Warranty starts when your laptop is delivered.</p>
+                ) : null}
               </>
             ) : (
               <>
                 <h1 className="text-2xl font-bold text-[#1A1A1A] leading-tight">{device.model_name}</h1>
-                <DeviceWarrantyBadge warranty={warranty} showDate={false} />
+                <Link href="/warranty" className="inline-flex">
+                  <DeviceWarrantyBadge warranty={warranty} showDate={false} />
+                </Link>
                 <p className="text-sm text-[#3A3A3A]">
-                  {warranty.endsOn
-                    ? `Warranty ends ${formatDeviceDate(warranty.endsOn)}`
-                    : 'No warranty recorded'}
+                  {warranty.status === 'starts_on_delivery'
+                    ? 'Warranty starts when your laptop is delivered.'
+                    : warranty.endsOn
+                      ? `Warranty ends ${formatDeviceDate(warranty.endsOn)}`
+                      : 'No warranty recorded'}
                 </p>
               </>
             )}
@@ -338,17 +379,31 @@ export function DevicePassport() {
             )}
 
             {!registering && device.view === 'public' && device.claimable && !sentTo && (
-              isAuthenticated ? (
-                <Button className="w-full" onClick={sendCode} isLoading={claiming}>Claim this laptop</Button>
-              ) : (
-                <Link
-                  href={claimHref}
-                  className="inline-flex w-full items-center justify-center rounded-lg bg-[#FF7A19] px-4 py-2 font-medium text-white"
-                >
-                  Claim this laptop
-                </Link>
-              )
+              <>
+                <InfoNote>
+                  To protect your privacy, we'll send a 6-digit code to the email used when this laptop was bought.
+                </InfoNote>
+                {isAuthenticated ? (
+                  <Button className="w-full" onClick={sendCode} isLoading={claiming}>Claim this laptop</Button>
+                ) : (
+                  <Link
+                    href={claimHref}
+                    className="inline-flex w-full items-center justify-center rounded-lg bg-[#FF7A19] px-4 py-2 font-medium text-white"
+                  >
+                    Claim this laptop
+                  </Link>
+                )}
+              </>
             )}
+
+            {device.view === 'public' && !device.claimable ? (
+              <div className="space-y-2 border-t border-gray-100 pt-3">
+                <p className="text-sm text-[#1A1A1A]">
+                  Found this laptop? Please contact VENTECH so we can return it to its owner.
+                </p>
+                <SupportContact contact={contact} compact />
+              </div>
+            ) : null}
 
             {!registering && device.view === 'public' && !isAuthenticated && (
               <p className="text-sm text-[#3A3A3A]">
@@ -362,7 +417,9 @@ export function DevicePassport() {
                   To protect your privacy, we'll send a 6-digit code to the email used when this laptop was bought. Enter it here to link the laptop to your account.
                 </InfoNote>
                 <p className="text-sm text-[#1A1A1A]">We sent a 6-digit code to {sentTo}</p>
+                <label htmlFor="claim-code" className="block text-sm font-medium text-[#1A1A1A]">6-digit code</label>
                 <input
+                  id="claim-code"
                   inputMode="numeric"
                   autoComplete="one-time-code"
                   maxLength={6}
@@ -385,10 +442,11 @@ export function DevicePassport() {
               </div>
             )}
 
-            {!registering && device.view === 'owner' && (
+            {device.view === 'owner' && (
               <Link
                 href={`/account/service/new?device=${encodeURIComponent(token)}`}
                 className="inline-flex w-full items-center justify-center rounded-lg bg-[#1A1A1A] px-4 py-2 font-medium text-white"
+                onClick={() => recordPortalEvent('service_start', { token })}
               >
                 Request service
               </Link>
@@ -420,6 +478,7 @@ export function DevicePassport() {
                         className="w-full flex items-center justify-between gap-3 px-3 py-3 text-left"
                         onClick={() => openGuide(article.slug)}
                         aria-expanded={open}
+                        aria-controls={`guide-${article.slug}`}
                       >
                         <span>
                           <span className="block text-sm font-medium text-[#1A1A1A]">{article.title}</span>
@@ -428,7 +487,7 @@ export function DevicePassport() {
                         <ChevronDown size={16} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
                       </button>
                       {open && (
-                        <div className="px-3 pb-3">
+                        <div id={`guide-${article.slug}`} role="region" className="px-3 pb-3">
                           {bodies[article.slug] ? <ContentHtml html={bodies[article.slug]} /> : <p className="text-sm text-[#3A3A3A]">Loading…</p>}
                         </div>
                       )}
@@ -450,14 +509,18 @@ export function DevicePassport() {
                   <button
                     type="button"
                     className="w-full flex items-center justify-between gap-3 px-3 py-3 text-left"
-                    onClick={() => setOpenFaqId(open ? null : faq.id)}
+                    onClick={() => {
+                      setOpenFaqId(open ? null : faq.id);
+                      if (!open) recordPortalEvent('faq_open', { token, article_id: faq.id });
+                    }}
                     aria-expanded={open}
+                    aria-controls={`faq-${faq.id}`}
                   >
                     <span className="text-sm font-medium text-[#1A1A1A]">{faq.question}</span>
                     <ChevronDown size={16} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
                   </button>
                   {open ? (
-                    <div className="px-3 pb-3">
+                    <div id={`faq-${faq.id}`} role="region" className="px-3 pb-3">
                       <ContentHtml html={faq.answer_html} />
                     </div>
                   ) : null}
@@ -487,16 +550,26 @@ function Detail({ label, value, mono }: { label: string; value: string; mono?: b
   );
 }
 
-function SupportContact({ contact }: { contact: StoreContact }) {
+function SupportContact({ contact, compact }: { contact: StoreContact; compact?: boolean }) {
   const whatsapp = whatsappHref(contact.whatsapp);
+  const hasDirect = Boolean(contact.phone || contact.email || whatsapp);
   return (
-    <div className="space-y-2 text-sm text-left">
-      <p className="font-semibold text-[#1A1A1A]">VENTECH support</p>
-      <a className="block text-[#FF7A19]" href={`tel:${contact.phone.replace(/\s/g, '')}`}>{contact.phone}</a>
+    <div className={`space-y-2 text-sm text-left ${compact ? '' : ''}`}>
+      {compact ? null : <p className="font-semibold text-[#1A1A1A]">VENTECH support</p>}
+      {contact.phone ? (
+        <a className="block text-[#FF7A19]" href={`tel:${contact.phone.replace(/\s/g, '')}`}>{contact.phone}</a>
+      ) : null}
       {whatsapp ? (
         <a className="block text-[#FF7A19]" href={whatsapp} target="_blank" rel="noopener noreferrer">WhatsApp</a>
       ) : null}
-      <a className="block text-[#FF7A19]" href={`mailto:${contact.email}`}>{contact.email}</a>
+      {contact.email ? (
+        <a className="block text-[#FF7A19]" href={`mailto:${contact.email}`}>{contact.email}</a>
+      ) : null}
+      {!hasDirect ? (
+        <Link href="/contact" className="block font-semibold text-[#FF7A19]">Contact VENTECH</Link>
+      ) : (
+        <Link href="/contact" className="block text-[#FF7A19]">Contact page</Link>
+      )}
     </div>
   );
 }

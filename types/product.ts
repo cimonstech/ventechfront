@@ -27,6 +27,8 @@ export interface Product {
   variants: ProductVariant[];
   created_at: string;
   updated_at: string;
+  operating_system?: 'windows' | 'macos' | 'chromeos' | 'linux' | 'none' | null;
+  condition?: 'new' | 'refurbished' | 'used';
   is_pre_order?: boolean; // Pre-order product flag
   pre_order_available?: boolean; // Pre-order availability
   // Flattened properties for search results

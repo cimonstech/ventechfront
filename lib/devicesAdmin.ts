@@ -3,7 +3,7 @@ import { accessDeniedMessage } from '@/lib/access';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
-export type WarrantyStatus = 'active' | 'expired' | 'none';
+export type WarrantyStatus = 'active' | 'expired' | 'none' | 'starts_on_delivery';
 export type DeviceStatus = 'pending' | 'active' | 'transferred' | 'retired';
 
 export interface DeviceWarranty {

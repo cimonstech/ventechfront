@@ -12,6 +12,7 @@ import {
   type FaqCategoryRecord,
   type FaqRecord,
 } from '@/lib/contentAdmin';
+import { FAQ_AUDIENCES, type FaqAudience } from '@/lib/portalTargeting';
 
 function byOrder<T extends { sort_order: number; question?: string; name?: string }>(rows: T[]): T[] {
   return [...rows].sort((a, b) => a.sort_order - b.sort_order || String(a.name || a.question).localeCompare(String(b.name || b.question)));
@@ -25,6 +26,8 @@ export default function AdminFaqsPage() {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [newCategory, setNewCategory] = useState('');
+  const [newAudience, setNewAudience] = useState<FaqAudience>('store');
+  const [categoryAudience, setCategoryAudience] = useState<FaqAudience>('store');
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [categoryName, setCategoryName] = useState('');
   const [editingFaq, setEditingFaq] = useState<string | null>(null);
@@ -61,9 +64,10 @@ export default function AdminFaqsPage() {
     try {
       await contentRequest('/api/admin/content/faq-categories', {
         method: 'POST',
-        body: JSON.stringify({ name: newCategory.trim(), sort_order: categories.length }),
+        body: JSON.stringify({ name: newCategory.trim(), sort_order: categories.length, audience: newAudience }),
       });
       setNewCategory('');
+      setNewAudience('store');
       toast.success('Category added');
       await load();
     } catch (error) {
@@ -75,7 +79,12 @@ export default function AdminFaqsPage() {
     try {
       await contentRequest(`/api/admin/content/faq-categories/${category.id}`, {
         method: 'PUT',
-        body: JSON.stringify({ name: categoryName.trim(), sort_order: category.sort_order, is_active: category.is_active }),
+        body: JSON.stringify({
+          name: categoryName.trim(),
+          sort_order: category.sort_order,
+          is_active: category.is_active,
+          audience: categoryAudience,
+        }),
       });
       setEditingCategory(null);
       toast.success('Category updated');
@@ -241,6 +250,15 @@ export default function AdminFaqsPage() {
             placeholder="New category name"
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm sm:max-w-sm"
           />
+          <select
+            value={newAudience}
+            onChange={(event) => setNewAudience(event.target.value as FaqAudience)}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          >
+            {FAQ_AUDIENCES.map((item) => (
+              <option key={item.value} value={item.value}>{item.label}</option>
+            ))}
+          </select>
           <Button type="button" size="sm" onClick={() => void createCategory()}>Add category</Button>
         </div>
       )}
@@ -253,13 +271,13 @@ export default function AdminFaqsPage() {
             <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
               <button type="button" className="text-left" onClick={() => setOpen((current) => ({ ...current, [category.id]: !expanded }))}>
                 <span className="font-semibold text-[#1A1A1A]">{category.name}</span>
-                <span className="ml-2 text-xs text-gray-500">{category.is_active ? 'Active' : 'Inactive'} · {items.length}</span>
+                <span className="ml-2 text-xs text-gray-500">{category.is_active ? 'Active' : 'Inactive'} · {FAQ_AUDIENCES.find((item) => item.value === (category.audience || 'store'))?.label} · {items.length}</span>
               </button>
               {editable && (
                 <div className="flex flex-wrap gap-2">
                   <Button type="button" variant="ghost" size="sm" disabled={index === 0} onClick={() => void moveCategory(index, -1)}>Up</Button>
                   <Button type="button" variant="ghost" size="sm" disabled={index === categories.length - 1} onClick={() => void moveCategory(index, 1)}>Down</Button>
-                  <Button type="button" variant="outline" size="sm" onClick={() => { setEditingCategory(category.id); setCategoryName(category.name); }}>{editingCategory === category.id ? 'Editing' : 'Edit'}</Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => { setEditingCategory(category.id); setCategoryName(category.name); setCategoryAudience(category.audience || 'store'); }}>{editingCategory === category.id ? 'Editing' : 'Edit'}</Button>
                   <Button type="button" variant="outline" size="sm" onClick={() => void toggleCategory(category)}>{category.is_active ? 'Deactivate' : 'Activate'}</Button>
                   <Button type="button" variant="danger" size="sm" onClick={() => void deleteCategory(category)}>Delete</Button>
                 </div>
@@ -270,6 +288,15 @@ export default function AdminFaqsPage() {
                 {editingCategory === category.id && editable && (
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <input value={categoryName} onChange={(event) => setCategoryName(event.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                    <select
+                      value={categoryAudience}
+                      onChange={(event) => setCategoryAudience(event.target.value as FaqAudience)}
+                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    >
+                      {FAQ_AUDIENCES.map((item) => (
+                        <option key={item.value} value={item.value}>{item.label}</option>
+                      ))}
+                    </select>
                     <Button type="button" size="sm" onClick={() => void saveCategory(category)}>Save</Button>
                   </div>
                 )}

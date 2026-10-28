@@ -175,7 +175,7 @@ export default function AccountOverviewPage() {
                     </span>
                   ) : (
                     <DeviceWarrantyBadge
-                      warranty={{ status: device.warranty_status as 'active' | 'expired' | 'none', endsOn: device.warranty_end }}
+                      warranty={{ status: device.warranty_status === 'starts_on_delivery' ? 'starts_on_delivery' : device.warranty_status as 'active' | 'expired' | 'none', endsOn: device.warranty_end }}
                     />
                   )}
                 </div>

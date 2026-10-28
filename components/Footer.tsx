@@ -161,6 +161,11 @@ export function Footer() {
                   Returns
                 </Link>
               </li>
+              <li>
+                <Link href="/warranty" className="hover:text-[#FF7A19] transition-colors">
+                  Warranty Policy
+                </Link>
+              </li>
             </ul>
 
             {/* Social Media Links */}

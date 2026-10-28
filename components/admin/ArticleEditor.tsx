@@ -18,6 +18,7 @@ import {
   type ContentStatus,
   type ContentTarget,
 } from '@/lib/contentAdmin';
+import { OPERATING_SYSTEMS, PRODUCT_CONDITIONS } from '@/lib/portalTargeting';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
@@ -175,6 +176,8 @@ export function ArticleEditor({ articleId }: { articleId?: string }) {
   const [brandIds, setBrandIds] = useState<string[]>([]);
   const [categoryIds, setCategoryIds] = useState<string[]>([]);
   const [productIds, setProductIds] = useState<string[]>([]);
+  const [appliesOs, setAppliesOs] = useState<string[]>([]);
+  const [appliesCondition, setAppliesCondition] = useState<string[]>([]);
   const [brands, setBrands] = useState<NamedItem[]>([]);
   const [categories, setCategories] = useState<NamedItem[]>([]);
   const [products, setProducts] = useState<NamedItem[]>([]);
@@ -227,6 +230,8 @@ export function ArticleEditor({ articleId }: { articleId?: string }) {
     setBrandIds(targets.filter((target) => target.target_type === 'brand' && target.target_id).map((target) => target.target_id as string));
     setCategoryIds(targets.filter((target) => target.target_type === 'category' && target.target_id).map((target) => target.target_id as string));
     setProductIds(targets.filter((target) => target.target_type === 'product' && target.target_id).map((target) => target.target_id as string));
+    setAppliesOs(article.applies_to_os || []);
+    setAppliesCondition(article.applies_to_condition || []);
     slugTouched.current = true;
     dirtyRef.current = false;
     setDirty(false);
@@ -258,6 +263,8 @@ export function ArticleEditor({ articleId }: { articleId?: string }) {
         attachment_url: attachmentUrl.trim() || null,
         sort_order: Number.isFinite(sortOrder) ? sortOrder : 0,
         status: nextStatus,
+        applies_to_os: appliesOs.length ? appliesOs : null,
+        applies_to_condition: appliesCondition.length ? appliesCondition : null,
         targets: targetsPayload(),
       };
       const path = id ? `/api/admin/content/articles/${id}` : '/api/admin/content/articles';
@@ -284,7 +291,7 @@ export function ArticleEditor({ articleId }: { articleId?: string }) {
       inFlight.current = false;
       setSaving(false);
     }
-  }, [attachmentUrl, body, id, router, slug, sortOrder, status, summary, targetsPayload, title, type]);
+  }, [appliesCondition, appliesOs, attachmentUrl, body, id, router, slug, sortOrder, status, summary, targetsPayload, title, type]);
 
   useEffect(() => {
     saveRef.current = () => {
@@ -502,6 +509,50 @@ export function ArticleEditor({ articleId }: { articleId?: string }) {
               ))}
             </select>
           </label>
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-medium text-[#1A1A1A]">Applies to operating systems</legend>
+            <p className="text-xs text-[#3A3A3A]">Leave empty for every OS, including products with no OS set.</p>
+            <div className="flex flex-wrap gap-3">
+              {OPERATING_SYSTEMS.map((item) => (
+                <label key={item.value} className="inline-flex items-center gap-2 text-sm text-[#1A1A1A]">
+                  <input
+                    type="checkbox"
+                    disabled={!editable}
+                    checked={appliesOs.includes(item.value)}
+                    onChange={() => {
+                      setAppliesOs((current) => current.includes(item.value)
+                        ? current.filter((value) => value !== item.value)
+                        : [...current, item.value]);
+                      markDirty();
+                    }}
+                  />
+                  {item.label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-medium text-[#1A1A1A]">Applies to condition</legend>
+            <p className="text-xs text-[#3A3A3A]">Leave empty for new, refurbished, and used.</p>
+            <div className="flex flex-wrap gap-3">
+              {PRODUCT_CONDITIONS.map((item) => (
+                <label key={item.value} className="inline-flex items-center gap-2 text-sm text-[#1A1A1A]">
+                  <input
+                    type="checkbox"
+                    disabled={!editable}
+                    checked={appliesCondition.includes(item.value)}
+                    onChange={() => {
+                      setAppliesCondition((current) => current.includes(item.value)
+                        ? current.filter((value) => value !== item.value)
+                        : [...current, item.value]);
+                      markDirty();
+                    }}
+                  />
+                  {item.label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <label className="block text-sm font-medium text-[#1A1A1A]">
             Title
             <input

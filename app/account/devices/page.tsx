@@ -10,6 +10,7 @@ import { OwnerQrCard } from '@/components/devices/OwnerQrCard';
 import { useAppSelector } from '@/store';
 import { settingsService } from '@/lib/settings.service';
 import { apiMessage, deviceRequest, formatDeviceDate, type DeviceWarranty } from '@/lib/devicesAdmin';
+import { recordPortalEvent } from '@/lib/portalEvents';
 
 interface MineDevice {
   id?: string;
@@ -102,9 +103,18 @@ export default function MyDevicesPage() {
                       Setup, care, and support are already in your laptop portal. Serial number and warranty dates appear once VENTECH registers it.
                     </p>
                     {device.qr_token ? (
-                      <Link href={`/d/${encodeURIComponent(device.qr_token)}`} className="mt-3 inline-flex text-sm font-semibold text-[#FF7A19]">
-                        Open laptop portal
-                      </Link>
+                      <div className="mt-3 flex flex-wrap items-center gap-3">
+                        <Link href={`/d/${encodeURIComponent(device.qr_token)}`} className="inline-flex text-sm font-semibold text-[#FF7A19]">
+                          Open laptop portal
+                        </Link>
+                        <Link
+                          href={`/account/service/new?device=${encodeURIComponent(device.qr_token)}`}
+                          className="inline-flex text-sm font-semibold text-[#FF7A19]"
+                          onClick={() => recordPortalEvent('service_start', { token: device.qr_token })}
+                        >
+                          Request service
+                        </Link>
+                      </div>
                     ) : null}
                   </>
                 ) : (
@@ -126,7 +136,11 @@ export default function MyDevicesPage() {
                           <Link href={`/d/${encodeURIComponent(device.qr_token)}`} className="text-sm font-semibold text-[#FF7A19]">
                             View
                           </Link>
-                          <Link href={`/account/service/new?device=${encodeURIComponent(device.qr_token)}`} className="text-sm font-semibold text-[#FF7A19]">
+                          <Link
+                            href={`/account/service/new?device=${encodeURIComponent(device.qr_token)}`}
+                            className="text-sm font-semibold text-[#FF7A19]"
+                            onClick={() => recordPortalEvent('service_start', { token: device.qr_token })}
+                          >
                             Request service
                           </Link>
                         </div>

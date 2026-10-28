@@ -10,6 +10,7 @@ const ALLOWED_PATHS = new Set([
   '/shipping',
   '/laptop-banking',
   '/laptop-banking/terms',
+  '/warranty',
 ]);
 
 function secretsMatch(provided: string, expected: string): boolean {

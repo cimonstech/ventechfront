@@ -12,6 +12,7 @@ import { ADMIN_DATA_DENIED } from '@/lib/access';
 import { MediaPicker } from './MediaPicker';
 import { ProductVariantManager } from './ProductVariantManager';
 import { notificationService } from '@/services/notification.service';
+import { OPERATING_SYSTEMS, PRODUCT_CONDITIONS } from '@/lib/portalTargeting';
 
 interface ProductModalProps {
   isOpen: boolean;
@@ -55,6 +56,8 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
     pre_order_available: false,
     estimated_arrival_date: '',
     warranty_months: '',
+    operating_system: '',
+    condition: 'new',
   });
   
   const [keySpecs, setKeySpecs] = useState<Array<{ label: string; color: string }>>([]);
@@ -116,6 +119,8 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
         warranty_months: product.warranty_months === null || product.warranty_months === undefined
           ? ''
           : String(product.warranty_months),
+        operating_system: product.operating_system || '',
+        condition: product.condition || 'new',
       });
       fetchProductAttributes(product.id);
       // Reset productVariants when opening a product - ProductVariantManager will fetch them
@@ -165,6 +170,8 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
       pre_order_available: isPreOrderPage, // Auto-set to true if on pre-orders page
       estimated_arrival_date: '',
       warranty_months: '',
+      operating_system: '',
+      condition: 'new',
     });
     setSelectedAttributes([]);
     setKeySpecs([]);
@@ -498,6 +505,8 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
         pre_order_available: formData.is_pre_order, // Auto-set to true if is_pre_order is true
         estimated_arrival_date: formData.estimated_arrival_date ? new Date(formData.estimated_arrival_date).toISOString() : null,
         warranty_months: warrantyMonths,
+        operating_system: formData.operating_system || null,
+        condition: formData.condition || 'new',
         updated_at: new Date().toISOString(),
       };
 
@@ -623,6 +632,38 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
                 placeholder={isLaptopCategory ? 'Recommended' : 'Leave blank if none'}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-[#1A1A1A] mb-2">
+                Operating system
+                {isLaptopCategory ? (
+                  <span className="ml-2 text-xs font-medium text-[#FF7A19]">Needed for laptop guides</span>
+                ) : null}
+              </label>
+              <select
+                value={formData.operating_system}
+                onChange={(e) => setFormData({ ...formData, operating_system: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
+              >
+                <option value="">Not set</option>
+                {OPERATING_SYSTEMS.map((item) => (
+                  <option key={item.value} value={item.value}>{item.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-[#1A1A1A] mb-2">Condition</label>
+              <select
+                value={formData.condition}
+                onChange={(e) => setFormData({ ...formData, condition: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
+              >
+                {PRODUCT_CONDITIONS.map((item) => (
+                  <option key={item.value} value={item.value}>{item.label}</option>
+                ))}
+              </select>
             </div>
 
             {/* Category */}
