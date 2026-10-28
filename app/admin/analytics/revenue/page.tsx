@@ -1,5 +1,6 @@
 'use client';
 
+import { ADMIN_DATA_DENIED, isAccessDeniedStatus } from '@/lib/access';
 import { authHeaders } from '@/lib/authHeaders';
 import { useState, useEffect } from 'react';
 import {
@@ -24,6 +25,7 @@ interface RevenueData {
 
 export default function RevenueAnalyticsPage() {
   const [loading, setLoading] = useState(true);
+  const [denied, setDenied] = useState(false);
   const [timeFilter, setTimeFilter] = useState<'7days' | '30days' | '90days' | 'year'>('30days');
   const [revenueData, setRevenueData] = useState<RevenueData>({
     total: 0,
@@ -41,6 +43,7 @@ export default function RevenueAnalyticsPage() {
   const fetchRevenueData = async () => {
     try {
       setLoading(true);
+      setDenied(false);
 
       // Calculate date range
       const now = new Date();
@@ -68,6 +71,7 @@ export default function RevenueAnalyticsPage() {
       let total = 0;
       let transactionCount = 0;
       let averageOrder = 0;
+      let apiDenied = false;
 
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
       
@@ -81,7 +85,9 @@ export default function RevenueAnalyticsPage() {
           },
         });
 
-        if (response.ok) {
+        if (isAccessDeniedStatus(response.status)) {
+          apiDenied = true;
+        } else if (response.ok) {
           const result = await response.json();
           if (result.success && result.data) {
             // Filter orders by date range and payment status (paid only)
@@ -129,6 +135,10 @@ export default function RevenueAnalyticsPage() {
         total = orders.reduce((sum, order) => sum + order.total, 0);
         transactionCount = orders.length;
         averageOrder = transactionCount > 0 ? total / transactionCount : 0;
+      }
+
+      if (apiDenied && orders.length === 0) {
+        throw new Error(ADMIN_DATA_DENIED);
       }
 
       // Calculate previous period for growth
@@ -240,7 +250,13 @@ export default function RevenueAnalyticsPage() {
       });
     } catch (error) {
       console.error('Error fetching revenue data:', error);
-      toast.error('Failed to load revenue analytics');
+      const deniedAccess = error instanceof Error && error.message === ADMIN_DATA_DENIED;
+      if (deniedAccess) {
+        setDenied(true);
+        toast.error(ADMIN_DATA_DENIED);
+      } else {
+        toast.error('Failed to load revenue analytics');
+      }
     } finally {
       setLoading(false);
     }
@@ -254,6 +270,12 @@ export default function RevenueAnalyticsPage() {
           <p className="text-[#3A3A3A]">Loading revenue analytics...</p>
         </div>
       </div>
+    );
+  }
+
+  if (denied) {
+    return (
+      <p className="rounded-xl bg-white p-6 text-sm text-[#3A3A3A] shadow-sm">{ADMIN_DATA_DENIED}</p>
     );
   }
 

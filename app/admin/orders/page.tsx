@@ -20,6 +20,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { useAppSelector } from '@/store';
+import { ADMIN_DATA_DENIED, isAccessDeniedStatus } from '@/lib/access';
 import { hasAdminEntry } from '@/lib/roles';
 import { useAccess } from '@/context/AccessContext';
 import { supabase } from '@/lib/supabase';
@@ -49,6 +50,7 @@ export default function AdminOrdersPage() {
   const canEditOrders = canEdit('orders');
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [denied, setDenied] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -72,18 +74,13 @@ export default function AdminOrdersPage() {
     // Clear pending orders notification when orders page is opened
     const clearPendingOrdersNotification = async () => {
       try {
-        // Mark pending orders notifications as read (if notifications table exists)
-        try {
-          await supabase
-            .from('notifications')
-            .update({ is_read: true })
-            .eq('type', 'order')
-            .eq('is_read', false);
-        } catch (notifError) {
-          // Notifications table might not exist - ignore
-        }
-      } catch (error) {
-        // Ignore errors
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+        await fetch(`${API_URL}/api/orders/notifications/read`, {
+          method: 'POST',
+          headers: await authHeaders(),
+        });
+      } catch {
+        // Ignore errors — badge count is not blocking
       }
     };
     
@@ -100,6 +97,7 @@ export default function AdminOrdersPage() {
   const fetchOrders = async () => {
     try {
       setIsLoading(true);
+      setDenied(false);
       
       // Try backend API first (better access to all fields including is_pre_order)
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
@@ -111,6 +109,10 @@ export default function AdminOrdersPage() {
             'Content-Type': 'application/json',
           },
         });
+
+        if (isAccessDeniedStatus(response.status)) {
+          throw new Error(ADMIN_DATA_DENIED);
+        }
 
         if (response.ok) {
           const result = await response.json();
@@ -153,6 +155,7 @@ export default function AdminOrdersPage() {
           }
         }
       } catch (apiError) {
+        if (apiError instanceof Error && apiError.message === ADMIN_DATA_DENIED) throw apiError;
         console.warn('Backend API failed, trying Supabase:', apiError);
       }
 
@@ -217,7 +220,12 @@ export default function AdminOrdersPage() {
       setOrders(formattedOrders);
     } catch (error) {
       console.error('Error fetching orders:', error);
-      toast.error('Failed to fetch orders');
+      if (error instanceof Error && error.message === ADMIN_DATA_DENIED) {
+        setDenied(true);
+        toast.error(ADMIN_DATA_DENIED);
+      } else {
+        toast.error('Failed to fetch orders');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -588,6 +596,8 @@ export default function AdminOrdersPage() {
             <div className="flex items-center justify-center py-20">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF7A19]"></div>
             </div>
+          ) : denied ? (
+            <p className="px-6 py-20 text-center text-sm text-[#3A3A3A]">{ADMIN_DATA_DENIED}</p>
           ) : orders.length === 0 ? (
             /* Empty State */
             <div className="text-center py-20">

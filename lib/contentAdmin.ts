@@ -1,3 +1,4 @@
+import { accessDeniedMessage } from '@/lib/access';
 import { authHeaders } from '@/lib/authHeaders';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
@@ -86,12 +87,12 @@ export async function contentRequest<T>(path: string, init: RequestInit = {}): P
 
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const message = typeof body?.message === 'string'
+    const fallback = typeof body?.message === 'string'
       ? body.message
       : typeof body?.error === 'string'
         ? body.error
         : 'Request failed';
-    throw new Error(message);
+    throw new Error(accessDeniedMessage(response.status, fallback));
   }
 
   return body.data as T;

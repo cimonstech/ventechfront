@@ -1,4 +1,5 @@
 import { authHeaders } from '@/lib/authHeaders';
+import { accessDeniedMessage } from '@/lib/access';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
@@ -104,8 +105,8 @@ export async function deviceRequest<T>(
 
   const body = await response.json().catch(() => ({}));
   if (!response.ok || body?.success === false) {
-    const message = typeof body?.message === 'string' ? body.message : 'Request failed';
-    throw new Error(message);
+    const fallback = typeof body?.message === 'string' ? body.message : 'Request failed';
+    throw new Error(accessDeniedMessage(response.status, fallback));
   }
 
   return {

@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/Button';
 import toast from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 import { authHeaders } from '@/lib/authHeaders';
+import { useAccess } from '@/context/AccessContext';
+import { ADMIN_DATA_DENIED } from '@/lib/access';
 import { MediaPicker } from './MediaPicker';
 import { ProductVariantManager } from './ProductVariantManager';
 import { notificationService } from '@/services/notification.service';
@@ -20,6 +22,9 @@ interface ProductModalProps {
 
 export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductModalProps) {
   const pathname = usePathname();
+  const { canEdit } = useAccess();
+  const canEditProducts = canEdit('products');
+  const canEditOrders = canEdit('orders');
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [showMediaPicker, setShowMediaPicker] = useState(false);
@@ -352,6 +357,49 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const preOrderOnlyUpdate = Boolean(product) && canEditOrders && !canEditProducts;
+
+    if (!product && !canEditProducts) {
+      toast.error(ADMIN_DATA_DENIED);
+      return;
+    }
+
+    if (preOrderOnlyUpdate) {
+      setLoading(true);
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+        const response = await fetch(`${apiUrl}/api/products/${product.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(await authHeaders()),
+          },
+          body: JSON.stringify({
+            is_pre_order: formData.is_pre_order,
+            pre_order_available: formData.is_pre_order,
+            estimated_arrival_date: formData.estimated_arrival_date
+              ? new Date(formData.estimated_arrival_date).toISOString()
+              : null,
+          }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload.success === false) {
+          throw new Error(payload.message || 'Failed to save product');
+        }
+        toast.success('Product updated successfully');
+        onClose();
+        setTimeout(() => {
+          onSuccess();
+        }, 100);
+      } catch (error: any) {
+        console.error('Error saving product:', error);
+        toast.error(error.message || 'Failed to save product');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
 
     if (!formData.name || !formData.slug || !formData.price || !formData.description || !formData.description.trim()) {
       toast.error('Please fill in all required fields (including description)');

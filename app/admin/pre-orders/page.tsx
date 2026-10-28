@@ -30,6 +30,8 @@ export default function AdminPreOrdersPage() {
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const { canEdit } = useAccess();
   const canEditOrders = canEdit('orders');
+  const canEditProducts = canEdit('products');
+  const canSavePreOrder = canEditOrders || canEditProducts;
 
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -151,7 +153,7 @@ export default function AdminPreOrdersPage() {
                   Back to Dashboard
                 </Button>
               </Link>
-              {canEditOrders && (
+              {canEditProducts && (
               <Button 
                 variant="primary" 
                 size="sm" 
@@ -301,8 +303,7 @@ export default function AdminPreOrdersPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex items-center justify-end gap-2">
-                            {canEditOrders && (
-                            <>
+                            {canSavePreOrder && (
                             <button
                               onClick={() => handleEdit(product)}
                               className="text-blue-600 hover:text-blue-900 p-2 hover:bg-blue-50 rounded-lg transition-colors"
@@ -310,6 +311,8 @@ export default function AdminPreOrdersPage() {
                             >
                               <Edit size={18} />
                             </button>
+                            )}
+                            {canEditProducts && (
                             <button
                               onClick={() => handleDelete(product.id)}
                               className="text-red-600 hover:text-red-900 p-2 hover:bg-red-50 rounded-lg transition-colors"
@@ -317,7 +320,6 @@ export default function AdminPreOrdersPage() {
                             >
                               <Trash2 size={18} />
                             </button>
-                            </>
                             )}
                           </div>
                         </td>

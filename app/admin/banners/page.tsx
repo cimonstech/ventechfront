@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import toast from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 import { MediaPicker } from '@/components/admin/MediaPicker';
+import { accessDeniedMessage } from '@/lib/access';
 import { useAccess } from '@/context/AccessContext';
 
 interface Banner {
@@ -63,7 +64,7 @@ export default function BannersPage() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'Failed to fetch banners' }));
-        throw new Error(errorData.message || `Failed to fetch banners: ${response.status} ${response.statusText}`);
+        throw new Error(accessDeniedMessage(response.status, errorData.message || `Failed to fetch banners: ${response.status} ${response.statusText}`));
       }
 
       const result = await response.json();

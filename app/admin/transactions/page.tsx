@@ -1,5 +1,6 @@
 'use client';
 
+import { ADMIN_DATA_DENIED, isAccessDeniedStatus } from '@/lib/access';
 import { authHeaders } from '@/lib/authHeaders';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -34,6 +35,7 @@ export default function TransactionsPage() {
   const { canEdit } = useAccess();
   const canEditFinance = canEdit('finance');
   const [loading, setLoading] = useState(true);
+  const [denied, setDenied] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -48,6 +50,7 @@ export default function TransactionsPage() {
   const fetchTransactions = async () => {
     try {
       setLoading(true);
+      setDenied(false);
       
       // Try backend API first (bypasses RLS)
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
@@ -68,6 +71,10 @@ export default function TransactionsPage() {
             'Content-Type': 'application/json',
           },
         });
+
+        if (isAccessDeniedStatus(response.status)) {
+          throw new Error(ADMIN_DATA_DENIED);
+        }
 
         if (response.ok) {
           const result = await response.json();
@@ -91,6 +98,7 @@ export default function TransactionsPage() {
           }
         }
       } catch (apiError) {
+        if (apiError instanceof Error && apiError.message === ADMIN_DATA_DENIED) throw apiError;
         console.warn('Backend API failed, trying Supabase:', apiError);
       }
 
@@ -146,7 +154,12 @@ export default function TransactionsPage() {
     } catch (error) {
       console.error('Error fetching transactions:', error);
       setTransactions([]);
-      toast.error('Failed to load transactions. Please check console for details.');
+      if (error instanceof Error && error.message === ADMIN_DATA_DENIED) {
+        setDenied(true);
+        toast.error(ADMIN_DATA_DENIED);
+      } else {
+        toast.error('Failed to load transactions. Please check console for details.');
+      }
     } finally {
       setLoading(false);
     }
@@ -316,6 +329,12 @@ export default function TransactionsPage() {
           <p className="text-[#3A3A3A]">Loading transactions...</p>
         </div>
       </div>
+    );
+  }
+
+  if (denied) {
+    return (
+      <p className="rounded-xl bg-white p-6 text-sm text-[#3A3A3A] shadow-sm">{ADMIN_DATA_DENIED}</p>
     );
   }
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { ADMIN_DATA_DENIED, isAccessDeniedStatus } from '@/lib/access';
 import { authHeaders } from '@/lib/authHeaders';
 import { useState, useEffect } from 'react';
 import { TrendingUp, Package, ShoppingBag, Star, Download } from 'lucide-react';
@@ -16,6 +17,7 @@ interface SalesData {
 
 export default function SalesAnalyticsPage() {
   const [loading, setLoading] = useState(true);
+  const [denied, setDenied] = useState(false);
   const [timeFilter, setTimeFilter] = useState<'7days' | '30days' | '90days'>('30days');
   const [salesData, setSalesData] = useState<SalesData>({
     totalOrders: 0,
@@ -31,6 +33,7 @@ export default function SalesAnalyticsPage() {
   const fetchSalesData = async () => {
     try {
       setLoading(true);
+      setDenied(false);
 
       // Calculate date range
       const now = new Date();
@@ -64,6 +67,10 @@ export default function SalesAnalyticsPage() {
           },
         });
 
+        if (isAccessDeniedStatus(response.status)) {
+          throw new Error(ADMIN_DATA_DENIED);
+        }
+
         if (response.ok) {
           const result = await response.json();
           if (result.success && result.data) {
@@ -88,6 +95,7 @@ export default function SalesAnalyticsPage() {
           }
         }
       } catch (apiError) {
+        if (apiError instanceof Error && apiError.message === ADMIN_DATA_DENIED) throw apiError;
         console.warn('Backend API failed, trying Supabase:', apiError);
       }
 
@@ -204,7 +212,12 @@ export default function SalesAnalyticsPage() {
       });
     } catch (error) {
       console.error('Error fetching sales data:', error);
-      toast.error('Failed to load sales analytics');
+      if (error instanceof Error && error.message === ADMIN_DATA_DENIED) {
+        setDenied(true);
+        toast.error(ADMIN_DATA_DENIED);
+      } else {
+        toast.error('Failed to load sales analytics');
+      }
     } finally {
       setLoading(false);
     }
@@ -218,6 +231,12 @@ export default function SalesAnalyticsPage() {
           <p className="text-[#3A3A3A]">Loading sales analytics...</p>
         </div>
       </div>
+    );
+  }
+
+  if (denied) {
+    return (
+      <p className="rounded-xl bg-white p-6 text-sm text-[#3A3A3A] shadow-sm">{ADMIN_DATA_DENIED}</p>
     );
   }
 

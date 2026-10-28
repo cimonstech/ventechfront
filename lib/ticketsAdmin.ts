@@ -1,3 +1,4 @@
+import { accessDeniedMessage } from '@/lib/access';
 import { authHeaders } from '@/lib/authHeaders';
 import { apiMessage, deviceRequest, formatDeviceDate } from '@/lib/devicesAdmin';
 
@@ -147,7 +148,7 @@ export async function downloadReceiptPdf(path: string, filename: string): Promis
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(typeof body?.message === 'string' ? body.message : 'Could not download this receipt.');
+    throw new Error(accessDeniedMessage(response.status, typeof body?.message === 'string' ? body.message : 'Could not download this receipt.'));
   }
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);

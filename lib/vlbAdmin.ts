@@ -1,3 +1,4 @@
+import { accessDeniedMessage } from '@/lib/access';
 import { authHeaders } from '@/lib/authHeaders';
 import { apiMessage, deviceRequest } from '@/lib/devicesAdmin';
 import { formatGhs, ghsInput, nested, pesewasFromGhs } from '@/lib/affiliatesAdmin';
@@ -106,7 +107,7 @@ export async function uploadVlbDocument(
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || payload?.success === false) {
-    throw new Error(typeof payload?.message === 'string' ? payload.message : 'Could not store this file.');
+    throw new Error(accessDeniedMessage(response.status, typeof payload?.message === 'string' ? payload.message : 'Could not store this file.'));
   }
   return payload.data;
 }

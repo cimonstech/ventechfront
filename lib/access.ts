@@ -82,6 +82,16 @@ const MODULE_PREFIXES: Array<{ prefix: string; module: AccessModule }> = [
 
 export { hasAdminEntry };
 
+export const ADMIN_DATA_DENIED = "You don't have access to this data.";
+
+export function isAccessDeniedStatus(status: number): boolean {
+  return status === 401 || status === 403;
+}
+
+export function accessDeniedMessage(status: number, fallback = 'Request failed'): string {
+  return isAccessDeniedStatus(status) ? ADMIN_DATA_DENIED : fallback;
+}
+
 export function isFullAdmin(role: string | null | undefined): boolean {
   return isAdminRole(role);
 }

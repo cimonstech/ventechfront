@@ -1,3 +1,4 @@
+import { accessDeniedMessage } from '@/lib/access';
 import { authHeaders } from '@/lib/authHeaders';
 import { apiMessage, deviceRequest, formatDeviceDate } from '@/lib/devicesAdmin';
 
@@ -232,7 +233,7 @@ export async function downloadAffiliateCsv(
   const response = await fetch(`${API_URL}/api/admin/affiliates/export/${kind}?${params.toString()}`, { headers });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(typeof body?.message === 'string' ? body.message : 'Could not export this file.');
+    throw new Error(accessDeniedMessage(response.status, typeof body?.message === 'string' ? body.message : 'Could not export this file.'));
   }
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);
