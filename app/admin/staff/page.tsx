@@ -7,6 +7,8 @@ import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
+import { InfoNote } from '@/components/ui/InfoNote';
+import { Sheet } from '@/components/ui/Sheet';
 import { useAppSelector } from '@/store';
 import { hasAdminEntry, isAdminRole } from '@/lib/roles';
 import { authHeaders } from '@/lib/authHeaders';
@@ -254,7 +256,10 @@ export default function AdminStaffPage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8 space-y-4">
+        <InfoNote>
+          View lets this person see the section. Edit lets them make changes. Finance is needed to record payments, refunds and investment amounts.
+        </InfoNote>
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
           {isLoading ? (
             <div className="flex items-center justify-center py-20">
@@ -269,7 +274,7 @@ export default function AdminStaffPage() {
               <p className="text-[#3A3A3A]">Add a staff member to give them module access.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto sticky-first">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b">
                   <tr>
@@ -325,16 +330,22 @@ export default function AdminStaffPage() {
       </div>
 
       {dialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b">
-              <h2 className="text-xl font-bold text-[#1A1A1A]">{dialog === 'add' ? 'Add staff' : 'Edit staff'}</h2>
+        <Sheet
+          title={dialog === 'add' ? 'Add staff' : 'Edit staff'}
+          onClose={() => setDialog(null)}
+          wide
+          footer={(
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setDialog(null)}>Cancel</Button>
+              <Button className="w-full sm:w-auto" onClick={save} isLoading={saving}>Save</Button>
             </div>
-            <div className="p-6 space-y-4">
+          )}
+        >
+            <div className="space-y-4">
               {dialog === 'add' && (
                 <>
                   <Input label="Email" type="email" required value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <Input label="First name" required value={form.first_name} onChange={(event) => setForm({ ...form, first_name: event.target.value })} />
                     <Input label="Last name" required value={form.last_name} onChange={(event) => setForm({ ...form, last_name: event.target.value })} />
                   </div>
@@ -356,14 +367,17 @@ export default function AdminStaffPage() {
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-700 mb-2">Module access</p>
+                <InfoNote className="mb-3">
+                  View lets this person see the section. Edit lets them make changes. Finance is needed to record payments, refunds and investment amounts.
+                </InfoNote>
                 <div className="border rounded-lg divide-y">
                   {form.permissions.map((permission) => {
                     const label = MODULES.find((module) => module.id === permission.module)?.label;
                     return (
-                      <div key={permission.module} className="flex items-center justify-between px-4 py-3">
+                      <div key={permission.module} className="flex min-h-11 flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                         <span className="text-sm text-[#1A1A1A]">{label}</span>
                         <div className="flex items-center gap-4 text-sm">
-                          <label className="flex items-center gap-2">
+                          <label className="flex min-h-11 items-center gap-2">
                             <input
                               type="checkbox"
                               checked={permission.can_view}
@@ -372,7 +386,7 @@ export default function AdminStaffPage() {
                             />
                             View
                           </label>
-                          <label className="flex items-center gap-2">
+                          <label className="flex min-h-11 items-center gap-2">
                             <input
                               type="checkbox"
                               checked={permission.can_edit}
@@ -387,27 +401,24 @@ export default function AdminStaffPage() {
                 </div>
               </div>
             </div>
-            <div className="p-6 border-t flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => setDialog(null)}>Cancel</Button>
-              <Button onClick={save} isLoading={saving}>Save</Button>
-            </div>
-          </div>
-        </div>
+        </Sheet>
       )}
 
       {removeTarget && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-md w-full p-6">
-            <h2 className="text-xl font-bold text-[#1A1A1A]">Remove staff member</h2>
-            <p className="text-sm text-[#3A3A3A] mt-2">
+        <Sheet
+          title="Remove staff member"
+          onClose={() => setRemoveTarget(null)}
+          footer={(
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setRemoveTarget(null)}>Cancel</Button>
+              <Button variant="danger" className="w-full sm:w-auto" onClick={remove} isLoading={saving}>Remove</Button>
+            </div>
+          )}
+        >
+            <p className="text-sm text-[#3A3A3A]">
               {displayName(removeTarget)} will become a customer and lose module access.
             </p>
-            <div className="flex justify-end gap-2 mt-6">
-              <Button variant="ghost" onClick={() => setRemoveTarget(null)}>Cancel</Button>
-              <Button variant="danger" onClick={remove} isLoading={saving}>Remove</Button>
-            </div>
-          </div>
-        </div>
+        </Sheet>
       )}
     </div>
   );

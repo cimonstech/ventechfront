@@ -1,5 +1,5 @@
 import { authHeaders } from '@/lib/authHeaders';
-import { referralFromCookie } from '@/lib/referralCookie';
+import { referralForCheckout } from '@/lib/referralCookie';
 import { supabase } from '@/lib/supabase';
 import { CheckoutData, Order } from '@/types/order';
 
@@ -67,7 +67,7 @@ export const orderService = {
 
     // Try to call backend API first, fallback to Supabase if it fails
     try {
-      const referral = checkoutData.referral || referralFromCookie();
+      const referral = checkoutData.referral || (await referralForCheckout());
       const orderPayload = {
         user_id: userId,
         // order_number not provided - backend will generate sequential number

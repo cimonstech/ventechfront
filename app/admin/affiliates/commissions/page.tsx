@@ -5,6 +5,7 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { InfoNote } from '@/components/ui/InfoNote';
 import { AffiliatePrompt } from '@/components/admin/AffiliatePrompt';
 import { AffiliatesNav } from '@/components/admin/AffiliatesNav';
 import { useSetAdminHeading } from '@/components/admin/AdminHeading';
@@ -21,6 +22,7 @@ import {
   formatWhen,
   nested,
 } from '@/lib/affiliatesAdmin';
+import { fetchPublicAffiliateInfo } from '@/lib/affiliates';
 
 type Tab = 'ready' | 'pending' | 'approved' | 'reversed';
 
@@ -43,6 +45,7 @@ export default function AdminAffiliateCommissionsPage() {
   const [busy, setBusy] = useState(false);
   const [reverseId, setReverseId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [returnWindowDays, setReturnWindowDays] = useState(7);
 
   const load = async () => {
     setLoading(true);
@@ -64,6 +67,14 @@ export default function AdminAffiliateCommissionsPage() {
   useEffect(() => {
     void load();
   }, [tab, page]);
+
+  useEffect(() => {
+    fetchPublicAffiliateInfo()
+      .then((info) => {
+        if (info?.return_window_days) setReturnWindowDays(info.return_window_days);
+      })
+      .catch(() => undefined);
+  }, []);
 
   const run = async (path: string, body: Record<string, unknown> | undefined, fallback: string) => {
     setBusy(true);
@@ -109,6 +120,10 @@ export default function AdminAffiliateCommissionsPage() {
         </Button>
       </div>
 
+      <InfoNote>
+        Approve a commission only after the order is delivered, fully paid and the {returnWindowDays}-day return period has passed. Reverse it if the order was cancelled, refunded, returned, failed payment, was never completed, looks fraudulent, or duplicates another referral.
+      </InfoNote>
+
       <div className="flex flex-wrap gap-2">
         {TABS.map((item) => (
           <button
@@ -127,7 +142,7 @@ export default function AdminAffiliateCommissionsPage() {
         ))}
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto">
+      <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto sticky-first">
         <table className="min-w-[800px] w-full text-sm">
           <thead className="bg-gray-50 text-left text-[#3A3A3A]">
             <tr>
@@ -141,7 +156,7 @@ export default function AdminAffiliateCommissionsPage() {
           </thead>
           <tbody className="divide-y">
             {loading ? (
-              <tr><td colSpan={6} className="px-4 py-10 text-center text-[#3A3A3A]">Loading commissionsâ€¦</td></tr>
+              <tr><td colSpan={6} className="px-4 py-10 text-center text-[#3A3A3A]">Loading commissions…</td></tr>
             ) : rows.length === 0 ? (
               <tr><td colSpan={6} className="px-4 py-10 text-center text-[#3A3A3A]">No commissions in this list.</td></tr>
             ) : rows.map((row) => {
@@ -154,9 +169,9 @@ export default function AdminAffiliateCommissionsPage() {
                       <Link href={`/admin/affiliates/${row.affiliate_id}`} className="font-semibold text-[#FF7A19]">
                         {affiliate?.affiliate_no || 'Affiliate'}
                       </Link>
-                    ) : (affiliate?.affiliate_no || 'â€”')}
+                    ) : (affiliate?.affiliate_no || '—')}
                   </td>
-                  <td className="px-4 py-3">{order?.order_number || 'â€”'}</td>
+                  <td className="px-4 py-3">{order?.order_number || '—'}</td>
                   <td className="px-4 py-3">{formatGhs(row.amount_pesewas)}</td>
                   <td className="px-4 py-3">
                     <Badge size="sm" variant={affiliateStatusVariant(row.status)}>

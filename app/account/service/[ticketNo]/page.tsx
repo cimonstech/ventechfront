@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { ArrowLeft, Check, FileText, Film, Phone, Send, X } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { InfoNote } from '@/components/ui/InfoNote';
 import { useAppSelector } from '@/store';
 import { safeRedirectPath } from '@/lib/safeRedirect';
 import {
@@ -61,6 +62,20 @@ const STAGE_SHORT: Record<string, string> = {
   completed: 'Done',
 };
 
+const STAGE_EXPLAIN: Record<string, string> = {
+  submitted: "We've received your request.",
+  under_review: 'A technician is reviewing your details.',
+  diagnosing: "We're finding the cause.",
+  repair_resolution: "We're fixing the issue or preparing a solution.",
+  ready: 'Your laptop is ready for collection or delivery.',
+  completed: 'This request is complete.',
+};
+
+function stageLine(status: string, closedReason?: string | null): string | null {
+  if (status === 'closed') return `This request was closed: ${closedReason || '—'}.`;
+  return STAGE_EXPLAIN[status] || null;
+}
+
 export default function ServiceRequestPage() {
   const params = useParams<{ ticketNo: string }>();
   const ticketNo = Array.isArray(params.ticketNo) ? params.ticketNo[0] : params.ticketNo || '';
@@ -71,6 +86,7 @@ export default function ServiceRequestPage() {
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const mediaRefreshed = useRef(false);
 
   const load = useCallback(async () => {
     if (!ticketNo) return;
@@ -92,6 +108,11 @@ export default function ServiceRequestPage() {
       return;
     }
     void load();
+    const timer = window.setInterval(() => {
+      mediaRefreshed.current = false;
+      void load();
+    }, 90 * 1000);
+    return () => window.clearInterval(timer);
   }, [isAuthenticated, isLoading, load, router, ticketNo]);
 
   const send = async () => {
@@ -160,7 +181,7 @@ export default function ServiceRequestPage() {
               {ticket.repair_paid ? (
                 <Link
                   href={`/account/service/${ticket.ticket_no}/receipt`}
-                  className="inline-flex min-h-10 items-center rounded-lg bg-white px-3 py-1.5 text-sm font-semibold text-[#1A1A1A] hover:bg-orange-50"
+                  className="inline-flex min-h-11 items-center rounded-lg bg-white px-3 py-1.5 text-sm font-semibold text-[#1A1A1A] hover:bg-orange-50"
                 >
                   Receipt
                 </Link>
@@ -183,14 +204,14 @@ export default function ServiceRequestPage() {
               <span className="font-normal text-[#3A3A3A]"> · step {stageIndex + 1} of {TICKET_STAGES.length}</span>
             ) : null}
           </p>
-          <ol className="mt-4 grid grid-cols-3 sm:grid-cols-6 gap-2">
+          <ol className="mt-4 flex flex-col gap-2 md:grid md:grid-cols-6">
             {TICKET_STAGES.map((stage, index) => {
               const current = ticket.status === stage;
               const passed = stageIndex > index;
               return (
                 <li
                   key={stage}
-                  className={`min-w-0 rounded-xl px-2 py-3 text-center ${
+                  className={`min-w-0 rounded-xl px-3 py-3 md:px-2 md:text-center ${
                     current
                       ? 'bg-[#FF7A19] text-white'
                       : passed
@@ -198,16 +219,23 @@ export default function ServiceRequestPage() {
                         : 'bg-[#F4F1EC] text-[#3A3A3A]'
                   }`}
                 >
-                  <span className={`mx-auto mb-1 flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${
-                    current ? 'bg-white text-[#FF7A19]' : passed ? 'bg-[#FF7A19] text-white' : 'bg-white text-[#3A3A3A]'
-                  }`}>
-                    {passed ? <Check size={12} aria-hidden /> : index + 1}
+                  <span className="flex items-center gap-3 md:block">
+                    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold md:mx-auto md:mb-1 ${
+                      current ? 'bg-white text-[#FF7A19]' : passed ? 'bg-[#FF7A19] text-white' : 'bg-white text-[#3A3A3A]'
+                    }`}>
+                      {passed ? <Check size={12} aria-hidden /> : index + 1}
+                    </span>
+                    <span className="text-sm font-semibold leading-tight md:mt-0 md:block md:text-[11px]">{STAGE_SHORT[stage]}</span>
                   </span>
-                  <span className="block text-[11px] font-semibold leading-tight">{STAGE_SHORT[stage]}</span>
                 </li>
               );
             })}
           </ol>
+          {stageLine(ticket.status, ticket.closed_reason) ? (
+            <InfoNote className="mt-4">
+              {stageLine(ticket.status, ticket.closed_reason)}
+            </InfoNote>
+          ) : null}
         </section>
 
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_17.5rem] gap-6 items-start">
@@ -297,7 +325,16 @@ export default function ServiceRequestPage() {
                   {ticket.media.map((file) => (
                     <li key={file.id} className="min-w-0">
                       {file.kind === 'video' ? (
-                        <video src={file.previewUrl} controls className="w-full aspect-[4/3] rounded-xl bg-black object-cover" />
+                        <video
+                          src={file.previewUrl}
+                          controls
+                          className="w-full aspect-[4/3] rounded-xl bg-black object-cover"
+                          onError={() => {
+                            if (mediaRefreshed.current) return;
+                            mediaRefreshed.current = true;
+                            void load();
+                          }}
+                        />
                       ) : file.kind === 'receipt' ? (
                         <a
                           href={file.previewUrl}
@@ -314,7 +351,16 @@ export default function ServiceRequestPage() {
                           onClick={() => setLightbox(file.previewUrl)}
                           className="group relative block w-full overflow-hidden rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A19]"
                         >
-                          <img src={file.previewUrl} alt="" className="aspect-[4/3] w-full object-cover bg-gray-100" />
+                          <img
+                            src={file.previewUrl}
+                            alt=""
+                            className="aspect-[4/3] w-full object-cover bg-gray-100"
+                            onError={() => {
+                              if (mediaRefreshed.current) return;
+                              mediaRefreshed.current = true;
+                              void load();
+                            }}
+                          />
                           <span className="pointer-events-none absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
                         </button>
                       )}
@@ -337,13 +383,23 @@ export default function ServiceRequestPage() {
           <button
             type="button"
             aria-label="Close photo"
-            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#1A1A1A] hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A19]"
+            className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white text-[#1A1A1A] hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A19]"
             onClick={() => setLightbox(null)}
           >
             <X size={18} aria-hidden />
           </button>
           <button type="button" className="max-h-[90vh] max-w-full" onClick={() => setLightbox(null)}>
-            <img src={lightbox} alt="Attachment" className="max-h-[90vh] max-w-full object-contain" />
+            <img
+              src={lightbox}
+              alt="Attachment"
+              className="max-h-[90vh] max-w-full object-contain"
+              onError={() => {
+                if (mediaRefreshed.current) return;
+                mediaRefreshed.current = true;
+                setLightbox(null);
+                void load();
+              }}
+            />
           </button>
         </div>
       )}

@@ -69,7 +69,7 @@ export default function AdminVlbApplicationsPage() {
           </button>
         ))}
       </div>
-      <div className="overflow-x-auto rounded-xl bg-white shadow-sm">
+      <div className="overflow-x-auto sticky-first rounded-xl bg-white shadow-sm">
         <table className="min-w-full text-left text-sm">
           <thead>
             <tr className="border-b text-[#3A3A3A]">
@@ -81,7 +81,7 @@ export default function AdminVlbApplicationsPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td className="px-4 py-6 text-[#3A3A3A]" colSpan={4}>Loadingâ€¦</td></tr>
+              <tr><td className="px-4 py-6 text-[#3A3A3A]" colSpan={4}>Loading…</td></tr>
             ) : rows.length === 0 ? (
               <tr><td className="px-4 py-6 text-[#3A3A3A]" colSpan={4}>No applications.</td></tr>
             ) : (
@@ -93,7 +93,7 @@ export default function AdminVlbApplicationsPage() {
                     </Link>
                     <p className="text-xs text-[#3A3A3A]">{row.email}</p>
                   </td>
-                  <td className="px-4 py-3">{nested(row.vlb_plans)?.name || 'â€”'}</td>
+                  <td className="px-4 py-3">{nested(row.vlb_plans)?.name || '—'}</td>
                   <td className="px-4 py-3"><Badge variant={payoutStatusVariant(row.status)}>{row.status}</Badge></td>
                   <td className="px-4 py-3">{formatDeviceDate(row.created_at)}</td>
                 </tr>

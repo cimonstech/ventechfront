@@ -1,4 +1,7 @@
+'use client';
+
 import { Badge } from '@/components/ui/Badge';
+import { InfoTip } from '@/components/ui/InfoNote';
 import { DeviceWarranty, formatDeviceDate } from '@/lib/devicesAdmin';
 
 const LABEL: Record<DeviceWarranty['status'], string> = {
@@ -7,11 +10,22 @@ const LABEL: Record<DeviceWarranty['status'], string> = {
   none: 'None',
 };
 
+function warrantyTip(warranty: DeviceWarranty): string {
+  const date = formatDeviceDate(warranty.endsOn);
+  if (warranty.status === 'active') return `Covered until ${date || '—'}.`;
+  if (warranty.status === 'expired') {
+    return `Warranty ended on ${date || '—'}. VENTECH can still help; repairs may be charged.`;
+  }
+  return 'No warranty is recorded for this laptop.';
+}
+
 export function DeviceWarrantyBadge({ warranty, showDate = true }: { warranty: DeviceWarranty; showDate?: boolean }) {
   const variant = warranty.status === 'active' ? 'success' : warranty.status === 'expired' ? 'error' : 'default';
   return (
     <span className="inline-flex flex-col items-start gap-1">
-      <Badge variant={variant} size="sm">{LABEL[warranty.status] || 'None'}</Badge>
+      <InfoTip text={warrantyTip(warranty)}>
+        <Badge variant={variant} size="sm">{LABEL[warranty.status] || 'None'}</Badge>
+      </InfoTip>
       {showDate && warranty.endsOn ? (
         <span className="text-xs text-[#3A3A3A]">{formatDeviceDate(warranty.endsOn)}</span>
       ) : null}

@@ -15,12 +15,12 @@ export function AffiliatesNav({ current }: { current: string }) {
   const finance = canEdit('finance');
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex max-w-full flex-wrap items-center gap-2">
       {LINKS.filter((item) => !item.finance || finance).map((item) => (
         <Link
           key={item.href}
           href={item.href}
-          className={`px-3 py-1.5 rounded-full text-sm font-medium ${
+          className={`inline-flex min-h-11 items-center rounded-full px-3 py-1.5 text-sm font-medium ${
             current === item.href
               ? 'bg-[#FF7A19] text-white'
               : 'bg-white border border-gray-200 text-[#1A1A1A]'

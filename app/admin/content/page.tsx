@@ -60,22 +60,22 @@ export default function AdminContentPage() {
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search titles"
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          className="min-h-11 rounded-lg border border-gray-300 px-3 py-2 text-sm"
         />
-        <select value={type} onChange={(event) => setType(event.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+        <select value={type} onChange={(event) => setType(event.target.value)} className="min-h-11 rounded-lg border border-gray-300 px-3 py-2 text-sm">
           <option value="">All types</option>
           {ARTICLE_TYPES.map((item) => (
             <option key={item.value} value={item.value}>{item.label}</option>
           ))}
         </select>
-        <select value={status} onChange={(event) => setStatus(event.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+        <select value={status} onChange={(event) => setStatus(event.target.value)} className="min-h-11 rounded-lg border border-gray-300 px-3 py-2 text-sm">
           <option value="">All statuses</option>
           <option value="draft">Draft</option>
           <option value="published">Published</option>
         </select>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+      <div className="overflow-x-auto sticky-first rounded-xl border border-gray-200 bg-white">
         <table className="min-w-full text-left text-sm">
           <thead className="border-b border-gray-200 text-xs uppercase text-gray-500">
             <tr>

@@ -60,7 +60,7 @@ export default function AdminVlbInvestorsPage() {
         <input className="flex-1 rounded-lg border px-3 py-2 text-sm" placeholder="Investor number" value={search} onChange={(e) => setSearch(e.target.value)} />
         <button type="submit" className="rounded-lg bg-[#FF7A19] px-4 py-2 text-sm font-medium text-white">Search</button>
       </form>
-      <div className="overflow-x-auto rounded-xl bg-white shadow-sm">
+      <div className="overflow-x-auto sticky-first rounded-xl bg-white shadow-sm">
         <table className="min-w-full text-left text-sm">
           <thead>
             <tr className="border-b text-[#3A3A3A]">
@@ -71,7 +71,7 @@ export default function AdminVlbInvestorsPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td className="px-4 py-6" colSpan={3}>Loadingâ€¦</td></tr>
+              <tr><td className="px-4 py-6" colSpan={3}>Loading…</td></tr>
             ) : rows.length === 0 ? (
               <tr><td className="px-4 py-6 text-[#3A3A3A]" colSpan={3}>No investors.</td></tr>
             ) : rows.map((row) => (
@@ -80,8 +80,8 @@ export default function AdminVlbInvestorsPage() {
                   <Link href={`/admin/vlb/investors/${row.id}`} className="font-medium text-[#FF7A19]">{row.investor_no || row.id}</Link>
                   <p className="text-xs text-[#3A3A3A]">{row.name}</p>
                 </td>
-                <td className="px-4 py-3">{row.email || 'â€”'}</td>
-                <td className="px-4 py-3">{row.payout_method || 'â€”'}</td>
+                <td className="px-4 py-3">{row.email || '—'}</td>
+                <td className="px-4 py-3">{row.payout_method || '—'}</td>
               </tr>
             ))}
           </tbody>

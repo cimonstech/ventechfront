@@ -152,7 +152,7 @@ export default function DeviceLabelsPage() {
             value={orderNumber}
             onChange={(event) => setOrderNumber(event.target.value)}
             placeholder="Order number"
-            className="flex-1 min-w-[220px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
+            className="min-h-11 w-full min-w-0 flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19] sm:min-w-[220px]"
           />
           <Button variant="outline" onClick={searchOrder}>Load order</Button>
           <Button onClick={() => window.print()} disabled={labels.length === 0}>Print</Button>

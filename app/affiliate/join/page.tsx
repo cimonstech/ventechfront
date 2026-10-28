@@ -6,10 +6,13 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { useAppSelector } from '@/store';
 import { safeRedirectPath } from '@/lib/safeRedirect';
+import { InfoNote } from '@/components/ui/InfoNote';
+import { fetchPublicFeatures } from '@/lib/features';
 import {
   affiliateRequest,
   apiMessage,
   fetchPublicAffiliateInfo,
+  formatCopyGhs,
   formatGhs,
   loadAffiliateMe,
   payoutMethodLabel,
@@ -51,14 +54,20 @@ export default function AffiliateJoinPage() {
   const [paying, setPaying] = useState(false);
 
   useEffect(() => {
-    if (isLoading) return;
-    if (!isAuthenticated) {
-      const next = safeRedirectPath('/affiliate/join');
-      router.replace(next ? `/login?redirect=${encodeURIComponent(next)}` : '/login');
-      return;
-    }
     let cancelled = false;
     const load = async () => {
+      const flags = await fetchPublicFeatures();
+      if (cancelled) return;
+      if (!flags.feature_affiliates_enabled) {
+        router.replace('/affiliate');
+        return;
+      }
+      if (isLoading) return;
+      if (!isAuthenticated) {
+        const next = safeRedirectPath('/affiliate/join');
+        router.replace(next ? `/login?redirect=${encodeURIComponent(next)}` : '/login');
+        return;
+      }
       try {
         const [me, publicInfo] = await Promise.all([loadAffiliateMe(), fetchPublicAffiliateInfo()]);
         if (cancelled) return;
@@ -90,6 +99,11 @@ export default function AffiliateJoinPage() {
   };
 
   const payLabel = info ? `Pay ${formatGhs(info.fee_pesewas)}` : 'Pay application fee';
+  const joinFeeNote = info ? (
+    <InfoNote className="mb-3">
+      {`The one-time ${formatCopyGhs(info.fee_pesewas)} joining fee activates your affiliate account after VENTECH approves your application.${info.fee_refund_on_rejection ? ' If your application is not approved, the fee is refunded.' : ''}`}
+    </InfoNote>
+  ) : null;
   const formValid =
     acceptTerms
     && channels.length > 0
@@ -170,11 +184,12 @@ export default function AffiliateJoinPage() {
             <p className="mb-6 text-[#3A3A3A]">
               Your details are saved. Pay the application fee to send your application for review.
             </p>
+            {joinFeeNote}
             <button
               type="button"
               onClick={() => void resumePayment()}
               disabled={paying}
-              className="w-full rounded-lg bg-[#FF7A19] px-4 py-3 font-semibold text-white hover:bg-[#e66a0f] disabled:opacity-50"
+              className="min-h-11 w-full rounded-lg bg-[#FF7A19] px-4 py-3 font-semibold text-white hover:bg-[#e66a0f] disabled:opacity-50"
             >
               {paying ? 'Opening payment…' : payLabel}
             </button>
@@ -204,7 +219,7 @@ export default function AffiliateJoinPage() {
               <legend className="mb-2 text-sm font-medium text-[#1A1A1A]">Promotion channels</legend>
               <div className="grid grid-cols-1 gap-2">
                 {CHANNELS.map((channel) => (
-                  <label key={channel} className="flex items-center gap-2 text-sm text-[#3A3A3A]">
+                  <label key={channel} className="flex min-h-11 items-center gap-2 text-sm text-[#3A3A3A]">
                     <input
                       type="checkbox"
                       checked={channels.includes(channel)}
@@ -229,7 +244,7 @@ export default function AffiliateJoinPage() {
                       id={`handle-${channel}`}
                       value={handles[channel] || ''}
                       onChange={(event) => setHandles((current) => ({ ...current, [channel]: event.target.value }))}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-transparent focus:ring-2 focus:ring-[#FF7A19]"
+                      className="min-h-11 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-transparent focus:ring-2 focus:ring-[#FF7A19]"
                       placeholder="@handle or https://"
                     />
                   </div>
@@ -265,7 +280,7 @@ export default function AffiliateJoinPage() {
                     id="momoNetwork"
                     value={momoNetwork}
                     onChange={(event) => setMomoNetwork(event.target.value)}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#FF7A19]"
+                    className="min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#FF7A19]"
                   >
                     {MOMO_NETWORKS.map((network) => (
                       <option key={network} value={network}>
@@ -280,10 +295,13 @@ export default function AffiliateJoinPage() {
                   </label>
                   <input
                     id="momoNumber"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
                     required
                     value={momoNumber}
                     onChange={(event) => setMomoNumber(event.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#FF7A19]"
+                    className="min-h-11 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#FF7A19]"
                     placeholder="0240000000"
                   />
                 </div>
@@ -299,7 +317,7 @@ export default function AffiliateJoinPage() {
                     required
                     value={bankName}
                     onChange={(event) => setBankName(event.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#FF7A19]"
+                    className="min-h-11 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#FF7A19]"
                   />
                 </div>
                 <div>
@@ -311,7 +329,7 @@ export default function AffiliateJoinPage() {
                     required
                     value={bankAccountName}
                     onChange={(event) => setBankAccountName(event.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#FF7A19]"
+                    className="min-h-11 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#FF7A19]"
                   />
                 </div>
                 <div>
@@ -323,7 +341,7 @@ export default function AffiliateJoinPage() {
                     required
                     value={bankAccountNumber}
                     onChange={(event) => setBankAccountNumber(event.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#FF7A19]"
+                    className="min-h-11 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#FF7A19]"
                   />
                 </div>
               </>
@@ -345,10 +363,11 @@ export default function AffiliateJoinPage() {
               </span>
             </label>
 
+            {joinFeeNote}
             <button
               type="submit"
               disabled={submitting || !formValid}
-              className="w-full rounded-lg bg-[#FF7A19] px-4 py-3 font-semibold text-white hover:bg-[#e66a0f] disabled:opacity-50"
+              className="min-h-11 w-full rounded-lg bg-[#FF7A19] px-4 py-3 font-semibold text-white hover:bg-[#e66a0f] disabled:opacity-50"
             >
               {submitting ? 'Opening payment…' : payLabel}
             </button>

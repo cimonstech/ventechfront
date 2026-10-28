@@ -5,6 +5,7 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { InfoNote } from '@/components/ui/InfoNote';
 import { AffiliatePrompt } from '@/components/admin/AffiliatePrompt';
 import { AffiliatesNav } from '@/components/admin/AffiliatesNav';
 import { useSetAdminHeading } from '@/components/admin/AdminHeading';
@@ -104,6 +105,12 @@ export default function AdminAffiliateWithdrawalsPage() {
         </Button>
       </div>
 
+      {finance ? (
+        <InfoNote>
+          Marking a payment as paid does not send money. Send it first through MoMo or the bank, then record the reference here.
+        </InfoNote>
+      ) : null}
+
       <div className="flex flex-wrap gap-2">
         {TABS.map((item) => (
           <button
@@ -122,7 +129,7 @@ export default function AdminAffiliateWithdrawalsPage() {
         ))}
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto">
+      <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto sticky-first">
         <table className="min-w-[860px] w-full text-sm">
           <thead className="bg-gray-50 text-left text-[#3A3A3A]">
             <tr>
@@ -136,7 +143,7 @@ export default function AdminAffiliateWithdrawalsPage() {
           </thead>
           <tbody className="divide-y">
             {loading ? (
-              <tr><td colSpan={6} className="px-4 py-10 text-center text-[#3A3A3A]">Loading withdrawalsâ€¦</td></tr>
+              <tr><td colSpan={6} className="px-4 py-10 text-center text-[#3A3A3A]">Loading withdrawals…</td></tr>
             ) : rows.length === 0 ? (
               <tr><td colSpan={6} className="px-4 py-10 text-center text-[#3A3A3A]">No withdrawals in this list.</td></tr>
             ) : rows.map((row) => {
@@ -148,7 +155,7 @@ export default function AdminAffiliateWithdrawalsPage() {
                       <Link href={`/admin/affiliates/${row.affiliate_id}`} className="font-semibold text-[#FF7A19]">
                         {affiliate?.affiliate_no || 'Affiliate'}
                       </Link>
-                    ) : (affiliate?.affiliate_no || 'â€”')}
+                    ) : (affiliate?.affiliate_no || '—')}
                   </td>
                   <td className="px-4 py-3">{formatGhs(row.amount_pesewas)}</td>
                   <td className="px-4 py-3 capitalize">{row.mode?.replace('_', ' ')}</td>
@@ -204,6 +211,11 @@ export default function AdminAffiliateWithdrawalsPage() {
           label="MoMo or bank reference"
           submitLabel="Mark paid"
           placeholder="Transaction reference"
+          note={(
+            <InfoNote>
+              Marking a payment as paid does not send money. Send it first through MoMo or the bank, then record the reference here.
+            </InfoNote>
+          )}
           busy={busy}
           onClose={() => setPrompt(null)}
           onSubmit={(reference) => run(prompt.id, { to: 'paid', payment_reference: reference }, 'Could not mark this withdrawal paid.')}

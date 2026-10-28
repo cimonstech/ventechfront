@@ -1,3 +1,5 @@
+import { fetchPublicFeatures } from '@/lib/features';
+
 const COOKIE = 'vt_ref';
 
 export interface ReferralCookie {
@@ -40,4 +42,10 @@ export function readReferralCookie(): ReferralCookie | null {
 export function referralFromCookie(): { click_id: string } | null {
   const cookie = readReferralCookie();
   return cookie ? { click_id: cookie.click_id } : null;
+}
+
+export async function referralForCheckout(): Promise<{ click_id: string } | null> {
+  const flags = await fetchPublicFeatures();
+  if (!flags.feature_affiliates_enabled) return null;
+  return referralFromCookie();
 }

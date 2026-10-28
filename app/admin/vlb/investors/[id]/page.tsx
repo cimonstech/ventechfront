@@ -11,7 +11,8 @@ import { useSetAdminHeading } from '@/components/admin/AdminHeading';
 import { useAccess } from '@/context/AccessContext';
 import { formatDeviceDate } from '@/lib/devicesAdmin';
 import { formatGhs, payoutStatusVariant } from '@/lib/vlb';
-import { apiMessage, deviceRequest, uploadVlbDocument } from '@/lib/vlbAdmin';
+import { apiMessage, deviceRequest, openAdminVlbDocument, saveInvestorPayout, uploadVlbDocument } from '@/lib/vlbAdmin';
+import { EMPTY_VLB_PAYOUT, payoutPayload, VlbPayoutFields, type VlbPayoutForm } from '@/components/admin/VlbPayoutFields';
 
 interface InvestorDetail {
   id: string;
@@ -24,6 +25,7 @@ interface InvestorDetail {
     momo_network: string | null;
     momo_number: string | null;
     bank_name: string | null;
+    bank_account_name: string | null;
     bank_account_number: string | null;
   };
   investments: Array<{
@@ -34,6 +36,7 @@ interface InvestorDetail {
     maturity_date: string;
     status: string;
     current_term: number;
+    agreement_missing?: boolean;
   }>;
   documents: Array<{ id: string; title: string; kind: string; url: string | null }>;
 }
@@ -44,14 +47,28 @@ export default function AdminVlbInvestorDetailPage() {
   useSetAdminHeading('Investor');
   const { canEdit } = useAccess();
   const editable = canEdit('vlb');
+  const financeEdit = canEdit('finance');
   const [row, setRow] = useState<InvestorDetail | null>(null);
   const [kind, setKind] = useState('agreement');
   const [title, setTitle] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [investmentId, setInvestmentId] = useState('');
+  const [payoutForm, setPayoutForm] = useState<VlbPayoutForm>(EMPTY_VLB_PAYOUT);
   const [busy, setBusy] = useState(false);
 
   const load = () =>
-    deviceRequest<InvestorDetail>(`/api/admin/vlb/investors/${id}`).then((result) => setRow(result.data));
+    deviceRequest<InvestorDetail>(`/api/admin/vlb/investors/${id}`).then((result) => {
+      setRow(result.data);
+      const payout = result.data.payout;
+      setPayoutForm({
+        payout_method: payout.payout_method === 'bank' ? 'bank' : 'momo',
+        momo_network: payout.momo_network || 'MTN',
+        momo_number: payout.momo_number || '',
+        bank_name: payout.bank_name || '',
+        bank_account_name: payout.bank_account_name || '',
+        bank_account_number: payout.bank_account_number || '',
+      });
+    });
 
   useEffect(() => {
     if (!id) return;
@@ -68,7 +85,7 @@ export default function AdminVlbInvestorDetailPage() {
     }
     setBusy(true);
     try {
-      await uploadVlbDocument(id, file, kind, title.trim());
+      await uploadVlbDocument(id, file, kind, title.trim(), investmentId || undefined);
       toast.success('Document uploaded.');
       setTitle('');
       setFile(null);
@@ -91,10 +108,32 @@ export default function AdminVlbInvestorDetailPage() {
           Payout: {row.payout.payout_method === 'momo'
             ? `${row.payout.momo_network || 'MoMo'} · ${row.payout.momo_number || '—'}`
             : row.payout.payout_method === 'bank'
-              ? `${row.payout.bank_name || 'Bank'} · ${row.payout.bank_account_number || '—'}`
+              ? `${row.payout.bank_name || 'Bank'} · ${row.payout.bank_account_name || ''} · ${row.payout.bank_account_number || '—'}`
               : 'Not set'}
         </p>
       </div>
+      {financeEdit && (
+        <form
+          className="rounded-xl bg-white p-6 shadow-sm space-y-3"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            setBusy(true);
+            try {
+              await saveInvestorPayout(id, payoutPayload(payoutForm));
+              toast.success('Payout details saved.');
+              await load();
+            } catch (error) {
+              toast.error(apiMessage(error, 'Could not update payout details.'));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <h2 className="font-semibold text-[#1A1A1A]">Payout details</h2>
+          <VlbPayoutFields value={payoutForm} onChange={setPayoutForm} />
+          <Button type="submit" disabled={busy}>Save payout details</Button>
+        </form>
+      )}
       <section className="rounded-xl bg-white p-6 shadow-sm">
         <h2 className="font-semibold text-[#1A1A1A]">Investments</h2>
         <ul className="mt-3 space-y-2 text-sm">
@@ -102,7 +141,10 @@ export default function AdminVlbInvestorDetailPage() {
             <li key={item.id} className="flex items-center justify-between gap-3">
               <Link href={`/admin/vlb/investments/${item.id}`} className="font-medium text-[#FF7A19]">{item.plan_name}</Link>
               <span className="text-[#3A3A3A]">{formatGhs(item.principal_pesewas)} · {formatDeviceDate(item.maturity_date)}</span>
-              <Badge variant={payoutStatusVariant(item.status)}>{item.status}</Badge>
+              <span className="flex items-center gap-2">
+                {item.agreement_missing ? <Badge variant="error">Agreement missing</Badge> : null}
+                <Badge variant={payoutStatusVariant(item.status)}>{item.status}</Badge>
+              </span>
             </li>
           ))}
         </ul>
@@ -112,7 +154,13 @@ export default function AdminVlbInvestorDetailPage() {
         <ul className="mt-3 space-y-2 text-sm">
           {row.documents.map((doc) => (
             <li key={doc.id}>
-              {doc.url ? <a href={doc.url} target="_blank" rel="noreferrer" className="text-[#FF7A19]">{doc.title}</a> : doc.title}
+              <button
+                type="button"
+                className="font-medium text-[#FF7A19]"
+                onClick={() => openAdminVlbDocument(doc.id).catch((error) => toast.error(apiMessage(error, 'Could not download this file.')))}
+              >
+                {doc.title}
+              </button>
               <span className="ml-2 text-[#3A3A3A]">{doc.kind}</span>
             </li>
           ))}
@@ -122,8 +170,13 @@ export default function AdminVlbInvestorDetailPage() {
             <select className="rounded-lg border px-3 py-2 text-sm" value={kind} onChange={(e) => setKind(e.target.value)}>
               <option value="agreement">Agreement</option>
               <option value="receipt">Receipt</option>
-              <option value="statement">Statement</option>
               <option value="other">Other</option>
+            </select>
+            <select className="rounded-lg border px-3 py-2 text-sm" value={investmentId} onChange={(e) => setInvestmentId(e.target.value)}>
+              <option value="">All investments</option>
+              {row.investments.map((item) => (
+                <option key={item.id} value={item.id}>{item.plan_name}</option>
+              ))}
             </select>
             <input className="rounded-lg border px-3 py-2 text-sm" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
             <input className="rounded-lg border px-3 py-2 text-sm sm:col-span-2" type="file" accept="image/*,application/pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} />

@@ -58,6 +58,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const { user, isAuthenticated, isLoading } = useAppSelector((state) => state.auth);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileNav, setMobileNav] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['products', 'analytics']);
   const [mounted, setMounted] = useState(false);
   const [pendingOrdersCount, setPendingOrdersCount] = useState<number | undefined>(undefined);
@@ -70,6 +71,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     // Mark as mounted to prevent hydration mismatch
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    setMobileNav(false);
+  }, [pathname]);
 
   // Fetch badge counts
   useEffect(() => {
@@ -419,50 +424,65 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <AdminHeadingProvider>
     <div className="flex h-screen bg-gray-50 print:block print:h-auto print:bg-white">
+      {mobileNav ? (
+        <button
+          type="button"
+          className="fixed inset-0 z-40 bg-black/40 lg:hidden print:hidden"
+          aria-label="Close menu"
+          onClick={() => setMobileNav(false)}
+        />
+      ) : null}
       {/* Sidebar */}
       <aside
         className={`${
-          sidebarOpen ? 'w-64' : 'w-20'
-        } bg-[#1A1A1A] text-white transition-all duration-300 flex flex-col fixed h-full z-50 print:hidden`}
+          sidebarOpen ? 'lg:w-64' : 'lg:w-20'
+        } w-64 bg-[#1A1A1A] text-white transition-transform duration-300 lg:transition-[width] flex flex-col fixed h-full z-50 print:hidden max-lg:max-w-[18rem] ${
+          mobileNav ? 'translate-x-0' : '-translate-x-full'
+        } lg:translate-x-0`}
       >
         {/* Logo & Toggle */}
         <div className="p-4 flex items-center justify-between border-b border-gray-700">
-          {sidebarOpen && (
-            <div className="flex items-center gap-2">
-              <img
-                src="/logo/ventech_logo-white.png"
-                alt="VENTECH"
-                className="h-8 w-auto object-contain"
-              />
-            </div>
-          )}
+          <div className={`flex items-center gap-2 min-w-0 ${sidebarOpen ? '' : 'lg:hidden'}`}>
+            <img
+              src="/logo/ventech_logo-white.png"
+              alt="VENTECH"
+              className="h-8 w-auto object-contain"
+            />
+          </div>
           <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+            type="button"
+            onClick={() => {
+              if (typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches) {
+                setSidebarOpen(!sidebarOpen);
+              } else {
+                setMobileNav(false);
+              }
+            }}
+            className="inline-flex min-h-11 min-w-11 items-center justify-center p-2 hover:bg-gray-700 rounded-lg transition-colors"
+            aria-label="Close menu"
           >
-            {sidebarOpen ? <ChevronLeft size={20} /> : <Menu size={20} />}
+            <span className="lg:hidden"><ChevronLeft size={20} /></span>
+            <span className="hidden lg:inline">{sidebarOpen ? <ChevronLeft size={20} /> : <Menu size={20} />}</span>
           </button>
         </div>
 
         {/* Admin Info */}
-        {sidebarOpen && (
-          <div className="p-4 border-b border-gray-700">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-[#FF7A19] rounded-full flex items-center justify-center font-bold">
-                {user?.full_name?.charAt(0) || 'A'}
+        <div className={`p-4 border-b border-gray-700 ${sidebarOpen ? '' : 'lg:hidden'}`}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-[#FF7A19] rounded-full flex items-center justify-center font-bold">
+              {user?.full_name?.charAt(0) || 'A'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <p className="font-semibold truncate">{user?.full_name || 'Admin'}</p>
+                <span className="shrink-0 text-[10px] leading-none px-1.5 py-1 rounded bg-white/10 text-gray-200">
+                  {getRoleLabel(user?.role)}
+                </span>
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 min-w-0">
-                  <p className="font-semibold truncate">{user?.full_name || 'Admin'}</p>
-                  <span className="shrink-0 text-[10px] leading-none px-1.5 py-1 rounded bg-white/10 text-gray-200">
-                    {getRoleLabel(user?.role)}
-                  </span>
-                </div>
-                <p className="text-xs text-gray-400 truncate">{user?.email}</p>
-              </div>
+              <p className="text-xs text-gray-400 truncate">{user?.email}</p>
             </div>
           </div>
-        )}
+        </div>
 
         {/* Navigation Menu */}
         <nav className="flex-1 overflow-y-auto py-4">
@@ -473,63 +493,57 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <div>
                   <button
                     onClick={() => toggleMenu(item.label)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 transition-colors ${
-                      !sidebarOpen && 'justify-center'
+                    className={`w-full flex items-center gap-3 px-4 py-3 min-h-11 hover:bg-gray-700 transition-colors ${
+                      !sidebarOpen && 'lg:justify-center'
                     }`}
                   >
-                    <item.icon size={20} />
-                    {sidebarOpen && (
-                      <>
-                        <span className="flex-1 text-left text-sm">{item.label}</span>
-                        {expandedMenus.includes(item.label) ? (
-                          <ChevronDown size={16} />
-                        ) : (
-                          <ChevronRight size={16} />
-                        )}
-                      </>
-                    )}
+                    <item.icon size={20} className="shrink-0" />
+                    <span className={`flex-1 text-left text-sm ${sidebarOpen ? '' : 'lg:hidden'}`}>{item.label}</span>
+                    <span className={sidebarOpen ? '' : 'lg:hidden'}>
+                      {expandedMenus.includes(item.label) ? (
+                        <ChevronDown size={16} />
+                      ) : (
+                        <ChevronRight size={16} />
+                      )}
+                    </span>
                   </button>
-                  {expandedMenus.includes(item.label) && sidebarOpen && (
-                    <div className="bg-gray-800">
+                  {expandedMenus.includes(item.label) ? (
+                    <div className={`bg-gray-800 ${sidebarOpen ? '' : 'lg:hidden'}`}>
                       {item.children.map((child) => (
                         <Link
                           key={child.label}
                           href={child.href || '#'}
-                          className={`flex items-center gap-3 px-4 py-2 pl-12 hover:bg-gray-700 transition-colors text-sm ${
+                          className={`flex min-h-11 items-center gap-3 px-4 py-2 pl-12 hover:bg-gray-700 transition-colors text-sm ${
                             isActive(child.href) ? 'bg-gray-700 text-[#FF7A19]' : ''
                           }`}
                         >
-                          <child.icon size={16} />
+                          <child.icon size={16} className="shrink-0" />
                           {child.label}
                         </Link>
                       ))}
                     </div>
-                  )}
+                  ) : null}
                 </div>
               ) : (
                 // Regular menu item
                 <Link
                   href={item.href || '#'}
-                  className={`flex items-center gap-3 px-4 py-3 hover:bg-gray-700 transition-colors relative ${
-                    !sidebarOpen && 'justify-center'
+                  className={`flex min-h-11 items-center gap-3 px-4 py-3 hover:bg-gray-700 transition-colors relative ${
+                    !sidebarOpen ? 'lg:justify-center' : ''
                   } ${isActive(item.href) ? 'bg-gray-700 text-[#FF7A19]' : ''}`}
                 >
-                  <item.icon size={20} />
-                  {sidebarOpen && (
-                    <>
-                      <span className="flex-1 text-sm">{item.label}</span>
-                      {item.badge && (
-                        <span className="bg-[#FF7A19] text-white text-xs px-2 py-1 rounded-full">
-                          {item.badge}
-                        </span>
-                      )}
-                    </>
-                  )}
-                  {!sidebarOpen && item.badge && (
-                    <span className="absolute -top-1 -right-1 bg-[#FF7A19] text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                  <item.icon size={20} className="shrink-0" />
+                  <span className={`flex-1 text-sm ${sidebarOpen ? '' : 'lg:hidden'}`}>{item.label}</span>
+                  {item.badge ? (
+                    <span className={`bg-[#FF7A19] text-white text-xs px-2 py-1 rounded-full ${sidebarOpen ? '' : 'lg:hidden'}`}>
                       {item.badge}
                     </span>
-                  )}
+                  ) : null}
+                  {!sidebarOpen && item.badge ? (
+                    <span className="absolute -top-1 -right-1 hidden bg-[#FF7A19] text-white text-xs w-5 h-5 rounded-full lg:flex items-center justify-center">
+                      {item.badge}
+                    </span>
+                  ) : null}
                 </Link>
               )}
             </div>
@@ -540,36 +554,48 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="p-4 border-t border-gray-700">
           <button
             onClick={handleLogout}
-            className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-red-600 rounded-lg transition-colors ${
-              !sidebarOpen && 'justify-center'
+            className={`w-full flex min-h-11 items-center gap-3 px-4 py-3 hover:bg-red-600 rounded-lg transition-colors ${
+              !sidebarOpen ? 'lg:justify-center' : ''
             }`}
           >
-            <LogOut size={20} />
-            {sidebarOpen && <span className="text-sm">Logout</span>}
+            <LogOut size={20} className="shrink-0" />
+            <span className={`text-sm ${sidebarOpen ? '' : 'lg:hidden'}`}>Logout</span>
           </button>
         </div>
       </aside>
 
       {/* Main Content */}
       <main
-        className={`flex-1 ${sidebarOpen ? 'ml-64' : 'ml-20'} transition-all duration-300 print:ml-0`}
+        className={`flex-1 min-w-0 ml-0 ${sidebarOpen ? 'lg:ml-64' : 'lg:ml-20'} transition-all duration-300 print:ml-0`}
       >
         {/* Top Bar */}
-        <div className="bg-white border-b border-gray-200 px-8 py-4 sticky top-0 z-40 print:hidden">
-          <div className="flex items-center justify-between">
-            <AdminPageTitle
-              pathname={pathname}
-              welcome={user?.full_name?.split(' ')[0] || 'Admin'}
-            />
-            <div className="flex items-center gap-4">
-              <AreaSwitcher />
-              <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
+        <div className="bg-white border-b border-gray-200 px-4 py-3 lg:px-8 lg:py-4 sticky top-0 z-40 print:hidden">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <button
+                type="button"
+                className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg hover:bg-gray-100 lg:hidden"
+                aria-label="Open menu"
+                onClick={() => setMobileNav(true)}
+              >
+                <Menu size={20} />
+              </button>
+              <AdminPageTitle
+                pathname={pathname}
+                welcome={user?.full_name?.split(' ')[0] || 'Admin'}
+              />
+            </div>
+            <div className="flex shrink-0 items-center gap-2 lg:gap-4">
+              <div className="hidden sm:block">
+                <AreaSwitcher />
+              </div>
+              <button type="button" className="relative inline-flex min-h-11 min-w-11 items-center justify-center hover:bg-gray-100 rounded-lg transition-colors">
                 <Bell size={20} />
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
               </button>
               <Link
                 href="/"
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
+                className="hidden sm:inline-flex min-h-11 items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
               >
                 View Store →
               </Link>
@@ -578,7 +604,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         {/* Page Content */}
-        <div className="p-8 print:p-0">
+        <div className="p-4 lg:p-8 print:p-0 max-w-full overflow-x-hidden">
           {accessLoading ? (
             <div className="flex items-center justify-center py-20">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF7A19]" />
@@ -620,8 +646,8 @@ function AdminPageTitle({ pathname, welcome }: { pathname: string; welcome: stri
   };
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-[#1A1A1A]">{heading?.title || fallback}</h1>
+    <div className="min-w-0">
+      <h1 className="truncate text-lg font-bold text-[#1A1A1A] lg:text-2xl">{heading?.title || fallback}</h1>
       {heading?.id ? (
         <p className="mt-1 flex items-center gap-2 text-xs text-gray-500">
           <span className="font-mono break-all">{heading.id}</span>

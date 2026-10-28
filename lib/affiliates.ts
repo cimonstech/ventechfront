@@ -15,6 +15,10 @@ export interface PublicAffiliateInfo {
   eligible_category_names: string[];
   min_withdrawal_pesewas: number;
   payout_methods: PayoutMethod[];
+  return_window_days?: number;
+  payout_change_hold_hours?: number;
+  fee_refund_on_rejection?: boolean;
+  payout_working_days?: number;
 }
 
 export interface AffiliateMe {
@@ -32,6 +36,7 @@ export interface AffiliateMe {
     bank_name: string | null;
     bank_account_name: string | null;
     bank_account_number: string | null;
+    payout_details_changed_at?: string | null;
   };
   links: { general: string; product: string } | null;
   fee_paid_at: string | null;
@@ -82,6 +87,46 @@ export function payoutMethodLabel(method: string): string {
   if (method === 'momo') return 'Mobile Money';
   if (method === 'bank') return 'Bank transfer';
   return method;
+}
+
+export function formatCopyGhs(pesewas: number | null | undefined): string {
+  const amount = Number(pesewas);
+  if (!Number.isFinite(amount)) return 'GHS 0';
+  const cedis = amount / 100;
+  if (Number.isInteger(cedis)) return `GHS ${cedis.toLocaleString('en-US')}`;
+  return `GHS ${cedis.toFixed(2)}`;
+}
+
+export function formatCopyDateTime(value: string | Date): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'Africa/Accra',
+  });
+}
+
+export function payoutHoldUntil(changedAt: string | null | undefined, holdHours: number): Date | null {
+  if (!changedAt || holdHours <= 0) return null;
+  const start = new Date(changedAt).getTime();
+  if (!Number.isFinite(start)) return null;
+  return new Date(start + holdHours * 60 * 60 * 1000);
+}
+
+export function withdrawalStatusTip(status: string, reference?: string | null, reason?: string | null): string {
+  if (status === 'requested') return "We've received your request.";
+  if (status === 'processing') return "We're preparing your payment.";
+  if (status === 'approved') return 'Your payment is approved and will be sent shortly.';
+  if (status === 'paid') return `Sent to your account. Reference: ${reference || '—'}.`;
+  if (status === 'rejected') {
+    return `Not paid. Reason: ${reason || '—'}. The amount has been returned to your available balance.`;
+  }
+  return '';
 }
 
 export async function fetchPublicAffiliateInfo(): Promise<PublicAffiliateInfo | null> {

@@ -2,7 +2,6 @@
 
 import React, { useMemo, useState } from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import {
   TrendingUp,
@@ -21,7 +20,7 @@ import {
   Headphones,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { submitVlbApplication, vlbGhs, type VlbPublicPlan } from '@/lib/vlb';
+import { fetchPublicAgreementTemplate, submitVlbApplication, vlbGhs, type VlbPublicPlan } from '@/lib/vlb';
 
 export default function LaptopBankingPage({
   termsPublished,
@@ -292,17 +291,32 @@ export default function LaptopBankingPage({
               Learn More
             </Button>
             {termsPublished ? (
-              <Link
-                href="/laptop-banking/terms"
+              <button
+                type="button"
+                onClick={async () => {
+                  const template = await fetchPublicAgreementTemplate();
+                  if (template?.url) {
+                    window.open(template.url, '_blank', 'noopener,noreferrer');
+                    return;
+                  }
+                  window.location.href = '/laptop-banking/terms';
+                }}
                 className="inline-flex w-full items-center justify-center rounded-lg border-2 border-[#FF7A19] px-3 py-2 text-sm font-medium text-[#FF7A19] transition-colors hover:bg-[#FF7A19] hover:text-white sm:px-4"
               >
                 Read Agreement
-              </Link>
+              </button>
             ) : (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => window.open('https://files.ventechgadgets.com/VENTECH%20LAPTOP%20BANKING%20INVESTMENT%20AGREEMENT.pdf', '_blank', 'noopener,noreferrer')}
+                onClick={async () => {
+                  const template = await fetchPublicAgreementTemplate();
+                  if (template?.url) {
+                    window.open(template.url, '_blank', 'noopener,noreferrer');
+                    return;
+                  }
+                  window.open('https://files.ventechgadgets.com/VENTECH%20LAPTOP%20BANKING%20INVESTMENT%20AGREEMENT.pdf', '_blank', 'noopener,noreferrer');
+                }}
                 className="w-full px-3 py-2 sm:px-4 sm:py-2 text-sm border-2 border-[#FF7A19] text-[#FF7A19] hover:!bg-[#FF7A19] hover:!text-white transition-colors"
               >
                 Read Agreement
@@ -489,9 +503,9 @@ export default function LaptopBankingPage({
       </section>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
-          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="p-8">
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end sm:items-center justify-center sm:p-4" onClick={() => setShowModal(false)}>
+          <div className="bg-white w-full max-w-2xl max-h-[100dvh] sm:max-h-[90vh] overflow-y-auto sm:rounded-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 sm:p-8">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-[#1A1A1A]">Start Your Investment Journey</h2>
                 <button type="button" onClick={() => setShowModal(false)} className="text-[#3A3A3A] hover:text-[#1A1A1A] min-h-11 min-w-11">

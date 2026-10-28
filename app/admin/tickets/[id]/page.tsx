@@ -74,7 +74,7 @@ export default function ServiceRequestDetailPage() {
     const timer = window.setInterval(() => {
       mediaRefreshed.current = false;
       void load();
-    }, 9 * 60 * 1000);
+    }, 90 * 1000);
     return () => window.clearInterval(timer);
   }, [load]);
 
@@ -172,12 +172,12 @@ export default function ServiceRequestDetailPage() {
           </section>
 
           <section className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6 space-y-4">
-            <ol className="flex gap-2 overflow-x-auto pb-1">
+            <ol className="flex flex-col gap-2 md:flex-row md:overflow-x-auto md:pb-1">
               {TICKET_STAGES.map((stage, index) => {
                 const current = ticket.status === stage;
                 const passed = stageIndex > index;
                 return (
-                  <li key={stage} className={`min-w-[108px] flex-1 rounded-lg px-2 py-2 text-center text-xs font-semibold ${
+                  <li key={stage} className={`rounded-lg px-3 py-3 text-sm font-semibold md:min-w-[108px] md:flex-1 md:px-2 md:py-2 md:text-center md:text-xs ${
                     current ? 'bg-[#FF7A19] text-white' : passed ? 'bg-orange-50 text-[#FF7A19]' : 'bg-gray-100 text-[#3A3A3A]'
                   }`}>
                     {index + 1}. {STATUS_LABEL[stage]}

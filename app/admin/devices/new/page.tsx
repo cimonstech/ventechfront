@@ -125,7 +125,7 @@ export default function AddDevicesPage() {
           value={orderNumber}
           onChange={(event) => setOrderNumber(event.target.value)}
           placeholder="Order number"
-          className="flex-1 min-w-[220px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
+          className="min-h-11 w-full min-w-0 flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19] sm:min-w-[220px]"
         />
         <Button onClick={search} isLoading={searching}>Search</Button>
       </div>

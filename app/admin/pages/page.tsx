@@ -29,7 +29,7 @@ export default function AdminPagesPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold text-[#1A1A1A]">Pages</h1>
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+      <div className="overflow-x-auto sticky-first rounded-xl border border-gray-200 bg-white">
         <table className="min-w-full text-left text-sm">
           <thead className="border-b border-gray-200 text-xs uppercase text-gray-500">
             <tr>

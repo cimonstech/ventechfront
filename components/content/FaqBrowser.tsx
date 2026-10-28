@@ -52,7 +52,7 @@ export function FaqBrowser({ categories }: { categories: PublicFaqCategory[] }) 
             key={category}
             type="button"
             onClick={() => setActiveCategory(category)}
-            className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+            className={`inline-flex min-h-11 items-center rounded-full px-4 py-2 text-sm font-medium transition-colors ${
               activeCategory === category
                 ? 'bg-[#FF7A19] text-white'
                 : 'bg-white text-[#3A3A3A] hover:bg-gray-100'
@@ -72,7 +72,7 @@ export function FaqBrowser({ categories }: { categories: PublicFaqCategory[] }) 
             <button
               type="button"
               onClick={() => setOpenId(openId === faq.id ? null : faq.id)}
-              className="flex w-full items-center justify-between px-6 py-5 text-left transition-colors hover:bg-gray-50"
+              className="flex min-h-11 w-full items-center justify-between px-4 py-5 text-left transition-colors hover:bg-gray-50 sm:px-6"
             >
               <div className="flex-1">
                 <span className="text-xs font-semibold uppercase tracking-wide text-[#FF7A19]">

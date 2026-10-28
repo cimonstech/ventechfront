@@ -19,6 +19,7 @@ import { deliveryOptionsService } from '@/services/deliveryOptions.service';
 import { formatCurrency } from '@/lib/helpers';
 import { useAppSelector } from '@/store';
 import { hasAdminEntry } from '@/lib/roles';
+import { FeaturesCard } from '@/components/admin/FeaturesCard';
 import toast from 'react-hot-toast';
 
 interface DeliveryOption {
@@ -201,6 +202,7 @@ export default function AdminSettingsPage() {
 
   return (
     <div className="p-6">
+      {user?.role === 'superadmin' ? <FeaturesCard /> : null}
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Delivery Options Settings</h1>

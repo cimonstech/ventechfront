@@ -58,6 +58,8 @@ export interface VlbInvestmentSummary {
   next_payout: VlbPayoutSummary | null;
   totals_paid_pesewas: number;
   scholar_fund_deducted_pesewas: number;
+  scholar_fund_percent?: number;
+  scholar_fund_basis?: string;
   principal_settlement: {
     status: string;
     due_date: string;
@@ -67,10 +69,19 @@ export interface VlbInvestmentSummary {
   renewal_choice: 'settle' | 'renew';
   renewal_chosen_at: string | null;
   renewal_open: boolean;
+  renewal_deadline?: string | null;
   stars_total: number;
   stars_used: number;
   horizon_months?: number;
   horizon_progress?: { days_elapsed: number; days_total: number };
+  paid_payouts?: Array<{
+    id: string;
+    type: string;
+    period_no: number;
+    due_date: string;
+    paid_at: string | null;
+    net_pesewas: number;
+  }>;
 }
 
 export interface VlbPayoutRow {
@@ -155,6 +166,30 @@ export function vlbGhs(pesewas: number | null | undefined): string {
   return formatGhs(amount);
 }
 
+export const VLB_EARLY_EXIT_ALLOWED = false;
+
+export function formatPercentLabel(value: number | null | undefined, fallback = '1'): string {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return fallback;
+  const text = amount.toFixed(4).replace(/\.?0+$/, '');
+  return text || fallback;
+}
+
+export function scholarFundCopy(percent?: number | null, basis?: string | null): string {
+  const shown = formatPercentLabel(percent);
+  if (basis === 'principal') {
+    return `${shown}% of your principal, taken once per term`;
+  }
+  return `${shown}% of each payout goes to the VENTECH Scholar Fund, which supports students. It is shown on every payout so you can see exactly what you receive.`;
+}
+
+export function payoutStatusTip(status: string, reference?: string | null): string | null {
+  if (status === 'scheduled') return 'Not due yet.';
+  if (status === 'due') return 'Due now; VENTECH will send it shortly.';
+  if (status === 'paid') return `Sent. Reference: ${reference || '—'}.`;
+  return null;
+}
+
 export function payoutStatusVariant(status: string): 'default' | 'success' | 'warning' | 'error' | 'info' {
   if (status === 'paid' || status === 'settled' || status === 'active') return 'success';
   if (status === 'due' || status === 'processing' || status === 'settlement') return 'warning';
@@ -193,6 +228,21 @@ export async function submitVlbApplication(input: {
 
 export function vlbRequest<T>(path: string, init: RequestInit = {}) {
   return deviceRequest<T>(path, init);
+}
+
+export async function fetchPublicAgreementTemplate(): Promise<{ url: string; title: string } | null> {
+  const response = await fetch(`${API_URL}/api/vlb/agreement-template`, { cache: 'no-store' });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || body?.success === false || !body?.data?.url) return null;
+  return body.data as { url: string; title: string };
+}
+
+export async function openSignedVlbDocument(documentId: string) {
+  const result = await vlbRequest<{ url: string | null }>(`/api/vlb/me/documents/${documentId}`);
+  if (!result.data?.url) {
+    throw new Error('Could not download this file.');
+  }
+  window.open(result.data.url, '_blank', 'noopener,noreferrer');
 }
 
 export async function downloadAuthFile(path: string, filename: string) {

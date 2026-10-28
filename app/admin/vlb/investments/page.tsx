@@ -19,6 +19,7 @@ interface Row {
   maturity_date: string;
   status: string;
   current_term: number;
+  agreement_missing?: boolean;
 }
 
 export default function AdminVlbInvestmentsPage() {
@@ -81,7 +82,7 @@ export default function AdminVlbInvestmentsPage() {
         </select>
         <input className="rounded-lg border px-3 py-2 text-sm" type="month" value={month} onChange={(e) => { setMonth(e.target.value); setPage(1); }} />
       </div>
-      <div className="overflow-x-auto rounded-xl bg-white shadow-sm">
+      <div className="overflow-x-auto sticky-first rounded-xl bg-white shadow-sm">
         <table className="min-w-full text-left text-sm">
           <thead>
             <tr className="border-b text-[#3A3A3A]">
@@ -95,7 +96,7 @@ export default function AdminVlbInvestmentsPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td className="px-4 py-6" colSpan={6}>Loadingâ€¦</td></tr>
+              <tr><td className="px-4 py-6" colSpan={6}>Loading…</td></tr>
             ) : rows.length === 0 ? (
               <tr><td className="px-4 py-6 text-[#3A3A3A]" colSpan={6}>No investments.</td></tr>
             ) : rows.map((row) => (
@@ -107,7 +108,12 @@ export default function AdminVlbInvestmentsPage() {
                 <td className="px-4 py-3">{formatGhs(row.principal_pesewas)}</td>
                 <td className="px-4 py-3">{row.current_term}</td>
                 <td className="px-4 py-3">{formatDeviceDate(row.maturity_date)}</td>
-                <td className="px-4 py-3"><Badge variant={payoutStatusVariant(row.status)}>{row.status}</Badge></td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant={payoutStatusVariant(row.status)}>{row.status}</Badge>
+                    {row.agreement_missing ? <Badge variant="error">Agreement missing</Badge> : null}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>

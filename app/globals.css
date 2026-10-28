@@ -32,6 +32,28 @@ body {
   overflow-x: hidden;
 }
 
+img, video, canvas, svg, iframe {
+  max-width: 100%;
+}
+
+.overflow-x-auto {
+  max-width: 100%;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sticky-first table th:first-child,
+.sticky-first table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background-color: #fff;
+}
+
+.sticky-first tbody tr:hover td:first-child {
+  background-color: #f9fafb;
+}
+
 h1 {
   font-size: 1.875rem; /* 30px */
   font-weight: 700;

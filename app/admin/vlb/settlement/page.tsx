@@ -53,7 +53,7 @@ export default function AdminVlbSettlementPage() {
   return (
     <div className="space-y-6">
       <VlbNav current="/admin/vlb/settlement" />
-      <div className="overflow-x-auto rounded-xl bg-white shadow-sm">
+      <div className="overflow-x-auto sticky-first rounded-xl bg-white shadow-sm">
         <table className="min-w-full text-left text-sm">
           <thead>
             <tr className="border-b text-[#3A3A3A]">
@@ -76,7 +76,7 @@ export default function AdminVlbSettlementPage() {
                 <td className="px-4 py-3">{row.plan_name}</td>
                 <td className="px-4 py-3">{formatGhs(row.principal_pesewas)}</td>
                 <td className="px-4 py-3">{formatDeviceDate(row.maturity_date)}</td>
-                <td className="px-4 py-3"><Badge variant={payoutStatusVariant(row.renewal_choice)}>{row.renewal_choice || 'â€”'}</Badge></td>
+                <td className="px-4 py-3"><Badge variant={payoutStatusVariant(row.renewal_choice)}>{row.renewal_choice || '—'}</Badge></td>
                 <td className="px-4 py-3">
                   {money && (
                     <div className="flex gap-2">

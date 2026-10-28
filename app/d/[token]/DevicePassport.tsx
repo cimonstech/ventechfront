@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { InfoNote } from '@/components/ui/InfoNote';
 import { ContentHtml } from '@/components/content/ContentHtml';
 import { DeviceWarrantyBadge } from '@/components/admin/DeviceWarrantyBadge';
 import { OwnerQrCard } from '@/components/devices/OwnerQrCard';
@@ -319,6 +320,9 @@ export function DevicePassport() {
 
             {sentTo && (
               <div className="space-y-3 border-t border-gray-100 pt-3">
+                <InfoNote>
+                  To protect your privacy, we'll send a 6-digit code to the email used when this laptop was bought. Enter it here to link the laptop to your account.
+                </InfoNote>
                 <p className="text-sm text-[#1A1A1A]">We sent a 6-digit code to {sentTo}</p>
                 <input
                   inputMode="numeric"
@@ -411,7 +415,7 @@ function Detail({ label, value, mono }: { label: string; value: string; mono?: b
   return (
     <div className="flex justify-between gap-3">
       <dt className="text-[#3A3A3A]">{label}</dt>
-      <dd className={`font-medium text-[#1A1A1A] text-right ${mono ? 'font-mono' : ''}`}>{value}</dd>
+      <dd className={`min-w-0 break-all font-medium text-[#1A1A1A] text-right ${mono ? 'font-mono text-xs' : ''}`}>{value}</dd>
     </div>
   );
 }

@@ -468,17 +468,17 @@ export function ArticleEditor({ articleId }: { articleId?: string }) {
             {dirty ? 'Unsaved changes' : savedAt ? `Saved at ${savedAtLabel(savedAt)}` : 'Not saved yet'}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={() => setPreview(true)}>Preview</Button>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setPreview(true)}>Preview</Button>
           {editable && (
             <>
-              <Button type="button" variant="secondary" size="sm" isLoading={saving} onClick={() => void save({ status: 'draft', notice: 'Draft saved' })}>Save draft</Button>
+              <Button type="button" variant="secondary" size="sm" className="w-full sm:w-auto" isLoading={saving} onClick={() => void save({ status: 'draft', notice: 'Draft saved' })}>Save draft</Button>
               {status === 'published' ? (
-                <Button type="button" variant="outline" size="sm" isLoading={saving} onClick={() => void save({ status: 'draft', notice: 'Article unpublished' })}>Unpublish</Button>
+                <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" isLoading={saving} onClick={() => void save({ status: 'draft', notice: 'Article unpublished' })}>Unpublish</Button>
               ) : (
-                <Button type="button" size="sm" isLoading={saving} onClick={() => void save({ status: 'published', notice: 'Article published' })}>Publish</Button>
+                <Button type="button" size="sm" className="w-full sm:w-auto" isLoading={saving} onClick={() => void save({ status: 'published', notice: 'Article published' })}>Publish</Button>
               )}
-              <Button type="button" variant="danger" size="sm" onClick={() => void removeArticle()}>Delete</Button>
+              <Button type="button" variant="danger" size="sm" className="w-full sm:w-auto" onClick={() => void removeArticle()}>Delete</Button>
             </>
           )}
         </div>
@@ -630,14 +630,16 @@ export function ArticleEditor({ articleId }: { articleId?: string }) {
       </div>
 
       {preview && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center" onClick={() => setPreview(false)}>
-          <div className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-5" onClick={(event) => event.stopPropagation()}>
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="text-lg font-bold text-[#1A1A1A]">{title || 'Preview'}</h2>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4" onClick={() => setPreview(false)}>
+          <div className="flex max-h-[100dvh] w-full max-w-3xl flex-col overflow-hidden bg-white sm:max-h-[85vh] sm:rounded-xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
+              <h2 className="min-w-0 truncate text-lg font-bold text-[#1A1A1A]">{title || 'Preview'}</h2>
               <Button type="button" variant="ghost" size="sm" onClick={() => setPreview(false)}>Close</Button>
             </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
             {summary && <p className="mb-4 text-sm text-[#3A3A3A]">{summary}</p>}
             <div className="article-body text-[#1A1A1A]" dangerouslySetInnerHTML={{ __html: body || '<p></p>' }} />
+            </div>
           </div>
         </div>
       )}

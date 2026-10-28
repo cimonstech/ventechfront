@@ -360,9 +360,9 @@ function NewServiceRequest() {
   const labelClass = 'text-[11px] font-semibold uppercase tracking-wide text-[#3A3A3A]';
 
   return (
-    <div className="min-h-screen bg-[#F4F1EC] overflow-x-clip">
+    <div className="overflow-x-clip">
       <form
-        className="max-w-3xl mx-auto min-w-0 px-4 py-6 sm:py-10 space-y-6"
+        className="max-w-3xl mx-auto min-w-0 space-y-6"
         onSubmit={(event) => {
           event.preventDefault();
           void submit();
@@ -528,7 +528,7 @@ function NewServiceRequest() {
               </label>
               <label className="block min-w-0">
                 <span className={labelClass}>Phone</span>
-                <input value={phone} onChange={(event) => setPhone(event.target.value)} className={fieldClass} />
+                <input type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} className={fieldClass} />
               </label>
             </section>
           </aside>

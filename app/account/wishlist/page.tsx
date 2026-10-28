@@ -124,8 +124,8 @@ export default function WishlistPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gray-50 py-12">
-        <div className="container mx-auto px-4 max-w-5xl">
+      <div>
+        <div className="max-w-5xl">
           <div className="bg-white rounded-xl shadow-lg p-12 text-center">
             <h2 className="text-2xl font-bold text-[#1A1A1A] mb-3">Please Login</h2>
             <p className="text-[#3A3A3A] mb-6">You need to be logged in to view your wishlist.</p>
@@ -143,8 +143,8 @@ export default function WishlistPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 py-12">
-        <div className="container mx-auto px-4 max-w-5xl">
+      <div>
+        <div className="max-w-5xl">
           <div className="animate-pulse">
             <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -163,17 +163,9 @@ export default function WishlistPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
-      <div className="container mx-auto px-4 max-w-5xl">
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-sm text-[#3A3A3A] mb-6">
-          <Link href="/" className="hover:text-[#FF7A19]">Home</Link>
-          <ChevronRight size={16} />
-          <span className="text-[#FF7A19]">Wishlist</span>
-        </div>
-
-        {/* Header */}
-        <div className="mb-8">
+    <div>
+      <div className="max-w-5xl">
+        <div className="mb-6 hidden md:block">
           <h1 className="text-3xl font-bold text-[#1A1A1A] mb-2">My Wishlist</h1>
           <p className="text-[#3A3A3A]">
             {wishlistItems.length} {wishlistItems.length === 1 ? 'item' : 'items'} saved
@@ -192,7 +184,7 @@ export default function WishlistPage() {
             </p>
             <Link
               href="/shop"
-              className="inline-block bg-[#FF7A19] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#FF8C3A] transition-colors"
+              className="inline-flex min-h-11 w-full items-center justify-center bg-[#FF7A19] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#FF8C3A] transition-colors sm:w-auto"
             >
               Browse Products
             </Link>

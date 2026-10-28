@@ -63,11 +63,10 @@ export default function MyServiceRequestsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-lg mx-auto">
-        <div className="flex items-center justify-between gap-3 mb-6">
-          <h1 className="text-2xl font-bold text-[#1A1A1A]">Service requests</h1>
-          <Link href="/account/service/new" className="text-sm font-semibold text-[#FF7A19]">New request</Link>
+    <div>
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="hidden text-2xl font-bold text-[#1A1A1A] md:block">Service requests</h1>
+          <Link href="/account/service/new" className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-[#FF7A19] px-4 text-sm font-semibold text-white sm:w-auto">New request</Link>
         </div>
         {tickets.length === 0 ? (
           <div className="bg-white border border-gray-200 rounded-xl p-6 text-sm text-[#3A3A3A]">
@@ -91,7 +90,6 @@ export default function MyServiceRequestsPage() {
             ))}
           </ul>
         )}
-      </div>
     </div>
   );
 }

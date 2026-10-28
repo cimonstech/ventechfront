@@ -6,12 +6,17 @@ import { useParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { InfoNote, InfoTip } from '@/components/ui/InfoNote';
+import { StackRows } from '@/components/ui/ScrollTable';
 import {
+  VLB_EARLY_EXIT_ALLOWED,
   apiMessage,
   downloadAuthFile,
   formatDeviceDate,
   formatGhs,
+  payoutStatusTip,
   payoutStatusVariant,
+  vlbGhs,
   vlbRequest,
   type VlbInvestmentDetail,
 } from '@/lib/vlb';
@@ -62,6 +67,11 @@ export default function AccountInvestmentDetailPage() {
           </div>
           <Badge variant={payoutStatusVariant(row.status)}>{row.status}</Badge>
         </div>
+        {!VLB_EARLY_EXIT_ALLOWED ? (
+          <p className="mt-3 text-xs text-[#3A3A3A]">
+            Investments run for the full 10-month cycle and cannot be withdrawn early.
+          </p>
+        ) : null}
         <Button
           className="mt-4 w-full sm:w-auto"
           variant="outline"
@@ -84,12 +94,21 @@ export default function AccountInvestmentDetailPage() {
         </Button>
       </div>
 
+      <section className="rounded-xl bg-white p-4 shadow-sm sm:p-5">
+        <h2 className="font-semibold text-[#1A1A1A]">Settlement</h2>
+        <InfoNote className="mt-3">
+          Month 10 is the settlement month. VENTECH reconciles your investment and returns your principal of {vlbGhs(row.principal_pesewas)}. If you choose Renew, your principal starts a new 10-month cycle instead and is not paid out.
+        </InfoNote>
+      </section>
+
       {row.renewal_open && (
         <section className="rounded-xl bg-white p-4 shadow-sm sm:p-5">
           <h2 className="font-semibold text-[#1A1A1A]">Renewal</h2>
+          <InfoNote className="mt-3">
+            Choose by {formatDeviceDate(row.renewal_deadline || row.maturity_date)}. If you don't choose, your principal will be paid out in the settlement month.
+          </InfoNote>
           <p className="mt-2 text-sm text-[#3A3A3A]">
             Current choice: <span className="font-medium text-[#1A1A1A]">{row.renewal_choice}</span>.
-            Deadline: before settlement on {formatDeviceDate(row.maturity_date)}.
           </p>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <Button variant={row.renewal_choice === 'settle' ? 'primary' : 'outline'} disabled={busy} onClick={() => choose('settle')}>
@@ -102,9 +121,32 @@ export default function AccountInvestmentDetailPage() {
         </section>
       )}
 
-      <section className="overflow-x-auto rounded-xl bg-white p-4 shadow-sm sm:p-5">
+      <section className="rounded-xl bg-white p-4 shadow-sm sm:p-5">
         <h2 className="font-semibold text-[#1A1A1A]">Schedule</h2>
-        <table className="mt-3 min-w-[40rem] w-full text-left text-sm">
+        <div className="mt-3 space-y-3 md:hidden">
+          {row.schedule.map((payout) => {
+            const statusTip = payoutStatusTip(payout.status, payout.reference);
+            const statusBadge = <Badge variant={payoutStatusVariant(payout.status)} size="sm">{payout.status}</Badge>;
+            return (
+              <div key={payout.id} className="rounded-lg border border-gray-100 p-3">
+                <StackRows
+                  rows={[
+                    { label: 'Period', value: payout.period_no },
+                    { label: 'Due', value: formatDeviceDate(payout.due_date) },
+                    { label: 'Gross', value: formatGhs(payout.gross_pesewas) },
+                    { label: 'Scholar', value: formatGhs(payout.scholar_pesewas) },
+                    { label: 'Net', value: formatGhs(payout.net_pesewas) },
+                    { label: 'Status', value: statusTip ? <InfoTip text={statusTip}>{statusBadge}</InfoTip> : statusBadge },
+                    { label: 'Paid', value: payout.paid_at ? formatDeviceDate(payout.paid_at) : '—' },
+                    { label: 'Ref', value: <span className="break-all">{payout.reference || '—'}</span> },
+                  ]}
+                />
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-3 hidden overflow-x-auto sticky-first md:block">
+        <table className="min-w-[40rem] w-full text-left text-sm">
           <thead>
             <tr className="text-[#3A3A3A]">
               <th className="pb-2 font-medium">Period</th>
@@ -118,20 +160,27 @@ export default function AccountInvestmentDetailPage() {
             </tr>
           </thead>
           <tbody>
-            {row.schedule.map((payout) => (
+            {row.schedule.map((payout) => {
+              const statusTip = payoutStatusTip(payout.status, payout.reference);
+              const statusBadge = <Badge variant={payoutStatusVariant(payout.status)} size="sm">{payout.status}</Badge>;
+              return (
               <tr key={payout.id} className="border-t border-gray-100">
                 <td className="py-2">{payout.period_no}</td>
                 <td className="py-2">{formatDeviceDate(payout.due_date)}</td>
                 <td className="py-2">{formatGhs(payout.gross_pesewas)}</td>
                 <td className="py-2">{formatGhs(payout.scholar_pesewas)}</td>
                 <td className="py-2">{formatGhs(payout.net_pesewas)}</td>
-                <td className="py-2"><Badge variant={payoutStatusVariant(payout.status)} size="sm">{payout.status}</Badge></td>
+                <td className="py-2">
+                  {statusTip ? <InfoTip text={statusTip}>{statusBadge}</InfoTip> : statusBadge}
+                </td>
                 <td className="py-2">{payout.paid_at ? formatDeviceDate(payout.paid_at) : '—'}</td>
                 <td className="py-2">{payout.reference || '—'}</td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
+        </div>
       </section>
 
       <section className="rounded-xl bg-white p-4 shadow-sm sm:p-5">

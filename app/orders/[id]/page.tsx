@@ -149,7 +149,7 @@ export default function OrderDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen overflow-x-hidden bg-gray-50 py-6 sm:py-8">
       <div className="container mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
@@ -160,7 +160,7 @@ export default function OrderDetailPage() {
           </Link>
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h1 className="text-4xl font-bold text-gray-900 mb-2">Order Details</h1>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2 sm:text-4xl">Order Details</h1>
               <p className="text-gray-600">Order #{order.order_number}</p>
             </div>
             <Badge className={getOrderStatusColor(order.status)} size="lg">

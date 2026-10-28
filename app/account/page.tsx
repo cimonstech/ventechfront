@@ -5,6 +5,7 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { DeviceWarrantyBadge } from '@/components/admin/DeviceWarrantyBadge';
 import { Badge } from '@/components/ui/Badge';
+import { CopyValue } from '@/components/ui/CopyValue';
 import { useAccess } from '@/context/AccessContext';
 import {
   fetchAccountOverview,
@@ -91,7 +92,7 @@ export default function AccountOverviewPage() {
               <h2 className="font-semibold text-[#1A1A1A]">Laptop Banking</h2>
               <p className="text-sm text-[#3A3A3A]">{vlb.investor_no || 'Investments'}</p>
             </div>
-            <Link href="/account/investments" className="text-sm font-semibold text-[#FF7A19]">Open dashboard</Link>
+            <Link href="/account/investments" className="inline-flex min-h-11 items-center text-sm font-semibold text-[#FF7A19]">Open dashboard</Link>
           </div>
           <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
             <div>
@@ -233,7 +234,7 @@ export default function AccountOverviewPage() {
             Available {formatGhs(overview.affiliate.available_pesewas)} · Pending {formatGhs(overview.affiliate.pending_pesewas)}
           </p>
           {overview.affiliate.link ? (
-            <p className="mt-2 break-all text-sm text-[#1A1A1A]">{overview.affiliate.link}</p>
+            <p className="mt-2 text-sm text-[#1A1A1A]"><CopyValue value={overview.affiliate.link} /></p>
           ) : null}
         </section>
       ) : showAffiliateCta ? (

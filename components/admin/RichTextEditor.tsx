@@ -53,7 +53,7 @@ function ToolbarButton({
       disabled={disabled}
       onMouseDown={(event) => event.preventDefault()}
       onClick={onClick}
-      className={`rounded px-2 py-1 text-xs font-medium sm:text-sm ${
+      className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded px-2 py-1 text-xs font-medium sm:min-h-0 sm:min-w-0 sm:text-sm ${
         active ? 'bg-[#FF7A19] text-white' : 'text-[#1A1A1A] hover:bg-gray-100'
       } disabled:cursor-not-allowed disabled:opacity-40`}
     >
@@ -113,7 +113,7 @@ function Toolbar({ editor, compact }: { editor: Editor; compact?: boolean }) {
   };
 
   return (
-    <div className="flex flex-wrap gap-1 border-b border-gray-200 p-2">
+    <div className="flex max-w-full flex-wrap gap-1 overflow-x-auto overscroll-x-contain border-b border-gray-200 p-2">
       {!compact && (
         <>
           <ToolbarButton label="H2" active={editor.isActive('heading', { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} />
@@ -191,7 +191,7 @@ export function RichTextEditor({
     content: value || '',
     editorProps: {
       attributes: {
-        class: 'article-body min-h-40 px-3 py-2 focus:outline-none sm:min-h-56',
+        class: 'article-body min-h-40 max-h-[50vh] overflow-y-auto px-3 py-2 focus:outline-none sm:min-h-56 sm:max-h-none',
       },
     },
     onUpdate: ({ editor: current }) => {

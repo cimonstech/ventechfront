@@ -6,8 +6,11 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Copy, Facebook } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
+import { InfoNote, InfoTip } from '@/components/ui/InfoNote';
+import { StackRows } from '@/components/ui/ScrollTable';
 import { useAppSelector } from '@/store';
 import { safeRedirectPath } from '@/lib/safeRedirect';
+import { fetchPublicFeatures } from '@/lib/features';
 import {
   AFFILIATE_STATUS_LABEL,
   COMMISSION_STATUS_LABEL,
@@ -20,10 +23,14 @@ import {
   affiliateRequest,
   apiMessage,
   fetchPublicAffiliateInfo,
+  formatCopyDateTime,
+  formatCopyGhs,
   formatGhs,
   formatWhen,
   loadAffiliateMe,
+  payoutHoldUntil,
   payoutMethodLabel,
+  withdrawalStatusTip,
   type AffiliateMe,
   type AffiliateProductHit,
   type AffiliateSale,
@@ -101,14 +108,20 @@ export default function AffiliateDashboardPage() {
   };
 
   useEffect(() => {
-    if (isLoading) return;
-    if (!isAuthenticated) {
-      const next = safeRedirectPath('/account/affiliate');
-      router.replace(next ? `/login?redirect=${encodeURIComponent(next)}` : '/login');
-      return;
-    }
     let cancelled = false;
     const run = async () => {
+      const flags = await fetchPublicFeatures();
+      if (cancelled) return;
+      if (!flags.feature_affiliates_enabled) {
+        router.replace('/affiliate');
+        return;
+      }
+      if (isLoading) return;
+      if (!isAuthenticated) {
+        const next = safeRedirectPath('/account/affiliate');
+        router.replace(next ? `/login?redirect=${encodeURIComponent(next)}` : '/login');
+        return;
+      }
       try {
         await load();
       } catch (error) {
@@ -143,17 +156,29 @@ export default function AffiliateDashboardPage() {
     [withdrawals]
   );
   const minPesewas = info?.min_withdrawal_pesewas || 0;
-  const available = summary?.available_pesewas || 0;
+  const available = summary?.available_pesewas ?? 0;
   const requestedPesewas = pesewasFromGhs(amount);
+  const holdHours = info?.payout_change_hold_hours ?? 48;
+  const holdUntil = payoutHoldUntil(me?.payout.payout_details_changed_at, holdHours);
+  const inPayoutHold = Boolean(holdUntil && holdUntil.getTime() > Date.now());
+  const negativeBalance = available < 0;
   const withdrawBlockedReason = openWithdrawal
     ? 'A withdrawal request is already open.'
-    : available < minPesewas
-      ? `Minimum withdrawal is ${formatGhs(minPesewas)}.`
-      : requestedPesewas < minPesewas
-        ? `Minimum withdrawal is ${formatGhs(minPesewas)}.`
-        : requestedPesewas > available
-          ? 'Amount is more than your available balance.'
-          : null;
+    : inPayoutHold
+      ? null
+      : negativeBalance
+        ? null
+        : available < minPesewas
+          ? `Minimum withdrawal is ${formatGhs(minPesewas)}.`
+          : requestedPesewas < minPesewas
+            ? `Minimum withdrawal is ${formatGhs(minPesewas)}.`
+            : requestedPesewas > available
+              ? 'Amount is more than your available balance.'
+              : null;
+  const withdrawBlocked = Boolean(withdrawBlockedReason) || inPayoutHold || negativeBalance || available < minPesewas;
+  const returnWindowDays = info?.return_window_days ?? 7;
+  const payoutDays = info?.payout_working_days ?? 3;
+  const payoutKind = me?.payout.payout_method === 'bank' ? 'bank' : 'MoMo';
 
   const resumePayment = async () => {
     setPaying(true);
@@ -187,7 +212,7 @@ export default function AffiliateDashboardPage() {
   };
 
   const requestWithdraw = async () => {
-    if (withdrawBlockedReason) return;
+    if (withdrawBlocked) return;
     setWithdrawBusy(true);
     try {
       const result = await affiliateRequest('/api/affiliates/me/withdrawals', {
@@ -392,11 +417,11 @@ export default function AffiliateDashboardPage() {
               const link = productRefLink(me.links?.product, hit.slug, me.referral_code);
               return (
                 <li key={hit.slug} className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 p-3">
-                  <span className="text-sm text-[#1A1A1A]">{hit.name}</span>
+                  <span className="min-w-0 break-words text-sm text-[#1A1A1A]">{hit.name}</span>
                   <button
                     type="button"
                     onClick={() => copyText(link)}
-                    className="shrink-0 text-sm text-[#FF7A19] hover:underline"
+                    className="inline-flex min-h-11 shrink-0 items-center text-sm font-semibold text-[#FF7A19] hover:underline"
                   >
                     Copy link
                   </button>
@@ -408,10 +433,36 @@ export default function AffiliateDashboardPage() {
 
         <section className="rounded-xl bg-white p-4 shadow-sm">
           <h2 className="mb-3 text-lg font-semibold text-[#1A1A1A]">My sales</h2>
+          <InfoNote className="mb-3">
+            Customer names and contact details are never shown, to protect their privacy.
+          </InfoNote>
           {sales.length === 0 ? (
             <p className="text-sm text-[#3A3A3A]">No sales yet.</p>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+            <div className="space-y-3 md:hidden">
+              {sales.map((sale, index) => (
+                <div key={`${sale.order_number}-${index}`} className="rounded-lg border border-gray-100 p-3">
+                  <StackRows
+                    rows={[
+                      { label: 'Order', value: sale.order_number || '—' },
+                      { label: 'Products', value: sale.product_names.join(', ') || '—' },
+                      { label: 'Date', value: formatWhen(sale.date) },
+                      {
+                        label: 'Status',
+                        value: (
+                          <Badge variant={affiliateStatusVariant(sale.commission_status)} size="sm">
+                            {COMMISSION_STATUS_LABEL[sale.commission_status] || sale.commission_status}
+                          </Badge>
+                        ),
+                      },
+                      { label: 'Commission', value: formatGhs(sale.amount_pesewas) },
+                    ]}
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto sticky-first md:block">
               <table className="min-w-full text-left text-sm">
                 <thead>
                   <tr className="text-[#3A3A3A]">
@@ -439,6 +490,7 @@ export default function AffiliateDashboardPage() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </section>
 
@@ -458,6 +510,18 @@ export default function AffiliateDashboardPage() {
               <p className="font-semibold">{formatGhs(summary?.withdrawn_pesewas)}</p>
             </div>
           </div>
+          <InfoNote title="Why is my commission pending?" defaultOpen={false} className="mt-3">
+            <p>Every commission is checked before it can be withdrawn. This protects you and VENTECH from paying out on sales that don't go through.</p>
+            <p className="mt-2">A commission becomes available once:</p>
+            <ul className="mt-1 space-y-0.5">
+              <li>• the order has been delivered and fully paid for,</li>
+              <li>• the {returnWindowDays}-day return period has passed, and</li>
+              <li>• VENTECH has confirmed the sale.</li>
+            </ul>
+            <p className="mt-2">
+              A commission is cancelled if the order is cancelled, refunded or returned, the payment fails, the order is never completed, the sale appears to be fraudulent, or the same sale has already been credited through another referral.
+            </p>
+          </InfoNote>
           <div className="mt-4">
             <p className="mb-2 text-sm font-medium text-[#1A1A1A]">Withdrawal mode</p>
             <div className="flex gap-2">
@@ -484,18 +548,33 @@ export default function AffiliateDashboardPage() {
             </label>
             <input
               id="withdrawAmount"
+              type="text"
+              inputMode="decimal"
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#FF7A19]"
+              className="min-h-11 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#FF7A19]"
             />
             <button
               type="button"
-              disabled={Boolean(withdrawBlockedReason) || withdrawBusy}
+              disabled={withdrawBlocked || withdrawBusy}
               onClick={() => void requestWithdraw()}
               className="mt-3 w-full rounded-lg bg-[#FF7A19] px-4 py-3 font-semibold text-white hover:bg-[#e66a0f] disabled:opacity-50"
             >
               {withdrawBusy ? 'Requesting…' : 'Withdraw'}
             </button>
+            <InfoNote className="mt-2">
+              You can withdraw once your available balance reaches {formatCopyGhs(minPesewas)}. Payments go to your registered {payoutKind} account, usually within {payoutDays} working days.
+            </InfoNote>
+            {inPayoutHold && holdUntil ? (
+              <InfoNote className="mt-2">
+                For your security, withdrawals pause for {holdHours} hours after your payout details change. You can withdraw again from {formatCopyDateTime(holdUntil)}.
+              </InfoNote>
+            ) : null}
+            {negativeBalance ? (
+              <InfoNote className="mt-2">
+                Your balance is below zero because a sale you were already paid for was later refunded. Your next approved commissions will bring it back up. Withdrawals resume once your balance reaches {formatCopyGhs(minPesewas)}.
+              </InfoNote>
+            ) : null}
             {withdrawBlockedReason && <p className="mt-2 text-sm text-[#3A3A3A]">{withdrawBlockedReason}</p>}
           </div>
         </section>
@@ -510,9 +589,11 @@ export default function AffiliateDashboardPage() {
                 <li key={row.id} className="rounded-lg border border-gray-100 p-3 text-sm">
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-medium">{formatGhs(row.amount_pesewas)}</span>
-                    <Badge variant={affiliateStatusVariant(row.status)} size="sm">
-                      {WITHDRAWAL_STATUS_LABEL[row.status] || row.status}
-                    </Badge>
+                    <InfoTip text={withdrawalStatusTip(row.status, row.payment_reference, row.reason)}>
+                      <Badge variant={affiliateStatusVariant(row.status)} size="sm">
+                        {WITHDRAWAL_STATUS_LABEL[row.status] || row.status}
+                      </Badge>
+                    </InfoTip>
                   </div>
                   <p className="mt-1 text-[#3A3A3A]">{formatWhen(row.created_at)}</p>
                   {row.reason && <p className="mt-1 text-[#3A3A3A]">{row.reason}</p>}

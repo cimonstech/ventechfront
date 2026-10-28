@@ -130,7 +130,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
             </div>
 
             <div className="sticky top-14 z-20 mb-4 -mx-4 bg-gray-50/95 px-4 py-2 backdrop-blur sm:top-16 md:hidden">
-              <nav aria-label="My account" className="flex w-max max-w-full gap-2 overflow-x-auto pb-1">
+              <nav aria-label="My account" className="flex w-full gap-2 overflow-x-auto pb-1">
                 {items.map((item) => {
                   const active = accountNavActive(pathname, item);
                   return (

@@ -122,7 +122,7 @@ export default function AdminDevicesPage() {
           value={searchInput}
           onChange={(event) => setSearchInput(event.target.value)}
           placeholder="Search serial, customer, order, or model"
-          className="flex-1 min-w-[220px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
+          className="min-h-11 w-full min-w-0 flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19] sm:min-w-[220px]"
         />
         <select
           value={status}
@@ -151,7 +151,7 @@ export default function AdminDevicesPage() {
         </select>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto">
+      <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto sticky-first">
         <table className="w-full min-w-[880px]">
           <thead className="bg-gray-50 text-left text-sm text-[#1A1A1A]">
             <tr>
@@ -170,7 +170,7 @@ export default function AdminDevicesPage() {
           <tbody className="divide-y">
             {loading ? (
               <tr>
-                <td colSpan={8} className="px-4 py-12 text-center text-[#3A3A3A]">Loading devicesâ€¦</td>
+                <td colSpan={8} className="px-4 py-12 text-center text-[#3A3A3A]">Loading devices…</td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
@@ -193,7 +193,7 @@ export default function AdminDevicesPage() {
                 </td>
                 <td className="px-4 py-3 text-sm text-[#1A1A1A]">{device.model_name}</td>
                 <td className="px-4 py-3">
-                  <p className="text-sm text-[#1A1A1A]">{device.customer_name || 'â€”'}</p>
+                  <p className="text-sm text-[#1A1A1A]">{device.customer_name || '—'}</p>
                   <p className="text-xs text-[#3A3A3A]">{device.customer_email || ''}</p>
                 </td>
                 <td className="px-4 py-3 text-sm">
@@ -202,7 +202,7 @@ export default function AdminDevicesPage() {
                       {device.order_number}
                     </Link>
                   ) : (
-                    <span className="text-[#3A3A3A]">{device.order_number || 'â€”'}</span>
+                    <span className="text-[#3A3A3A]">{device.order_number || '—'}</span>
                   )}
                 </td>
                 <td className="px-4 py-3">

@@ -80,12 +80,12 @@ export default function AdminVlbUpgradesPage() {
           </button>
         ))}
       </div>
-      <div className="overflow-x-auto rounded-xl bg-white shadow-sm">
+      <div className="overflow-x-auto sticky-first rounded-xl bg-white shadow-sm">
         <table className="min-w-full text-left text-sm">
           <thead>
             <tr className="border-b text-[#3A3A3A]">
               <th className="px-4 py-3 font-medium">Investor</th>
-              <th className="px-4 py-3 font-medium">From â†’ To</th>
+              <th className="px-4 py-3 font-medium">From ? To</th>
               <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 font-medium">Date</th>
               <th className="px-4 py-3 font-medium"></th>
@@ -93,14 +93,14 @@ export default function AdminVlbUpgradesPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td className="px-4 py-6" colSpan={5}>Loadingâ€¦</td></tr>
+              <tr><td className="px-4 py-6" colSpan={5}>Loading…</td></tr>
             ) : rows.length === 0 ? (
               <tr><td className="px-4 py-6 text-[#3A3A3A]" colSpan={5}>No upgrade requests.</td></tr>
             ) : rows.map((row) => (
               <tr key={row.id} className="border-t">
-                <td className="px-4 py-3">{nested(row.investors)?.investor_no || 'â€”'}</td>
+                <td className="px-4 py-3">{nested(row.investors)?.investor_no || '—'}</td>
                 <td className="px-4 py-3">
-                  {nested(row.vlb_plans)?.name || 'â€”'}
+                  {nested(row.vlb_plans)?.name || '—'}
                   {row.message && <p className="text-xs text-[#3A3A3A]">{row.message}</p>}
                 </td>
                 <td className="px-4 py-3"><Badge variant={payoutStatusVariant(row.status)}>{row.status}</Badge></td>

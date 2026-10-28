@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
+import { fetchPublicFeatures } from '@/lib/features';
 import { storeReferralCookie } from '@/lib/referralCookie';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
@@ -27,17 +28,21 @@ export function ReferralCapture() {
       url.searchParams.delete('ref');
       window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
 
-      void fetch(`${API_URL}/api/ref/click`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          code,
-          landing_url: landingUrl,
-          ...(productSlug ? { product_slug: productSlug } : {}),
-        }),
-      })
+      void fetchPublicFeatures()
+        .then((flags) => {
+          if (!flags.feature_affiliates_enabled) return;
+          return fetch(`${API_URL}/api/ref/click`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              code,
+              landing_url: landingUrl,
+              ...(productSlug ? { product_slug: productSlug } : {}),
+            }),
+          });
+        })
         .then(async (response) => {
-          if (!response.ok) return;
+          if (!response?.ok) return;
           const body = await response.json().catch(() => null);
           const clickId = body?.data?.click_id;
           const expiresAt = body?.data?.expires_at;

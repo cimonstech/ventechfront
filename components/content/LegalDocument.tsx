@@ -17,21 +17,21 @@ export async function LegalDocument({
   const updated = result.state === 'published' ? formatUpdatedDate(result.page.updated_at) : '';
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
+    <div className="min-h-screen overflow-x-hidden bg-gray-50 py-8 sm:py-12">
       <div className={`container mx-auto px-4 ${wide ? 'max-w-5xl' : 'max-w-4xl'}`}>
-        <div className={wide ? '' : 'rounded-xl bg-white p-8 shadow-lg md:p-12'}>
-          <div className={wide ? 'mb-12 text-center' : 'mb-8'}>
-            <Link href="/" className="mb-4 inline-block text-sm text-[#FF7A19] hover:underline">
+        <div className={wide ? '' : 'rounded-xl bg-white p-4 shadow-lg sm:p-8 md:p-12'}>
+          <div className={wide ? 'mb-8 text-center sm:mb-12' : 'mb-6 sm:mb-8'}>
+            <Link href="/" className="mb-4 inline-flex min-h-11 items-center text-sm text-[#FF7A19] hover:underline">
               ← Back to Home
             </Link>
-            <h1 className={`font-bold text-[#1A1A1A] ${wide ? 'mb-4 text-4xl md:text-5xl' : 'mb-4 text-4xl'}`}>
+            <h1 className={`font-bold break-words text-[#1A1A1A] ${wide ? 'mb-4 text-2xl sm:text-4xl md:text-5xl' : 'mb-4 text-2xl sm:text-4xl'}`}>
               {title}
             </h1>
             {updated && <p className="text-sm text-[#3A3A3A]">Last updated: {updated}</p>}
           </div>
 
           {wide ? (
-            <div className="rounded-xl bg-white p-8 shadow-lg md:p-12">
+            <div className="rounded-xl bg-white p-4 shadow-lg sm:p-8 md:p-12">
               {result.state === 'published' ? (
                 <ContentHtml html={result.page.body_html} />
               ) : (

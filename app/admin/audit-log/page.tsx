@@ -64,7 +64,7 @@ export default function AuditLogPage() {
       ) : rows.length === 0 ? (
         <p className="px-6 py-12 text-center text-[#3A3A3A]">No audit entries yet.</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto sticky-first">
           <table className="w-full">
             <thead className="bg-gray-50 border-b">
               <tr>
@@ -79,10 +79,10 @@ export default function AuditLogPage() {
               {rows.map((row) => (
                 <tr key={row.id} className="hover:bg-gray-50">
                   <td className="px-6 py-3 text-sm text-[#3A3A3A]">{new Date(row.created_at).toLocaleString()}</td>
-                  <td className="px-6 py-3 text-sm text-[#1A1A1A]">{row.actor_role || 'â€”'}</td>
+                  <td className="px-6 py-3 text-sm text-[#1A1A1A]">{row.actor_role || '—'}</td>
                   <td className="px-6 py-3 text-sm text-[#1A1A1A]">{row.action}</td>
                   <td className="px-6 py-3 text-sm text-[#3A3A3A]">{row.entity}</td>
-                  <td className="px-6 py-3 text-sm text-[#3A3A3A]">{row.entity_id || 'â€”'}</td>
+                  <td className="px-6 py-3 text-sm text-[#3A3A3A]">{row.entity_id || '—'}</td>
                 </tr>
               ))}
             </tbody>

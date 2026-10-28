@@ -58,6 +58,14 @@ export interface VlbSchedulePreview {
 }
 
 export interface VlbPayoutQueueRow extends VlbPayoutRow {
+  payout_details?: {
+    payout_method: string | null;
+    momo_network: string | null;
+    momo_number: string | null;
+    bank_name: string | null;
+    bank_account_name: string | null;
+    bank_account_number: string | null;
+  } | null;
   vlb_investments?:
     | {
         id: string;
@@ -85,6 +93,43 @@ export function payoutQueueMeta(row: VlbPayoutQueueRow) {
     investor_no: investor?.investor_no || null,
     plan_name: investment?.plan_snapshot?.name || '—',
   };
+}
+
+export const VLB_MOMO_NETWORKS = ['MTN', 'Telecel', 'AirtelTigo'];
+
+export async function saveInvestorPayout(
+  investorId: string,
+  body: Record<string, string | undefined>
+) {
+  return deviceRequest(`/api/admin/vlb/investors/${investorId}/payout`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function uploadAgreementTemplate(file: File, title?: string) {
+  const headers = await authHeaders();
+  const body = new FormData();
+  body.append('file', file);
+  if (title) body.append('title', title);
+  const response = await fetch(`${API_URL}/api/admin/vlb/agreement-template`, {
+    method: 'POST',
+    headers,
+    body,
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload?.success === false) {
+    throw new Error(accessDeniedMessage(response.status, typeof payload?.message === 'string' ? payload.message : 'Could not store this file.'));
+  }
+  return payload.data;
+}
+
+export async function openAdminVlbDocument(documentId: string) {
+  const result = await deviceRequest<{ url: string | null }>(`/api/admin/vlb/documents/${documentId}`);
+  if (!result.data?.url) {
+    throw new Error('Could not download this file.');
+  }
+  window.open(result.data.url, '_blank', 'noopener,noreferrer');
 }
 
 export async function uploadVlbDocument(

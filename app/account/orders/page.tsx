@@ -92,8 +92,8 @@ export default function OrdersPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 py-12">
-        <div className="container mx-auto px-4 max-w-5xl">
+      <div>
+        <div className="max-w-5xl">
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FF7A19]"></div>
             <span className="ml-3 text-[#3A3A3A]">Loading orders...</span>
@@ -104,17 +104,9 @@ export default function OrdersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
-      <div className="container mx-auto px-4 max-w-5xl">
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-sm text-[#3A3A3A] mb-6">
-          <Link href="/" className="hover:text-[#FF7A19]">Home</Link>
-          <ChevronRight size={16} />
-          <span className="text-[#FF7A19]">My Orders</span>
-        </div>
-
-        {/* Header */}
-        <div className="mb-8">
+    <div>
+      <div className="max-w-5xl">
+        <div className="mb-6 hidden md:block">
           <h1 className="text-3xl font-bold text-[#1A1A1A] mb-2">My Orders</h1>
           <p className="text-[#3A3A3A]">View and track your order history</p>
         </div>
@@ -131,7 +123,7 @@ export default function OrdersPage() {
             </p>
             <Link
               href="/shop"
-              className="inline-block bg-[#FF7A19] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#FF8C3A] transition-colors"
+              className="inline-flex min-h-11 w-full items-center justify-center bg-[#FF7A19] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#FF8C3A] transition-colors sm:w-auto"
             >
               Start Shopping
             </Link>
@@ -139,7 +131,7 @@ export default function OrdersPage() {
         ) : (
           <div className="space-y-4">
             {orders.map((order) => (
-              <div key={order.id} className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+              <div key={order.id} className="bg-white rounded-xl shadow-lg p-4 sm:p-6 hover:shadow-xl transition-shadow">
                 <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
                   <div>
                     <h3 className="text-lg font-bold text-[#1A1A1A] mb-1">
@@ -167,8 +159,8 @@ export default function OrdersPage() {
                     <div className="text-sm text-[#3A3A3A]">
                       <span className="font-medium">{(order.items || []).length} item(s)</span>
                     </div>
-                    <Link href={`/account/orders/${order.id}`}>
-                      <Button variant="outline" size="sm">
+                    <Link href={`/account/orders/${order.id}`} className="w-full sm:w-auto">
+                      <Button variant="outline" size="sm" className="w-full sm:w-auto min-h-11">
                         <Eye size={16} className="mr-2" />
                         View Details
                       </Button>

@@ -3,17 +3,24 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import { Info } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { InfoNote, InfoTip } from '@/components/ui/InfoNote';
+import { Sheet } from '@/components/ui/Sheet';
 import { useAccess } from '@/context/AccessContext';
 import { hasActiveInvestorRole } from '@/lib/account';
 import { settingsService } from '@/lib/settings.service';
 import {
   apiMessage,
   downloadAuthFile,
+  VLB_EARLY_EXIT_ALLOWED,
   formatDeviceDate,
   formatGhs,
+  openSignedVlbDocument,
   payoutStatusVariant,
+  scholarFundCopy,
+  vlbGhs,
   vlbRequest,
   type VlbDocument,
   type VlbMe,
@@ -71,8 +78,13 @@ export default function AccountInvestmentsPage() {
           toast.error(apiMessage(error, 'Could not load your investments'));
         }
       });
+    const timer = window.setInterval(() => {
+      if (cancelled || !allowed) return;
+      load().catch(() => undefined);
+    }, 90 * 1000);
     return () => {
       cancelled = true;
+      window.clearInterval(timer);
     };
   }, [allowed]);
 
@@ -119,6 +131,8 @@ export default function AccountInvestmentsPage() {
     : 0;
   const wa = whatsappHref(whatsapp);
   const call = telHref(phone);
+  const scholarSource = me.investments.find((row) => row.id === featured?.investment_id) || me.investments[0];
+  const scholarCopy = scholarFundCopy(scholarSource?.scholar_fund_percent, scholarSource?.scholar_fund_basis);
 
   return (
     <div className="space-y-4">
@@ -143,7 +157,12 @@ export default function AccountInvestmentsPage() {
             <dd className="font-semibold text-[#1A1A1A]">{formatGhs(summary?.received_pesewas || 0)}</dd>
           </div>
           <div>
-            <dt className="text-[#3A3A3A]">Scholar Fund</dt>
+            <dt className="flex items-center gap-1 text-[#3A3A3A]">
+              Scholar Fund
+              <InfoTip text={scholarCopy} label="About the Scholar Fund">
+                <Info className="h-3.5 w-3.5" aria-hidden />
+              </InfoTip>
+            </dt>
             <dd className="font-semibold text-[#1A1A1A]">{formatGhs(summary?.scholar_fund_pesewas || 0)}</dd>
           </div>
         </dl>
@@ -201,6 +220,11 @@ export default function AccountInvestmentsPage() {
             </a>
           ) : null}
         </div>
+        {!VLB_EARLY_EXIT_ALLOWED ? (
+          <p className="mt-3 text-xs text-[#3A3A3A]">
+            Investments run for the full 10-month cycle and cannot be withdrawn early.
+          </p>
+        ) : null}
       </section>
 
       {me.investments.length === 0 ? (
@@ -213,10 +237,10 @@ export default function AccountInvestmentsPage() {
             ? Math.min(100, Math.round((row.term_progress.days_elapsed / row.term_progress.days_total) * 100))
             : 0;
           return (
+            <div key={row.id} className="rounded-xl bg-white p-4 shadow-sm sm:p-5">
             <Link
-              key={row.id}
               href={`/account/investments/${row.id}`}
-              className="block rounded-xl bg-white p-4 shadow-sm sm:p-5"
+              className="block"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -257,6 +281,10 @@ export default function AccountInvestmentsPage() {
                 Settlement: {row.principal_settlement?.status || '—'}
               </p>
             </Link>
+            <InfoNote className="mt-3">
+              Month 10 is the settlement month. VENTECH reconciles your investment and returns your principal of {vlbGhs(row.principal_pesewas)}. If you choose Renew, your principal starts a new 10-month cycle instead and is not paid out.
+            </InfoNote>
+            </div>
           );
         })
       )}
@@ -269,27 +297,7 @@ export default function AccountInvestmentsPage() {
         <p className="mt-2 text-sm text-[#3A3A3A]">Ask VENTECH about moving to another plan.</p>
       </section>
 
-      <section className="rounded-xl bg-white p-4 shadow-sm sm:p-5">
-        <h2 className="font-semibold text-[#1A1A1A]">Documents</h2>
-        {docs.length === 0 ? (
-          <p className="mt-2 text-sm text-[#3A3A3A]">No documents yet.</p>
-        ) : (
-          <ul className="mt-3 space-y-2">
-            {docs.map((doc) => (
-              <li key={doc.id}>
-                {doc.url ? (
-                  <a href={doc.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-[#FF7A19]">
-                    {doc.title}
-                  </a>
-                ) : (
-                  <span className="text-sm text-[#3A3A3A]">{doc.title}</span>
-                )}
-                <span className="ml-2 text-xs text-[#3A3A3A]">{doc.kind}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <DocumentsSection me={me} docs={docs} reload={load} />
 
       <section className="rounded-xl bg-white p-4 shadow-sm sm:p-5">
         <h2 className="font-semibold text-[#1A1A1A]">Payout details</h2>
@@ -297,18 +305,27 @@ export default function AccountInvestmentsPage() {
           {payout.payout_method === 'momo'
             ? `${payout.momo_network || 'MoMo'} · ${payout.momo_number || '—'}`
             : payout.payout_method === 'bank'
-              ? `${payout.bank_name || 'Bank'} · ${payout.bank_account_number || '—'}`
+              ? `${payout.bank_name || 'Bank'} · ${payout.bank_account_name || ''} · ${payout.bank_account_number || '—'}`
               : 'Not set yet'}
         </p>
         <p className="mt-2 text-xs text-[#3A3A3A]">
-          Changes to payout details are handled by VENTECH support.
+          To change these, contact VENTECH support.
         </p>
       </section>
 
       {upgradeOpen && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
+        <Sheet
+          title="Upgrade request"
+          onClose={() => setUpgradeOpen(false)}
+          footer={(
+            <div className="flex flex-col-reverse gap-2 sm:flex-row">
+              <Button type="button" variant="outline" className="w-full sm:flex-1" onClick={() => setUpgradeOpen(false)}>Cancel</Button>
+              <Button type="submit" form="vlb-upgrade" className="w-full sm:flex-1" disabled={busy}>{busy ? 'Sending…' : 'Send'}</Button>
+            </div>
+          )}
+        >
           <form
-            className="w-full max-w-md rounded-xl bg-white p-5"
+            id="vlb-upgrade"
             onSubmit={async (event) => {
               event.preventDefault();
               if (!planId) {
@@ -331,8 +348,7 @@ export default function AccountInvestmentsPage() {
               }
             }}
           >
-            <h2 className="text-lg font-bold text-[#1A1A1A]">Upgrade request</h2>
-            <label className="mt-4 block text-sm font-medium text-[#1A1A1A]">Plan</label>
+            <label className="block text-sm font-medium text-[#1A1A1A]">Plan</label>
             <select
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-3 text-sm"
               value={planId}
@@ -353,13 +369,177 @@ export default function AccountInvestmentsPage() {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
             />
-            <div className="mt-4 flex gap-2">
-              <Button type="button" variant="outline" className="flex-1" onClick={() => setUpgradeOpen(false)}>Cancel</Button>
-              <Button type="submit" className="flex-1" disabled={busy}>{busy ? 'Sending…' : 'Send'}</Button>
-            </div>
           </form>
-        </div>
+        </Sheet>
       )}
     </div>
+  );
+}
+
+function DocRow({
+  name,
+  date,
+  onDownload,
+}: {
+  name: string;
+  date?: string | null;
+  onDownload: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <li className="flex items-center justify-between gap-3 py-2">
+      <div>
+        <p className="text-sm font-medium text-[#1A1A1A]">{name}</p>
+        {date ? <p className="text-xs text-[#3A3A3A]">{formatDeviceDate(date)}</p> : null}
+      </div>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          try {
+            await onDownload();
+          } catch (error) {
+            toast.error(apiMessage(error, 'Could not download this file.'));
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        Download
+      </Button>
+    </li>
+  );
+}
+
+async function openDocumentWithRefresh(documentId: string, reload: () => Promise<void>) {
+  try {
+    await openSignedVlbDocument(documentId);
+  } catch (error) {
+    await reload();
+    try {
+      await openSignedVlbDocument(documentId);
+    } catch {
+      throw error;
+    }
+  }
+}
+
+function DocumentsSection({
+  me,
+  docs,
+  reload,
+}: {
+  me: VlbMe;
+  docs: VlbDocument[];
+  reload: () => Promise<void>;
+}) {
+  const agreements = docs.filter((doc) => doc.kind === 'agreement');
+  const others = docs.filter((doc) => doc.kind !== 'agreement' && doc.kind !== 'agreement_template');
+  const template = docs.find((doc) => doc.kind === 'agreement_template');
+  const receipts = me.investments
+    .flatMap((investment) =>
+      (investment.paid_payouts || []).map((payout) => ({
+        ...payout,
+        plan_name: investment.plan_name,
+        investment_id: investment.id,
+      }))
+    )
+    .sort((a, b) => String(b.paid_at || b.due_date).localeCompare(String(a.paid_at || a.due_date)));
+
+  return (
+    <section className="rounded-xl bg-white p-4 shadow-sm sm:p-5">
+      <h2 className="font-semibold text-[#1A1A1A]">Documents</h2>
+      <p className="mt-2 text-sm text-[#3A3A3A]">
+        Your agreement, receipts and statements are kept here. Download links expire after 2 minutes for your security.
+      </p>
+
+      <h3 className="mt-4 text-sm font-medium text-[#1A1A1A]">Your agreement</h3>
+      {agreements.length === 0 ? (
+        <p className="mt-2 text-sm text-[#3A3A3A]">Your signed agreement will appear here once VENTECH has uploaded it.</p>
+      ) : (
+        <ul className="mt-1 divide-y divide-gray-100">
+          {agreements.map((doc) => (
+            <DocRow
+              key={doc.id}
+              name={doc.title}
+              date={doc.created_at}
+              onDownload={() => openDocumentWithRefresh(doc.id, reload)}
+            />
+          ))}
+        </ul>
+      )}
+
+      <h3 className="mt-4 text-sm font-medium text-[#1A1A1A]">Generated for you</h3>
+      <ul className="mt-1 divide-y divide-gray-100">
+        {me.investments.map((investment) => (
+          <DocRow
+            key={`confirm-${investment.id}`}
+            name={`Investment confirmation · ${investment.plan_name}`}
+            date={investment.start_date}
+            onDownload={() => downloadAuthFile(
+              `/api/vlb/me/investments/${investment.id}/confirmation.pdf`,
+              `vlb-confirmation-${me.investor_no || investment.id}.pdf`
+            )}
+          />
+        ))}
+        {me.investments.map((investment) => (
+          <DocRow
+            key={`statement-${investment.id}`}
+            name={`Statement · ${investment.plan_name}`}
+            date={investment.start_date}
+            onDownload={() => downloadAuthFile(
+              `/api/vlb/me/investments/${investment.id}/statement.pdf`,
+              `vlb-statement-${me.investor_no || investment.id}.pdf`
+            )}
+          />
+        ))}
+        {receipts.map((payout) => (
+          <DocRow
+            key={payout.id}
+            name={`Payout receipt · ${payout.plan_name} · ${payout.type} ${payout.period_no}`}
+            date={payout.paid_at || payout.due_date}
+            onDownload={() => downloadAuthFile(
+              `/api/vlb/me/payouts/${payout.id}/receipt.pdf`,
+              `vlb-receipt-${payout.id}.pdf`
+            )}
+          />
+        ))}
+        {me.investments.length === 0 && (
+          <li className="py-2 text-sm text-[#3A3A3A]">Generated documents will appear after activation.</li>
+        )}
+      </ul>
+
+      <h3 className="mt-4 text-sm font-medium text-[#1A1A1A]">Other documents</h3>
+      {others.length === 0 ? (
+        <p className="mt-2 text-sm text-[#3A3A3A]">No other documents yet.</p>
+      ) : (
+        <ul className="mt-1 divide-y divide-gray-100">
+          {others.map((doc) => (
+            <DocRow
+              key={doc.id}
+              name={doc.title}
+              date={doc.created_at}
+              onDownload={() => openDocumentWithRefresh(doc.id, reload)}
+            />
+          ))}
+        </ul>
+      )}
+
+      <h3 className="mt-4 text-sm font-medium text-[#1A1A1A]">Agreement template</h3>
+      {template ? (
+        <ul className="mt-1 divide-y divide-gray-100">
+          <DocRow
+            key={template.id}
+            name={template.title}
+            date={template.created_at}
+            onDownload={() => openDocumentWithRefresh(template.id, reload)}
+          />
+        </ul>
+      ) : (
+        <p className="mt-2 text-sm text-[#3A3A3A]">The blank agreement template is not available yet.</p>
+      )}
+    </section>
   );
 }

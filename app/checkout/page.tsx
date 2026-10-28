@@ -13,7 +13,7 @@ import { formatCurrency } from '@/lib/helpers';
 import { orderService } from '@/services/order.service';
 import { deliveryOptionsService } from '@/services/deliveryOptions.service';
 import { paymentService } from '@/services/payment.service';
-import { referralFromCookie } from '@/lib/referralCookie';
+import { referralForCheckout } from '@/lib/referralCookie';
 import { couponService } from '@/services/coupon.service';
 import { DeliveryOption } from '@/types/order';
 import { supabase } from '@/lib/supabase';
@@ -437,7 +437,7 @@ export default function CheckoutPage() {
         checkoutData.estimated_arrival_date = estimatedArrival.date.toISOString();
       }
 
-      const referral = referralFromCookie();
+      const referral = await referralForCheckout();
       if (referral) {
         checkoutData.referral = { click_id: referral.click_id };
       }
@@ -554,7 +554,7 @@ export default function CheckoutPage() {
             total: regularSubtotal + regularDeliveryFee - couponDiscount,
           };
 
-          const referral = referralFromCookie();
+          const referral = await referralForCheckout();
           if (referral) {
             (regularCheckoutData as { referral?: { click_id: string } }).referral = { click_id: referral.click_id };
           }
@@ -618,7 +618,7 @@ export default function CheckoutPage() {
             total: preOrderSubtotal + preOrderDeliveryFee - (hasRegularItems ? 0 : couponDiscount),
           };
 
-          const referral = referralFromCookie();
+          const referral = await referralForCheckout();
           if (referral) {
             (preOrderCheckoutData as { referral?: { click_id: string } }).referral = { click_id: referral.click_id };
           }

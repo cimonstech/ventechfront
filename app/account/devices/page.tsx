@@ -74,9 +74,8 @@ export default function MyDevicesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-lg mx-auto">
-        <h1 className="text-2xl font-bold text-[#1A1A1A] mb-6">My devices</h1>
+    <div>
+        <h1 className="mb-6 hidden text-2xl font-bold text-[#1A1A1A] md:block">My devices</h1>
         {devices.length === 0 ? (
           <div className="bg-white border border-gray-200 rounded-xl p-6 text-sm text-[#3A3A3A]">
             No laptops linked yet. Scan the QR sticker on your VENTECH laptop to add it.
@@ -113,7 +112,6 @@ export default function MyDevicesPage() {
             ))}
           </ul>
         )}
-      </div>
 
       {qrDevice?.qr_token ? (
         <div

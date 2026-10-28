@@ -10,11 +10,13 @@ import { VlbNav } from '@/components/admin/VlbNav';
 import { useSetAdminHeading } from '@/components/admin/AdminHeading';
 import { useAccess } from '@/context/AccessContext';
 import { formatGhs, payoutStatusVariant } from '@/lib/vlb';
+import { EMPTY_VLB_PAYOUT, payoutPayload, VlbPayoutFields, type VlbPayoutForm } from '@/components/admin/VlbPayoutFields';
 import {
   apiMessage,
   deviceRequest,
   nested,
   pesewasFromGhs,
+  uploadVlbDocument,
   type VlbAdminPlan,
   type VlbApplicationRow,
   type VlbSchedulePreview,
@@ -41,6 +43,9 @@ export default function AdminVlbApplicationDetailPage() {
   const [paymentMethod, setPaymentMethod] = useState('momo');
   const [reference, setReference] = useState('');
   const [agreementDate, setAgreementDate] = useState('');
+  const [agreementFile, setAgreementFile] = useState<File | null>(null);
+  const [payoutForm, setPayoutForm] = useState<VlbPayoutForm>(EMPTY_VLB_PAYOUT);
+  const [includePayout, setIncludePayout] = useState(false);
   const [preview, setPreview] = useState<VlbSchedulePreview | null>(null);
 
   const load = () =>
@@ -78,7 +83,7 @@ export default function AdminVlbApplicationDetailPage() {
       .catch(() => setPreview(null));
   }, [planId, startDate, amount]);
 
-  if (!row) return <p className="text-sm text-[#3A3A3A]">Loading applicationâ€¦</p>;
+  if (!row) return <p className="text-sm text-[#3A3A3A]">Loading application…</p>;
 
   return (
     <div className="space-y-6">
@@ -88,11 +93,11 @@ export default function AdminVlbApplicationDetailPage() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold text-[#1A1A1A]">{row.full_name}</h1>
-            <p className="text-sm text-[#3A3A3A]">{row.email} Â· {row.phone}</p>
+            <p className="text-sm text-[#3A3A3A]">{row.email} · {row.phone}</p>
           </div>
           <Badge variant={payoutStatusVariant(row.status)}>{row.status}</Badge>
         </div>
-        <p className="mt-3 text-sm text-[#3A3A3A]">{nested(row.vlb_plans)?.name || 'No plan'} Â· {formatDeviceDate(row.created_at)}</p>
+        <p className="mt-3 text-sm text-[#3A3A3A]">{nested(row.vlb_plans)?.name || 'No plan'} · {formatDeviceDate(row.created_at)}</p>
         {row.message && <p className="mt-3 text-sm text-[#1A1A1A]">{row.message}</p>}
       </div>
 
@@ -134,7 +139,7 @@ export default function AdminVlbApplicationDetailPage() {
             event.preventDefault();
             setBusy(true);
             try {
-              await deviceRequest(`/api/admin/vlb/applications/${id}/activate`, {
+              const result = await deviceRequest<{ investor_id: string; investment_id: string }>(`/api/admin/vlb/applications/${id}/activate`, {
                 method: 'POST',
                 body: JSON.stringify({
                   email,
@@ -144,8 +149,22 @@ export default function AdminVlbApplicationDetailPage() {
                   payment_method: paymentMethod,
                   payment_reference: reference,
                   agreement_signed_at: agreementDate,
+                  payout: includePayout ? payoutPayload(payoutForm) : undefined,
                 }),
               });
+              if (agreementFile && result.data?.investor_id && result.data?.investment_id) {
+                try {
+                  await uploadVlbDocument(
+                    result.data.investor_id,
+                    agreementFile,
+                    'agreement',
+                    'Signed agreement',
+                    result.data.investment_id
+                  );
+                } catch (uploadError) {
+                  toast.error(apiMessage(uploadError, 'Investment activated, but the agreement file could not be stored.'));
+                }
+              }
               toast.success('Investment activated.');
               await load();
             } catch (error) {
@@ -189,11 +208,25 @@ export default function AdminVlbApplicationDetailPage() {
           <label className="block text-sm">Agreement signed
             <input className="mt-1 w-full rounded-lg border px-3 py-2" type="date" required value={agreementDate} onChange={(e) => setAgreementDate(e.target.value)} />
           </label>
+          <label className="block text-sm">Signed agreement (PDF)
+            <input
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+              type="file"
+              accept="application/pdf"
+              onChange={(e) => setAgreementFile(e.target.files?.[0] || null)}
+            />
+          </label>
+          <p className="text-xs text-[#3A3A3A]">Optional. Activation still works without the file; the investment will show Agreement missing until one is uploaded.</p>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={includePayout} onChange={(e) => setIncludePayout(e.target.checked)} />
+            Record payout details now
+          </label>
+          {includePayout && <VlbPayoutFields value={payoutForm} onChange={setPayoutForm} />}
           {preview && (
-            <div className="overflow-x-auto rounded-lg border border-gray-100 p-3">
+            <div className="overflow-x-auto sticky-first rounded-lg border border-gray-100 p-3">
               <p className="text-sm font-medium text-[#1A1A1A]">Schedule preview</p>
               <p className="text-xs text-[#3A3A3A]">
-                Total net {formatGhs(preview.totals.total_net)} Â· Scholar {formatGhs(preview.totals.scholar_fund_total)}
+                Total net {formatGhs(preview.totals.total_net)} · Scholar {formatGhs(preview.totals.scholar_fund_total)}
               </p>
               <table className="mt-2 min-w-[28rem] w-full text-left text-xs">
                 <thead>
