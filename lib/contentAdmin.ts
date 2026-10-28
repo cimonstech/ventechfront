@@ -9,6 +9,7 @@ export const ARTICLE_TYPES = [
   { value: 'troubleshooting', label: 'Troubleshooting' },
   { value: 'hardware', label: 'Hardware' },
   { value: 'software', label: 'Software' },
+  { value: 'battery', label: 'Battery care' },
   { value: 'warranty', label: 'Warranty' },
 ] as const;
 

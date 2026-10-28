@@ -4,7 +4,7 @@ import { accessDeniedMessage } from '@/lib/access';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 export type WarrantyStatus = 'active' | 'expired' | 'none';
-export type DeviceStatus = 'active' | 'transferred' | 'retired';
+export type DeviceStatus = 'pending' | 'active' | 'transferred' | 'retired';
 
 export interface DeviceWarranty {
   status: WarrantyStatus;
@@ -21,7 +21,8 @@ export interface DeviceRecord {
   customer_email: string | null;
   customer_phone: string | null;
   model_name: string;
-  serial_number: string;
+  serial_number: string | null;
+  unit_no?: number | null;
   purchase_date: string;
   warranty_months: number;
   warranty_start: string;
@@ -32,9 +33,17 @@ export interface DeviceRecord {
   created_at?: string;
   warranty: DeviceWarranty;
   order_number: string | null;
-  product: { id: string; name: string; slug: string | null; thumbnail: string | null } | null;
+  product: { id: string; name: string; slug: string | null; thumbnail: string | null; warranty_months?: number | null } | null;
   order: { id: string; order_number: string; user_id?: string | null } | null;
   owner: { id: string; full_name: string | null; email: string | null; phone: string | null } | null;
+}
+
+export interface OrderLookupPendingDevice {
+  id: string;
+  unit_no: number | null;
+  warranty_months: number | null;
+  purchase_date: string | null;
+  product_id: string | null;
 }
 
 export interface OrderLookupItem {
@@ -44,6 +53,7 @@ export interface OrderLookupItem {
   quantity: number;
   warranty_months: number | null;
   devices_registered: number;
+  pending_devices?: OrderLookupPendingDevice[];
 }
 
 export interface OrderLookup {
@@ -92,7 +102,7 @@ export function devicePublicUrl(token: string): string {
 export async function deviceRequest<T>(
   path: string,
   init: RequestInit = {}
-): Promise<{ data: T; message: string; pagination?: DevicePage }> {
+): Promise<{ data: T; message: string; pagination?: DevicePage; pending_count?: number }> {
   const headers = await authHeaders();
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
@@ -113,5 +123,14 @@ export async function deviceRequest<T>(
     data: body.data as T,
     message: typeof body?.message === 'string' ? body.message : 'Saved',
     pagination: body.pagination,
+    pending_count: typeof body.pending_count === 'number' ? body.pending_count : undefined,
   };
+}
+
+export async function linkPendingDevices(): Promise<void> {
+  try {
+    await deviceRequest('/api/devices/link-pending', { method: 'POST' });
+  } catch (error) {
+    console.error('link pending devices', error);
+  }
 }

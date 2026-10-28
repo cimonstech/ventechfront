@@ -11,7 +11,8 @@ export interface AccountLatestOrder {
 
 export interface AccountDeviceItem {
   model: string;
-  warranty_status: 'active' | 'expired' | 'none' | string;
+  status?: string;
+  warranty_status: 'active' | 'expired' | 'none' | 'pending' | string;
   warranty_end: string | null;
 }
 

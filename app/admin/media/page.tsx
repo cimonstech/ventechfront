@@ -183,19 +183,17 @@ export default function MediaLibraryPage() {
             multiple
             onChange={handleUpload}
             className="hidden"
-            id="media-upload"
             disabled={uploading}
           />
-          <label htmlFor="media-upload">
-            <Button
-              variant="primary"
-              icon={uploading ? <Loader2 className="animate-spin" size={18} /> : <Upload size={18} />}
-              disabled={uploading}
-              className="cursor-pointer"
-            >
-              {uploading ? 'Uploading...' : 'Upload Media'}
-            </Button>
-          </label>
+          <Button
+            type="button"
+            variant="primary"
+            icon={uploading ? <Loader2 className="animate-spin" size={18} /> : <Upload size={18} />}
+            disabled={uploading}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {uploading ? 'Uploading...' : 'Upload Media'}
+          </Button>
           </>
           )}
         </div>
@@ -281,11 +279,14 @@ export default function MediaLibraryPage() {
             {searchQuery ? 'Try adjusting your search filters' : 'Upload your first media file to get started'}
           </p>
           {canEditProducts && !searchQuery && (
-            <label htmlFor="media-upload">
-              <Button variant="primary" icon={<Upload size={18} />} className="cursor-pointer">
-                Upload Media
-              </Button>
-            </label>
+            <Button
+              type="button"
+              variant="primary"
+              icon={<Upload size={18} />}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              Upload Media
+            </Button>
           )}
         </div>
       ) : viewMode === 'grid' ? (

@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { User, Session } from '@supabase/supabase-js';
+import { linkPendingDevices } from '@/lib/devicesAdmin';
 
 interface SignUpData {
   email: string;
@@ -202,6 +203,8 @@ export const getUserProfile = async (userId?: string) => {
       }
       userId = user.id;
     }
+
+    void linkPendingDevices();
 
     // Use maybeSingle() instead of single() to handle missing/duplicate records gracefully
     const { data, error } = await supabase

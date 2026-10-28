@@ -18,12 +18,13 @@ import { apiMessage, deviceRequest, formatDeviceDate, type DeviceWarranty } from
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 const GUIDE_LABELS = [
-  ['user_guide', 'User Guide'],
+  ['user_guide', 'Basic setup'],
+  ['software', 'Windows and software'],
   ['maintenance', 'Maintenance'],
-  ['troubleshooting', 'Troubleshooting'],
+  ['battery', 'Battery care'],
   ['hardware', 'Hardware'],
-  ['software', 'Software'],
   ['warranty', 'Warranty'],
+  ['troubleshooting', 'Troubleshooting'],
 ] as const;
 
 interface GuideArticle {
@@ -33,17 +34,25 @@ interface GuideArticle {
   summary: string | null;
 }
 
+interface LaptopFaq {
+  id: string;
+  question: string;
+  answer_html: string;
+}
+
 interface DevicePayload {
   view: 'public' | 'owner';
   ownership?: 'original' | 'transferred';
   claimable?: boolean;
+  registering?: boolean;
   model_name: string;
   product: { slug: string | null; thumbnail: string | null };
-  warranty: DeviceWarranty;
+  warranty?: DeviceWarranty;
   guides?: Record<string, GuideArticle[]>;
+  faqs?: LaptopFaq[];
   customer_name?: string | null;
   owner_name?: string | null;
-  serial_number?: string;
+  serial_number?: string | null;
   purchase_date?: string;
   linked_at?: string | null;
   order_number?: string | null;
@@ -79,6 +88,7 @@ export function DevicePassport() {
   const [phase, setPhase] = useState<'loading' | 'ready' | 'missing' | 'error'>('loading');
   const [contact, setContact] = useState<StoreContact>(FALLBACK_CONTACT);
   const [openSlug, setOpenSlug] = useState<string | null>(null);
+  const [openFaqId, setOpenFaqId] = useState<string | null>(null);
   const [bodies, setBodies] = useState<Record<string, string>>({});
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [code, setCode] = useState('');
@@ -244,14 +254,17 @@ export function DevicePassport() {
 
   if (!device) return null;
 
+  const registering = Boolean(device.registering);
   const returnPath = `/d/${token}`;
   const claimHref = `/login?redirect=${encodeURIComponent(`${returnPath}?claim=1`)}`;
   const detailsHref = `/login?redirect=${encodeURIComponent(returnPath)}`;
+  const warranty = device.warranty || { status: 'none' as const, endsOn: null };
   const groups = GUIDE_LABELS.map(([key, label]) => ({
     key,
     label,
     articles: device.guides?.[key] || [],
   })).filter((group) => group.articles.length > 0);
+  const faqs = device.faqs || [];
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-6">
@@ -264,15 +277,40 @@ export function DevicePassport() {
           )}
           <div className="p-4 space-y-3">
             <p className="text-xs font-bold tracking-wide text-[#FF7A19]">VENTECH</p>
-            <h1 className="text-2xl font-bold text-[#1A1A1A] leading-tight">{device.model_name}</h1>
-            <DeviceWarrantyBadge warranty={device.warranty} showDate={false} />
-            <p className="text-sm text-[#3A3A3A]">
-              {device.warranty.endsOn
-                ? `Warranty ends ${formatDeviceDate(device.warranty.endsOn)}`
-                : 'No warranty recorded'}
-            </p>
+            {registering ? (
+              <>
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Being prepared</p>
+                <h1 className="text-2xl font-bold text-[#1A1A1A] leading-tight">This laptop is being registered</h1>
+                <p className="text-lg font-medium text-[#1A1A1A]">{device.model_name}</p>
+                {device.view === 'owner' && device.order_number ? (
+                  <p className="text-sm text-[#3A3A3A]">
+                    {device.order_id ? (
+                      <>
+                        Order{' '}
+                        <Link href={`/orders/${device.order_id}`} className="text-[#FF7A19]">{device.order_number}</Link>
+                      </>
+                    ) : (
+                      <>Order {device.order_number}</>
+                    )}
+                  </p>
+                ) : null}
+                <p className="text-sm text-[#3A3A3A]">
+                  Serial number, warranty dates, and service requests appear once VENTECH registers this laptop. Setup, care, and support are already below.
+                </p>
+              </>
+            ) : (
+              <>
+                <h1 className="text-2xl font-bold text-[#1A1A1A] leading-tight">{device.model_name}</h1>
+                <DeviceWarrantyBadge warranty={warranty} showDate={false} />
+                <p className="text-sm text-[#3A3A3A]">
+                  {warranty.endsOn
+                    ? `Warranty ends ${formatDeviceDate(warranty.endsOn)}`
+                    : 'No warranty recorded'}
+                </p>
+              </>
+            )}
 
-            {device.view === 'owner' && device.ownership === 'transferred' && (
+            {!registering && device.view === 'owner' && device.ownership === 'transferred' && (
               <dl className="grid grid-cols-1 gap-2 text-sm border-t border-gray-100 pt-3">
                 <Detail label="Registered to" value={device.owner_name || '—'} />
                 <Detail label="Serial" value={device.serial_number || '—'} mono />
@@ -281,7 +319,7 @@ export function DevicePassport() {
               </dl>
             )}
 
-            {device.view === 'owner' && device.ownership !== 'transferred' && (
+            {!registering && device.view === 'owner' && device.ownership !== 'transferred' && (
               <dl className="grid grid-cols-1 gap-2 text-sm border-t border-gray-100 pt-3">
                 <Detail label="Name" value={device.customer_name || '—'} />
                 <Detail label="Serial" value={device.serial_number || '—'} mono />
@@ -299,7 +337,7 @@ export function DevicePassport() {
               </dl>
             )}
 
-            {device.view === 'public' && device.claimable && !sentTo && (
+            {!registering && device.view === 'public' && device.claimable && !sentTo && (
               isAuthenticated ? (
                 <Button className="w-full" onClick={sendCode} isLoading={claiming}>Claim this laptop</Button>
               ) : (
@@ -312,13 +350,13 @@ export function DevicePassport() {
               )
             )}
 
-            {device.view === 'public' && !isAuthenticated && (
+            {!registering && device.view === 'public' && !isAuthenticated && (
               <p className="text-sm text-[#3A3A3A]">
                 <Link href={detailsHref} className="text-[#FF7A19] font-semibold">Log in to see your device details</Link>
               </p>
             )}
 
-            {sentTo && (
+            {!registering && sentTo && (
               <div className="space-y-3 border-t border-gray-100 pt-3">
                 <InfoNote>
                   To protect your privacy, we'll send a 6-digit code to the email used when this laptop was bought. Enter it here to link the laptop to your account.
@@ -347,7 +385,7 @@ export function DevicePassport() {
               </div>
             )}
 
-            {device.view === 'owner' && (
+            {!registering && device.view === 'owner' && (
               <Link
                 href={`/account/service/new?device=${encodeURIComponent(token)}`}
                 className="inline-flex w-full items-center justify-center rounded-lg bg-[#1A1A1A] px-4 py-2 font-medium text-white"
@@ -358,7 +396,7 @@ export function DevicePassport() {
           </div>
         </section>
 
-        {device.view === 'owner' && device.qr_token && device.serial_number ? (
+        {!registering && device.view === 'owner' && device.qr_token && device.serial_number ? (
           <OwnerQrCard
             qrToken={device.qr_token}
             modelName={device.model_name}
@@ -402,8 +440,37 @@ export function DevicePassport() {
           </section>
         )}
 
-        <section className="bg-white border border-gray-200 rounded-2xl p-4 space-y-3 text-sm">
-          <Link href="/faq" className="font-semibold text-[#FF7A19]">FAQs</Link>
+        {faqs.length > 0 && (
+          <section className="bg-white border border-gray-200 rounded-2xl p-4 space-y-2">
+            <h2 className="font-semibold text-[#1A1A1A]">Laptop FAQs</h2>
+            {faqs.map((faq) => {
+              const open = openFaqId === faq.id;
+              return (
+                <div key={faq.id} className="border border-gray-200 rounded-lg">
+                  <button
+                    type="button"
+                    className="w-full flex items-center justify-between gap-3 px-3 py-3 text-left"
+                    onClick={() => setOpenFaqId(open ? null : faq.id)}
+                    aria-expanded={open}
+                  >
+                    <span className="text-sm font-medium text-[#1A1A1A]">{faq.question}</span>
+                    <ChevronDown size={16} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+                  </button>
+                  {open ? (
+                    <div className="px-3 pb-3">
+                      <ContentHtml html={faq.answer_html} />
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+            <p className="pt-1 text-sm">
+              <Link href="/faq" className="font-semibold text-[#FF7A19]">Store FAQs</Link>
+            </p>
+          </section>
+        )}
+
+        <section className="bg-white border border-gray-200 rounded-2xl p-4 text-sm">
           <SupportContact contact={contact} />
         </section>
       </div>
@@ -423,7 +490,7 @@ function Detail({ label, value, mono }: { label: string; value: string; mono?: b
 function SupportContact({ contact }: { contact: StoreContact }) {
   const whatsapp = whatsappHref(contact.whatsapp);
   return (
-    <div className="mt-4 space-y-2 text-sm text-left">
+    <div className="space-y-2 text-sm text-left">
       <p className="font-semibold text-[#1A1A1A]">VENTECH support</p>
       <a className="block text-[#FF7A19]" href={`tel:${contact.phone.replace(/\s/g, '')}`}>{contact.phone}</a>
       {whatsapp ? (

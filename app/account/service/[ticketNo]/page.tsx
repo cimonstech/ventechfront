@@ -171,7 +171,7 @@ export default function ServiceRequestPage() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#FF7A19]">Service request</p>
-              <h1 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight break-words">{ticket.ticket_no}</h1>
+              <h1 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight break-words text-white">{ticket.ticket_no}</h1>
               <p className="mt-2 text-sm text-white/80 min-w-0 break-words">{ticket.laptop_model}</p>
             </div>
             <div className="flex flex-col items-end gap-2 shrink-0">

@@ -2,6 +2,7 @@
 
 import { authHeaders } from '@/lib/authHeaders';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { X, Download, Mail, Package, User, MapPin, Calendar, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -62,9 +63,11 @@ interface OrderDetailModalProps {
 export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: OrderDetailModalProps) {
   const { canEdit } = useAccess();
   const canEditOrders = canEdit('orders');
+  const router = useRouter();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [serialWarning, setSerialWarning] = useState<{ status: string; count: number; orderNumber: string | null } | null>(null);
 
   useEffect(() => {
     if (isOpen && orderId) {
@@ -233,8 +236,28 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
     }
   };
 
-  const handleStatusUpdate = async (newStatus: string) => {
+  const handleStatusUpdate = async (newStatus: string, skipWarning = false) => {
     if (!order || updatingStatus) return;
+
+    if (!skipWarning && (newStatus === 'shipped' || newStatus === 'delivered')) {
+      try {
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+        const response = await fetch(`${API_URL}/api/admin/orders/${orderId}/device-status`, {
+          headers: await authHeaders(),
+        });
+        const body = await response.json().catch(() => ({}));
+        if (response.ok && body?.success && Number(body.data?.missing_serials) > 0) {
+          setSerialWarning({
+            status: newStatus,
+            count: Number(body.data.missing_serials),
+            orderNumber: body.data.order_number || order.order_number,
+          });
+          return;
+        }
+      } catch (error) {
+        console.error('device status check', error);
+      }
+    }
 
     try {
       setUpdatingStatus(true);
@@ -676,6 +699,42 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
           </div>
         </div>
       </div>
+
+      {serialWarning ? (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-lg">
+            <p className="text-lg font-semibold text-[#1A1A1A]">
+              {serialWarning.count} laptop{serialWarning.count === 1 ? '' : 's'} on this order have no serial yet.
+            </p>
+            <p className="mt-2 text-sm text-[#3A3A3A]">
+              Add serial numbers before shipping, or continue if you will register them later.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button
+                onClick={() => {
+                  const orderNumber = serialWarning.orderNumber || order?.order_number;
+                  setSerialWarning(null);
+                  if (orderNumber) {
+                    router.push(`/admin/devices?order=${encodeURIComponent(orderNumber)}`);
+                  }
+                }}
+              >
+                Add serials now
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const next = serialWarning.status;
+                  setSerialWarning(null);
+                  void handleStatusUpdate(next, true);
+                }}
+              >
+                Continue anyway
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

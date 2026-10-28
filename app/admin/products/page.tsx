@@ -25,6 +25,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 import { CSVExporter, ProductColumns } from '@/lib/csvExport';
+import { deviceRequest } from '@/lib/devicesAdmin';
 
 export default function AdminProductsPage() {
   const router = useRouter();
@@ -38,6 +39,8 @@ export default function AdminProductsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+  const [warrantyGaps, setWarrantyGaps] = useState<{ count: number; ids: string[] }>({ count: 0, ids: [] });
+  const [missingWarrantyOnly, setMissingWarrantyOnly] = useState(false);
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
@@ -56,15 +59,43 @@ export default function AdminProductsPage() {
     }, 300);
     
     return () => clearTimeout(timeoutId);
-  }, [isAuthenticated, user, pagination.page, searchQuery]);
+  }, [isAuthenticated, user, pagination.page, searchQuery, missingWarrantyOnly]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !hasAdminEntry(user?.role)) return;
+    let cancelled = false;
+    deviceRequest<{ count: number; ids: string[] }>('/api/admin/devices/laptop-warranty-gaps')
+      .then((result) => {
+        if (!cancelled) setWarrantyGaps(result.data || { count: 0, ids: [] });
+      })
+      .catch((error) => console.error('laptop warranty gaps', error));
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, user]);
 
   const fetchProducts = async () => {
     try {
       setIsLoading(true);
-      let productsData = await productService.getProducts({
-        limit: pagination.limit,
-        offset: (pagination.page - 1) * pagination.limit,
-      });
+      let productsData: Product[] = [];
+      if (missingWarrantyOnly && warrantyGaps.ids.length) {
+        const { data, error } = await supabase
+          .from('products')
+          .select(`
+            *,
+            categories!products_category_id_fkey(id, name, slug),
+            brands!products_brand_id_fkey(id, name, slug)
+          `)
+          .in('id', warrantyGaps.ids)
+          .order('name');
+        if (error) throw error;
+        productsData = (data || []) as Product[];
+      } else {
+        productsData = await productService.getProducts({
+          limit: pagination.limit,
+          offset: (pagination.page - 1) * pagination.limit,
+        });
+      }
       
       // Apply search filter client-side
       if (searchQuery) {
@@ -251,6 +282,23 @@ export default function AdminProductsPage() {
 
       {/* Content */}
       <div className="container mx-auto px-4 py-8">
+        {warrantyGaps.count > 0 ? (
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-sm font-medium text-[#1A1A1A]">
+              {warrantyGaps.count} laptop product{warrantyGaps.count === 1 ? '' : 's'} have no default warranty
+            </p>
+            <button
+              type="button"
+              className="text-sm font-semibold text-[#FF7A19]"
+              onClick={() => {
+                setMissingWarrantyOnly((current) => !current);
+                setPagination((current) => ({ ...current, page: 1 }));
+              }}
+            >
+              {missingWarrantyOnly ? 'Show all products' : 'Show them'}
+            </button>
+          </div>
+        ) : null}
         {/* Search & Filters */}
         <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
           <div className="flex gap-4">

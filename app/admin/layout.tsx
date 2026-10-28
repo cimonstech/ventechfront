@@ -65,6 +65,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState<number | undefined>(undefined);
   const [submittedTickets, setSubmittedTickets] = useState<number | undefined>(undefined);
   const [affiliateQueue, setAffiliateQueue] = useState<number | undefined>(undefined);
+  const [pendingDevices, setPendingDevices] = useState<number | undefined>(undefined);
   const { access, loading: accessLoading } = useAccess();
 
   useEffect(() => {
@@ -83,7 +84,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const includeNotifications = isFullAdmin(access.role);
     const includeTickets = canViewModule(access, 'tickets');
     const includeAffiliates = canViewModule(access, 'affiliates');
-    if (!includeOrders && !includeNotifications && !includeTickets && !includeAffiliates) return;
+    const includeDevices = canViewModule(access, 'devices');
+    if (!includeOrders && !includeNotifications && !includeTickets && !includeAffiliates && !includeDevices) return;
 
     const fetchBadgeCounts = async () => {
       try {
@@ -112,6 +114,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             setAffiliateQueue(await affiliateQueueBadge());
           } catch (error) {
             console.error('affiliate queue badge', error);
+          }
+        }
+
+        if (includeDevices) {
+          try {
+            const result = await deviceRequest('/api/admin/devices?limit=1&page=1&status=pending');
+            setPendingDevices(result.pending_count || 0);
+          } catch (error) {
+            console.error('pending devices badge', error);
           }
         }
 
@@ -254,6 +265,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       icon: Laptop,
       label: 'Devices',
       href: '/admin/devices',
+      badge: pendingDevices !== undefined ? (pendingDevices > 0 ? pendingDevices : undefined) : undefined,
     },
     {
       icon: Wrench,

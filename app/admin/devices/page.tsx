@@ -17,6 +17,7 @@ import {
 } from '@/lib/devicesAdmin';
 
 const STATUS_LABEL: Record<DeviceStatus, string> = {
+  pending: 'Awaiting serial',
   active: 'Active',
   transferred: 'Transferred',
   retired: 'Retired',
@@ -37,6 +38,11 @@ export default function AdminDevicesPage() {
   const [total, setTotal] = useState(0);
   const [selected, setSelected] = useState<string[]>([]);
   const [bootstrapped, setBootstrapped] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [serialDrafts, setSerialDrafts] = useState<Record<string, string>>({});
+  const [warrantyDrafts, setWarrantyDrafts] = useState<Record<string, string>>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
     const order = new URLSearchParams(window.location.search).get('order') || '';
@@ -71,6 +77,17 @@ export default function AdminDevicesPage() {
         setRows(result.data || []);
         setTotal(result.pagination?.total || 0);
         setTotalPages(result.pagination?.totalPages || 1);
+        if (typeof result.pending_count === 'number') setPendingCount(result.pending_count);
+        const serials: Record<string, string> = {};
+        const warranties: Record<string, string> = {};
+        for (const row of result.data || []) {
+          if (row.status === 'pending') {
+            serials[row.id] = '';
+            warranties[row.id] = row.warranty_months ? String(row.warranty_months) : '';
+          }
+        }
+        setSerialDrafts(serials);
+        setWarrantyDrafts(warranties);
       } catch (error) {
         if (!cancelled) toast.error(apiMessage(error, 'Could not load devices'));
       } finally {
@@ -81,7 +98,7 @@ export default function AdminDevicesPage() {
     return () => {
       cancelled = true;
     };
-  }, [bootstrapped, search, status, warranty, page]);
+  }, [bootstrapped, search, status, warranty, page, reloadToken]);
 
   const pageIds = rows.map((row) => row.id);
   const allOnPage = pageIds.length > 0 && pageIds.every((id) => selected.includes(id));
@@ -105,6 +122,41 @@ export default function AdminDevicesPage() {
     router.push(`/admin/devices/labels?ids=${selected.join(',')}`);
   };
 
+  const savePending = async (device: DeviceRecord) => {
+    const serial = (serialDrafts[device.id] || '').trim();
+    if (!serial) {
+      toast.error('Enter a serial number');
+      return;
+    }
+    const warrantyEditable = device.product?.warranty_months == null;
+    const monthsRaw = warrantyDrafts[device.id];
+    let warrantyMonths: number | undefined;
+    if (warrantyEditable && monthsRaw !== undefined && monthsRaw.trim() !== '') {
+      const months = Number(monthsRaw);
+      if (!Number.isInteger(months) || months < 0 || months > 120) {
+        toast.error('Warranty months must be between 0 and 120');
+        return;
+      }
+      warrantyMonths = months;
+    }
+    setSavingId(device.id);
+    try {
+      await deviceRequest(`/api/admin/devices/${device.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          serial_number: serial,
+          ...(warrantyMonths === undefined ? {} : { warranty_months: warrantyMonths }),
+        }),
+      });
+      toast.success('Laptop registered.');
+      setReloadToken((current) => current + 1);
+    } catch (error) {
+      toast.error(apiMessage(error, 'Could not save this serial'));
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -112,7 +164,7 @@ export default function AdminDevicesPage() {
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={printLabels}>Print labels</Button>
           {editable && (
-            <Button onClick={() => router.push('/admin/devices/new')}>Add from order</Button>
+            <Button onClick={() => router.push('/admin/devices/new')}>Add from Orders</Button>
           )}
         </div>
       </div>
@@ -124,19 +176,34 @@ export default function AdminDevicesPage() {
           placeholder="Search serial, customer, order, or model"
           className="min-h-11 w-full min-w-0 flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19] sm:min-w-[220px]"
         />
-        <select
-          value={status}
-          onChange={(event) => {
-            setStatus(event.target.value as '' | DeviceStatus);
-            setPage(1);
-          }}
-          className="px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
-        >
-          <option value="">All statuses</option>
-          <option value="active">Active</option>
-          <option value="transferred">Transferred</option>
-          <option value="retired">Retired</option>
-        </select>
+        <div className="flex flex-wrap gap-2">
+          {([
+            { value: 'pending' as const, label: 'Awaiting serial', count: pendingCount },
+            { value: '' as const, label: 'All' },
+            { value: 'active' as const, label: 'Active' },
+            { value: 'transferred' as const, label: 'Transferred' },
+            { value: 'retired' as const, label: 'Retired' },
+          ]).map((tab) => (
+            <button
+              key={tab.label}
+              type="button"
+              onClick={() => {
+                setStatus(tab.value);
+                setPage(1);
+              }}
+              className={`min-h-11 inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${
+                status === tab.value ? 'bg-[#1A1A1A] text-white' : 'bg-gray-100 text-[#1A1A1A]'
+              }`}
+            >
+              {tab.label}
+              {tab.count ? (
+                <span className={`rounded-full px-2 py-0.5 text-xs ${status === tab.value ? 'bg-white text-[#1A1A1A]' : 'bg-[#FF7A19] text-white'}`}>
+                  {tab.count}
+                </span>
+              ) : null}
+            </button>
+          ))}
+        </div>
         <select
           value={warranty}
           onChange={(event) => {
@@ -187,9 +254,38 @@ export default function AdminDevicesPage() {
                   />
                 </td>
                 <td className="px-4 py-3">
-                  <Link href={`/admin/devices/${device.id}`} className="font-mono text-sm text-[#FF7A19] font-semibold">
-                    {device.serial_number}
-                  </Link>
+                  {device.status === 'pending' ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        value={serialDrafts[device.id] || ''}
+                        disabled={!editable || savingId === device.id}
+                        onChange={(event) => setSerialDrafts((current) => ({ ...current, [device.id]: event.target.value }))}
+                        placeholder="Serial number"
+                        className="min-h-11 w-40 px-3 py-1 border border-gray-300 rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
+                      />
+                      {device.product?.warranty_months == null ? (
+                        <input
+                          type="number"
+                          min={0}
+                          max={120}
+                          value={warrantyDrafts[device.id] || ''}
+                          disabled={!editable || savingId === device.id}
+                          onChange={(event) => setWarrantyDrafts((current) => ({ ...current, [device.id]: event.target.value }))}
+                          placeholder="Warranty months"
+                          className="min-h-11 w-28 px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
+                        />
+                      ) : null}
+                      {editable ? (
+                        <Button size="sm" isLoading={savingId === device.id} onClick={() => void savePending(device)}>
+                          Save
+                        </Button>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <Link href={`/admin/devices/${device.id}`} className="font-mono text-sm text-[#FF7A19] font-semibold">
+                      {device.serial_number}
+                    </Link>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-sm text-[#1A1A1A]">{device.model_name}</td>
                 <td className="px-4 py-3">
@@ -212,7 +308,7 @@ export default function AdminDevicesPage() {
                 <td className="px-4 py-3">
                   <Badge
                     size="sm"
-                    variant={device.status === 'active' ? 'success' : device.status === 'transferred' ? 'warning' : 'default'}
+                    variant={device.status === 'active' ? 'success' : device.status === 'transferred' ? 'warning' : device.status === 'pending' ? 'info' : 'default'}
                   >
                     {STATUS_LABEL[device.status] || device.status}
                   </Badge>

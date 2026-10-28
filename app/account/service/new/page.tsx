@@ -22,6 +22,8 @@ interface MineDevice {
   serial_number: string;
   qr_token?: string;
   warranty: DeviceWarranty;
+  status?: string;
+  registering?: boolean;
 }
 
 interface OwnerDevice {
@@ -29,6 +31,7 @@ interface OwnerDevice {
   model_name: string;
   serial_number?: string;
   warranty: DeviceWarranty;
+  registering?: boolean;
 }
 
 interface LocalFile {
@@ -114,7 +117,7 @@ function NewServiceRequest() {
           try {
             const deviceResult = await deviceRequest<OwnerDevice>(`/api/devices/public/${encodeURIComponent(deviceToken)}`);
             if (cancelled) return;
-            if (deviceResult.data?.view === 'owner' && deviceResult.data.warranty) {
+            if (deviceResult.data?.view === 'owner' && deviceResult.data.warranty && !deviceResult.data.registering) {
               setLinked(deviceResult.data);
             } else {
               toast.error('Device not found.');
@@ -129,7 +132,13 @@ function NewServiceRequest() {
         }
         if (showList) {
           const mine = await deviceRequest<MineDevice[]>('/api/devices/mine');
-          if (!cancelled) setDevices((mine.data || []).filter((device) => device.qr_token));
+          const rows = (mine.data || []).filter((device) => device.qr_token && device.status !== 'pending' && !device.registering);
+          if (cancelled) return;
+          setDevices(rows);
+          if (!deviceToken && rows[0]?.qr_token) {
+            setSource('listed');
+            setSelectedToken(rows[0].qr_token);
+          }
         }
       } catch (error) {
         if (!cancelled) toast.error(apiMessage(error, 'Could not load this form'));
@@ -378,7 +387,7 @@ function NewServiceRequest() {
 
         <header className="rounded-2xl bg-[#1A1A1A] text-white px-5 py-6 sm:px-7 sm:py-8">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#FF7A19]">Service</p>
-          <h1 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight">Request service</h1>
+          <h1 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight text-white">Request service</h1>
           <p className="mt-2 text-sm text-white/80">Tell us what is going wrong. We will email you a copy of the request.</p>
         </header>
 

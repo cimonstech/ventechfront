@@ -23,8 +23,10 @@ const fieldClass = 'mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focu
 export default function DeviceDetailPage() {
   const params = useParams<{ id: string }>();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
-  const { canEdit } = useAccess();
+  const { canEdit, access } = useAccess();
   const editable = canEdit('devices');
+  const isSuperadmin = access?.role === 'superadmin';
+  const [warrantyStartReason, setWarrantyStartReason] = useState('');
   const [device, setDevice] = useState<DeviceRecord | null>(null);
   const [serial, setSerial] = useState('');
   const [warrantyMonths, setWarrantyMonths] = useState('');
@@ -68,7 +70,7 @@ export default function DeviceDetailPage() {
 
   const publicUrl = device ? devicePublicUrl(device.qr_token) : '';
   useSetAdminHeading(
-    device ? `${device.model_name} · ${device.serial_number}` : 'Device',
+    device ? `${device.model_name} · ${device.serial_number || 'Awaiting serial'}` : 'Device',
     id || null
   );
 
@@ -100,9 +102,20 @@ export default function DeviceDetailPage() {
       toast.error('Enter a serial number');
       return;
     }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(warrantyStart)) {
-      toast.error('Enter a warranty start date');
-      return;
+    const changingStart = device?.warranty_start?.slice(0, 10) !== warrantyStart;
+    if (changingStart) {
+      if (!isSuperadmin) {
+        toast.error('Only a superadmin can change the warranty start date');
+        return;
+      }
+      if (!warrantyStartReason.trim()) {
+        toast.error('Give a reason for changing the warranty start date');
+        return;
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(warrantyStart)) {
+        toast.error('Enter a warranty start date');
+        return;
+      }
     }
     setSaving(true);
     try {
@@ -111,9 +124,11 @@ export default function DeviceDetailPage() {
         body: JSON.stringify({
           serial_number: serial.trim(),
           warranty_months: months,
-          warranty_start: warrantyStart,
           notes: notes.trim() ? notes.trim() : null,
-          status,
+          ...(device?.status === 'pending' ? {} : { status }),
+          ...(changingStart
+            ? { warranty_start: warrantyStart, warranty_start_reason: warrantyStartReason.trim() }
+            : {}),
         }),
       });
       apply(result.data);
@@ -178,7 +193,7 @@ export default function DeviceDetailPage() {
     try {
       const dataUrl = await qrDataUrl(publicUrl, 512);
       const blob = await (await fetch(dataUrl)).blob();
-      downloadBlob(`${safeFileName(device.serial_number)}.png`, blob);
+      downloadBlob(`${safeFileName(device.serial_number || 'device')}.png`, blob);
     } catch (error) {
       toast.error(apiMessage(error, 'Could not download the PNG'));
     }
@@ -188,7 +203,7 @@ export default function DeviceDetailPage() {
     if (!publicUrl || !device) return;
     try {
       const svg = await qrSvg(publicUrl);
-      downloadBlob(`${safeFileName(device.serial_number)}.svg`, new Blob([svg], { type: 'image/svg+xml' }));
+      downloadBlob(`${safeFileName(device.serial_number || 'device')}.svg`, new Blob([svg], { type: 'image/svg+xml' }));
     } catch (error) {
       toast.error(apiMessage(error, 'Could not download the SVG'));
     }
@@ -269,15 +284,36 @@ export default function DeviceDetailPage() {
             </label>
             <label className="block text-sm">
               <span className="font-semibold text-[#1A1A1A]">Warranty start</span>
-              <input type="date" className={fieldClass} value={warrantyStart} disabled={!editable} onChange={(event) => setWarrantyStart(event.target.value)} />
+              <input
+                type="date"
+                className={fieldClass}
+                value={warrantyStart}
+                disabled={!editable || !isSuperadmin}
+                onChange={(event) => setWarrantyStart(event.target.value)}
+              />
             </label>
+            {isSuperadmin && device.warranty_start?.slice(0, 10) !== warrantyStart ? (
+              <label className="block text-sm md:col-span-2">
+                <span className="font-semibold text-[#1A1A1A]">Reason for changing warranty start</span>
+                <input
+                  className={fieldClass}
+                  value={warrantyStartReason}
+                  onChange={(event) => setWarrantyStartReason(event.target.value)}
+                  placeholder="Required"
+                />
+              </label>
+            ) : null}
             <label className="block text-sm">
               <span className="font-semibold text-[#1A1A1A]">Status</span>
-              <select className={fieldClass} value={status} disabled={!editable} onChange={(event) => setStatus(event.target.value as DeviceStatus)}>
-                <option value="active">Active</option>
-                <option value="transferred">Transferred</option>
-                <option value="retired">Retired</option>
-              </select>
+              {device.status === 'pending' ? (
+                <p className="mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg">Awaiting serial</p>
+              ) : (
+                <select className={fieldClass} value={status} disabled={!editable} onChange={(event) => setStatus(event.target.value as DeviceStatus)}>
+                  <option value="active">Active</option>
+                  <option value="transferred">Transferred</option>
+                  <option value="retired">Retired</option>
+                </select>
+              )}
             </label>
             {!ownersDiffer(device) && (
               <ReadOnly

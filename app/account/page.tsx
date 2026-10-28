@@ -166,11 +166,24 @@ export default function AccountOverviewPage() {
         ) : (
           <ul className="mt-3 space-y-2">
             {overview.devices.items.map((device, index) => (
-              <li key={`${device.model}-${device.warranty_end || 'none'}-${index}`} className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 p-3">
-                <p className="min-w-0 font-medium text-[#1A1A1A]">{device.model}</p>
-                <DeviceWarrantyBadge
-                  warranty={{ status: device.warranty_status as 'active' | 'expired' | 'none', endsOn: device.warranty_end }}
-                />
+              <li key={`${device.model}-${device.warranty_end || 'none'}-${index}`} className="rounded-lg border border-gray-100 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="min-w-0 font-medium text-[#1A1A1A]">{device.model}</p>
+                  {device.status === 'pending' || device.warranty_status === 'pending' ? (
+                    <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800">
+                      Being prepared
+                    </span>
+                  ) : (
+                    <DeviceWarrantyBadge
+                      warranty={{ status: device.warranty_status as 'active' | 'expired' | 'none', endsOn: device.warranty_end }}
+                    />
+                  )}
+                </div>
+                {device.status === 'pending' || device.warranty_status === 'pending' ? (
+                  <p className="mt-2 text-sm text-[#3A3A3A]">
+                    Setup, care, and support are already in your laptop portal. Serial number and warranty dates appear once VENTECH registers it.
+                  </p>
+                ) : null}
               </li>
             ))}
           </ul>

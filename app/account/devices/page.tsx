@@ -12,11 +12,15 @@ import { settingsService } from '@/lib/settings.service';
 import { apiMessage, deviceRequest, formatDeviceDate, type DeviceWarranty } from '@/lib/devicesAdmin';
 
 interface MineDevice {
+  id?: string;
+  status?: string;
+  registering?: boolean;
   model_name: string;
-  serial_number: string;
-  purchase_date: string;
-  warranty: DeviceWarranty;
+  serial_number?: string | null;
+  purchase_date?: string;
+  warranty?: DeviceWarranty;
   qr_token?: string;
+  order_number?: string | null;
 }
 
 const FALLBACK_PHONE = '+233 55 134 4310';
@@ -83,31 +87,53 @@ export default function MyDevicesPage() {
         ) : (
           <ul className="space-y-3">
             {devices.map((device) => (
-              <li key={`${device.serial_number}-${device.purchase_date}`} className="bg-white border border-gray-200 rounded-xl p-4">
-                <p className="font-semibold text-[#1A1A1A]">{device.model_name}</p>
-                <p className="text-sm font-mono text-[#3A3A3A] mt-1">{device.serial_number}</p>
-                <p className="text-xs text-[#3A3A3A] mt-1">Purchased {formatDeviceDate(device.purchase_date)}</p>
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                  <DeviceWarrantyBadge warranty={device.warranty} />
-                  {device.qr_token ? (
-                    <div className="flex flex-wrap items-center gap-3">
-                      <button
-                        type="button"
-                        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-[#FF7A19] hover:bg-orange-50"
-                        aria-label={`My QR code for ${device.serial_number}`}
-                        onClick={() => setQrDevice(device)}
-                      >
-                        <QrCode size={20} />
-                      </button>
-                      <Link href={`/d/${encodeURIComponent(device.qr_token)}`} className="text-sm font-semibold text-[#FF7A19]">
-                        View
-                      </Link>
-                      <Link href={`/account/service/new?device=${encodeURIComponent(device.qr_token)}`} className="text-sm font-semibold text-[#FF7A19]">
-                        Request service
-                      </Link>
-                    </div>
+              <li key={device.id || `${device.serial_number}-${device.purchase_date}`} className="bg-white border border-gray-200 rounded-xl p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-semibold text-[#1A1A1A]">{device.model_name}</p>
+                  {device.status === 'pending' || device.registering ? (
+                    <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800">
+                      Being prepared
+                    </span>
                   ) : null}
                 </div>
+                {device.status === 'pending' || device.registering ? (
+                  <>
+                    <p className="mt-2 text-sm text-[#3A3A3A]">
+                      Setup, care, and support are already in your laptop portal. Serial number and warranty dates appear once VENTECH registers it.
+                    </p>
+                    {device.qr_token ? (
+                      <Link href={`/d/${encodeURIComponent(device.qr_token)}`} className="mt-3 inline-flex text-sm font-semibold text-[#FF7A19]">
+                        Open laptop portal
+                      </Link>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-mono text-[#3A3A3A] mt-1">{device.serial_number}</p>
+                    <p className="text-xs text-[#3A3A3A] mt-1">Purchased {formatDeviceDate(device.purchase_date)}</p>
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                      {device.warranty ? <DeviceWarrantyBadge warranty={device.warranty} /> : null}
+                      {device.qr_token ? (
+                        <div className="flex flex-wrap items-center gap-3">
+                          <button
+                            type="button"
+                            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-[#FF7A19] hover:bg-orange-50"
+                            aria-label={`My QR code for ${device.serial_number}`}
+                            onClick={() => setQrDevice(device)}
+                          >
+                            <QrCode size={20} />
+                          </button>
+                          <Link href={`/d/${encodeURIComponent(device.qr_token)}`} className="text-sm font-semibold text-[#FF7A19]">
+                            View
+                          </Link>
+                          <Link href={`/account/service/new?device=${encodeURIComponent(device.qr_token)}`} className="text-sm font-semibold text-[#FF7A19]">
+                            Request service
+                          </Link>
+                        </div>
+                      ) : null}
+                    </div>
+                  </>
+                )}
               </li>
             ))}
           </ul>
@@ -132,7 +158,7 @@ export default function MyDevicesPage() {
             <OwnerQrCard
               qrToken={qrDevice.qr_token}
               modelName={qrDevice.model_name}
-              serialNumber={qrDevice.serial_number}
+              serialNumber={qrDevice.serial_number || ''}
               phone={phone}
             />
           </div>

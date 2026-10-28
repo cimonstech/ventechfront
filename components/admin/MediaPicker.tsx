@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Upload, X, Grid, Search, ImageIcon, Loader2, Check } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { mediaService, MediaFile } from '@/services/media.service';
@@ -29,6 +29,7 @@ export function MediaPicker({
   const [filteredFiles, setFilteredFiles] = useState<MediaFile[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -96,10 +97,8 @@ export function MediaPicker({
         setSelectedFiles([...selectedFiles, ...urls]);
       }
       
-      // Reset file input
-      const input = document.getElementById('media-picker-upload') as HTMLInputElement;
-      if (input) {
-        input.value = '';
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
       }
     } catch (error: any) {
       console.error('Error uploading files:', error);
@@ -145,24 +144,23 @@ export function MediaPicker({
           </div>
           <div className="flex items-center gap-3">
             <input
+              ref={fileInputRef}
               type="file"
               accept="image/*"
               multiple={multiple}
               onChange={handleUpload}
               className="hidden"
-              id="media-picker-upload"
               disabled={uploading}
             />
-            <label htmlFor="media-picker-upload">
-              <Button
-                variant="outline"
-                icon={uploading ? <Loader2 className="animate-spin" size={18} /> : <Upload size={18} />}
-                disabled={uploading}
-                className="cursor-pointer"
-              >
-                {uploading ? 'Uploading...' : 'Upload New'}
-              </Button>
-            </label>
+            <Button
+              type="button"
+              variant="outline"
+              icon={uploading ? <Loader2 className="animate-spin" size={18} /> : <Upload size={18} />}
+              disabled={uploading}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {uploading ? 'Uploading...' : 'Upload New'}
+            </Button>
             {multiple && selectedFiles.length > 0 && (
               <Button
                 variant="primary"
@@ -209,11 +207,14 @@ export function MediaPicker({
                 {searchQuery ? 'Try adjusting your search' : 'Upload your first image to get started'}
               </p>
               {!searchQuery && (
-                <label htmlFor="media-picker-upload">
-                  <Button variant="primary" icon={<Upload size={18} />} className="cursor-pointer">
-                    Upload Image
-                  </Button>
-                </label>
+                <Button
+                  type="button"
+                  variant="primary"
+                  icon={<Upload size={18} />}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  Upload Image
+                </Button>
               )}
             </div>
           ) : (

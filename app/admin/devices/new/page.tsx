@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { useAccess } from '@/context/AccessContext';
-import { OrderLookup, apiMessage, deviceRequest } from '@/lib/devicesAdmin';
+import { useSetAdminHeading } from '@/components/admin/AdminHeading';
+import { OrderLookup, apiMessage, deviceRequest, formatDeviceDate } from '@/lib/devicesAdmin';
 
 interface UnitDraft {
   key: string;
@@ -16,9 +17,12 @@ interface UnitDraft {
   serial_number: string;
   warranty_months: string;
   purchase_date: string;
+  device_id?: string;
+  warranty_locked?: boolean;
 }
 
 export default function AddDevicesPage() {
+  useSetAdminHeading('Add devices from orders');
   const router = useRouter();
   const { canEdit } = useAccess();
   const editable = canEdit('devices');
@@ -43,16 +47,33 @@ export default function AddDevicesPage() {
       const drafts: UnitDraft[] = [];
       for (const item of result.data.items) {
         if (!item.product_id) continue;
-        const remaining = Math.max(0, Number(item.quantity) - Number(item.devices_registered));
+        const pending = item.pending_devices || [];
+        for (const pendingDevice of pending) {
+          drafts.push({
+            key: pendingDevice.id,
+            order_item_id: item.order_item_id,
+            product_id: pendingDevice.product_id || item.product_id,
+            product_name: item.product_name,
+            serial_number: '',
+            warranty_months: pendingDevice.warranty_months === null || pendingDevice.warranty_months === undefined
+              ? ''
+              : String(pendingDevice.warranty_months),
+            purchase_date: (pendingDevice.purchase_date || orderDate).slice(0, 10),
+            device_id: pendingDevice.id,
+            warranty_locked: item.warranty_months != null,
+          });
+        }
+        const remaining = Math.max(0, Number(item.quantity) - Number(item.devices_registered) - pending.length);
         for (let index = 0; index < remaining; index += 1) {
           drafts.push({
-            key: `${item.order_item_id}-${index}`,
+            key: `${item.order_item_id}-new-${index}`,
             order_item_id: item.order_item_id,
             product_id: item.product_id,
             product_name: item.product_name,
             serial_number: '',
             warranty_months: item.warranty_months === null || item.warranty_months === undefined ? '' : String(item.warranty_months),
             purchase_date: orderDate,
+            warranty_locked: item.warranty_months != null,
           });
         }
       }
@@ -87,10 +108,6 @@ export default function AddDevicesPage() {
           return;
         }
       }
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(unit.purchase_date)) {
-        toast.error('Enter a purchase date for every laptop');
-        return;
-      }
     }
 
     setSaving(true);
@@ -104,7 +121,7 @@ export default function AddDevicesPage() {
             product_id: unit.product_id,
             serial_number: unit.serial_number.trim(),
             ...(unit.warranty_months.trim() === '' ? {} : { warranty_months: Number(unit.warranty_months) }),
-            purchase_date: unit.purchase_date,
+            ...(unit.device_id ? { device_id: unit.device_id } : {}),
           })),
         }),
       });
@@ -171,20 +188,16 @@ export default function AddDevicesPage() {
                         min={0}
                         max={120}
                         value={unit.warranty_months}
-                        disabled={!editable}
+                        disabled={!editable || unit.warranty_locked}
                         onChange={(event) => updateUnit(unit.key, { warranty_months: event.target.value })}
                         className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
                       />
                     </label>
                     <label className="block text-sm">
                       <span className="font-semibold text-[#1A1A1A]">Purchase date</span>
-                      <input
-                        type="date"
-                        value={unit.purchase_date}
-                        disabled={!editable}
-                        onChange={(event) => updateUnit(unit.key, { purchase_date: event.target.value })}
-                        className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
-                      />
+                      <p className="mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[#1A1A1A]">
+                        {formatDeviceDate(unit.purchase_date) || unit.purchase_date}
+                      </p>
                     </label>
                   </div>
                 ))}

@@ -174,7 +174,7 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
     try {
       const { data, error } = await supabase
         .from('categories')
-        .select('id, name')
+        .select('id, name, slug, parent_id')
         .order('name');
       if (error) throw error;
       setCategories(data || []);
@@ -182,6 +182,26 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
       console.error('Error fetching categories:', error);
     }
   };
+
+  const laptopCategoryIds = (() => {
+    const wanted = new Set(
+      categories
+        .filter((cat: { slug?: string }) => String(cat.slug || '').toLowerCase() === 'laptops')
+        .map((cat: { id: string }) => cat.id)
+    );
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const cat of categories as Array<{ id: string; parent_id?: string | null }>) {
+        if (cat.parent_id && wanted.has(cat.parent_id) && !wanted.has(cat.id)) {
+          wanted.add(cat.id);
+          grew = true;
+        }
+      }
+    }
+    return wanted;
+  })();
+  const isLaptopCategory = Boolean(formData.category_id && laptopCategoryIds.has(formData.category_id));
 
   const fetchBrands = async () => {
     try {
@@ -589,6 +609,9 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
             <div>
               <label className="block text-sm font-semibold text-[#1A1A1A] mb-2">
                 Default warranty (months)
+                {isLaptopCategory ? (
+                  <span className="ml-2 text-xs font-medium text-[#FF7A19]">Recommended for laptops</span>
+                ) : null}
               </label>
               <input
                 type="number"
@@ -597,7 +620,7 @@ export function ProductModal({ isOpen, onClose, product, onSuccess }: ProductMod
                 step={1}
                 value={formData.warranty_months}
                 onChange={(e) => setFormData({ ...formData, warranty_months: e.target.value })}
-                placeholder="Leave blank if none"
+                placeholder={isLaptopCategory ? 'Recommended' : 'Leave blank if none'}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
               />
             </div>

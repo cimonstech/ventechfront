@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 import { postSignInPath } from '@/lib/landing';
 import { peekRememberedRedirect, clearRememberedRedirect, safeRedirectPath } from '@/lib/safeRedirect';
+import { linkPendingDevices } from '@/lib/devicesAdmin';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -130,6 +131,7 @@ export default function AuthCallbackPage() {
 
             // Otherwise, proceed with email verification flow
             await handleUserProfile(session.user);
+            await linkPendingDevices();
           setStatus('success');
           setMessage('Signed in successfully.');
             localStorage.removeItem('pendingVerificationEmail');
@@ -167,6 +169,7 @@ export default function AuthCallbackPage() {
 
             // Otherwise, proceed with email verification flow
             await handleUserProfile(data.user);
+            await linkPendingDevices();
             setStatus('success');
             setMessage('Signed in successfully.');
           localStorage.removeItem('pendingVerificationEmail');
