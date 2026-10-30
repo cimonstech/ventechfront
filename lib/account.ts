@@ -92,10 +92,15 @@ export function hasActiveInvestorRole(roles: ProgramRoleRow[] | undefined): bool
   return Boolean(roles?.some((row) => row.role === 'investor' && row.status === 'active'));
 }
 
-export function visibleAccountNav(roles: ProgramRoleRow[] | undefined): AccountNavItem[] {
+export function visibleAccountNav(
+  roles: ProgramRoleRow[] | undefined,
+  flags?: { feature_vlb_v3_enabled?: boolean } | null
+): AccountNavItem[] {
   return ACCOUNT_NAV.filter((item) => {
     if (item.require === 'affiliate') return hasAffiliateRole(roles);
-    if (item.require === 'investor-active') return hasActiveInvestorRole(roles);
+    if (item.require === 'investor-active') {
+      return flags?.feature_vlb_v3_enabled === true && hasActiveInvestorRole(roles);
+    }
     return true;
   });
 }

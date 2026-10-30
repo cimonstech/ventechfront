@@ -8,6 +8,7 @@ import { setUser, setLoading } from './authSlice';
 import { onAuthStateChange, getUserProfile } from '@/services/auth.service';
 import { supabase } from '@/lib/supabase';
 import { AccessProvider } from '@/context/AccessContext';
+import { clearRecoveryOnly, holdAuthUi, markRecoveryOnly } from '@/lib/recoverySession';
 
 export function ReduxProvider({ children }: { children: React.ReactNode }) {
   useLayoutEffect(() => {
@@ -34,7 +35,7 @@ export function ReduxProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        if (session?.user) {
+        if (session?.user && !holdAuthUi()) {
           // Session exists - fetch user profile
           const profile = await getUserProfile(session.user.id);
           if (profile) {
@@ -63,7 +64,19 @@ export function ReduxProvider({ children }: { children: React.ReactNode }) {
       
       try {
         // Handle INITIAL_SESSION - this happens on page refresh
+        if (event === 'PASSWORD_RECOVERY') {
+          markRecoveryOnly();
+          store.dispatch(setUser(null));
+          store.dispatch(setLoading(false));
+          return;
+        }
+
         if (event === 'INITIAL_SESSION' && session?.user) {
+          if (holdAuthUi()) {
+            store.dispatch(setUser(null));
+            store.dispatch(setLoading(false));
+            return;
+          }
           // Initial session load - fetch user profile
           const profile = await getUserProfile(session.user.id);
           if (profile) {
@@ -78,25 +91,34 @@ export function ReduxProvider({ children }: { children: React.ReactNode }) {
         }
         
         if (event === 'SIGNED_IN' && session?.user) {
-          // User signed in - fetch their profile
-          const profile = await getUserProfile(session.user.id);
-          if (profile) {
-            store.dispatch(setUser(profile));
+          if (holdAuthUi()) {
+            store.dispatch(setUser(null));
+          } else {
+            const profile = await getUserProfile(session.user.id);
+            if (profile) {
+              store.dispatch(setUser(profile));
+            }
           }
         } else if (event === 'SIGNED_OUT') {
-          // User signed out - clear state
+          clearRecoveryOnly();
           store.dispatch(setUser(null));
         } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-          // Token refreshed - ensure user is still set
-          const profile = await getUserProfile(session.user.id);
-          if (profile) {
-            store.dispatch(setUser(profile));
+          if (holdAuthUi()) {
+            store.dispatch(setUser(null));
+          } else {
+            const profile = await getUserProfile(session.user.id);
+            if (profile) {
+              store.dispatch(setUser(profile));
+            }
           }
         } else if (event === 'USER_UPDATED' && session?.user) {
-          // User updated - refresh profile
-          const profile = await getUserProfile(session.user.id);
-          if (profile) {
-            store.dispatch(setUser(profile));
+          if (holdAuthUi()) {
+            store.dispatch(setUser(null));
+          } else {
+            const profile = await getUserProfile(session.user.id);
+            if (profile) {
+              store.dispatch(setUser(profile));
+            }
           }
         }
       } catch (error: any) {

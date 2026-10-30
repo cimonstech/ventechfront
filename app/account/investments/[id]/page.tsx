@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { InfoNote, InfoTip } from '@/components/ui/InfoNote';
 import { StackRows } from '@/components/ui/ScrollTable';
+import { fetchPublicFeatures } from '@/lib/features';
 import {
   VLB_EARLY_EXIT_ALLOWED,
   apiMessage,
@@ -27,14 +28,38 @@ export default function AccountInvestmentDetailPage() {
   const [row, setRow] = useState<VlbInvestmentDetail | null>(null);
   const [busy, setBusy] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [dashboardOn, setDashboardOn] = useState<boolean | null>(null);
 
   const load = () =>
     vlbRequest<VlbInvestmentDetail>(`/api/vlb/me/investments/${id}`).then((result) => setRow(result.data));
 
   useEffect(() => {
-    if (!id) return;
+    let cancelled = false;
+    fetchPublicFeatures()
+      .then((flags) => {
+        if (!cancelled) setDashboardOn(flags.feature_vlb_v3_enabled === true);
+      })
+      .catch(() => {
+        if (!cancelled) setDashboardOn(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!id || dashboardOn !== true) return;
     load().catch((error) => toast.error(apiMessage(error, 'Could not load this investment.')));
-  }, [id]);
+  }, [id, dashboardOn]);
+
+  if (dashboardOn === false) {
+    return (
+      <div className="rounded-xl bg-white p-5 shadow-sm">
+        <h1 className="text-xl font-bold text-[#1A1A1A]">Investments</h1>
+        <p className="mt-2 text-sm text-[#3A3A3A]">This feature is not available yet.</p>
+      </div>
+    );
+  }
 
   if (!row) {
     return <p className="text-sm text-[#3A3A3A]">Loading investment…</p>;

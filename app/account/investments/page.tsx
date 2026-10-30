@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { Info } from 'lucide-react';
@@ -8,8 +8,11 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { InfoNote, InfoTip } from '@/components/ui/InfoNote';
 import { Sheet } from '@/components/ui/Sheet';
+import { AccessDenied, EmptyState, ErrorState, OverviewSkeleton } from '@/components/ui-states';
+import { useOnlineRefetch } from '@/hooks/useOnlineRefetch';
 import { useAccess } from '@/context/AccessContext';
 import { hasActiveInvestorRole } from '@/lib/account';
+import { fetchPublicFeatures } from '@/lib/features';
 import { settingsService } from '@/lib/settings.service';
 import {
   apiMessage,
@@ -44,6 +47,7 @@ function telHref(value: string): string {
 export default function AccountInvestmentsPage() {
   const { access } = useAccess();
   const allowed = hasActiveInvestorRole(access?.programRoles);
+  const [dashboardOn, setDashboardOn] = useState<boolean | null>(null);
   const [me, setMe] = useState<VlbMe | null>(null);
   const [docs, setDocs] = useState<VlbDocument[]>([]);
   const [plans, setPlans] = useState<VlbPublicPlan[]>([]);
@@ -56,37 +60,48 @@ export default function AccountInvestmentsPage() {
   const [phone, setPhone] = useState(FALLBACK_PHONE);
   const [whatsapp, setWhatsapp] = useState('');
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const [mine, documents] = await Promise.all([
       vlbRequest<VlbMe>('/api/vlb/me'),
       vlbRequest<VlbDocument[]>('/api/vlb/me/documents'),
     ]);
     setMe(mine.data);
     setDocs(documents.data || []);
-  };
+  }, []);
 
   useEffect(() => {
-    if (!allowed) return;
     let cancelled = false;
-    load()
-      .then(() => {
-        if (!cancelled) setFailed(false);
+    fetchPublicFeatures()
+      .then((flags) => {
+        if (!cancelled) setDashboardOn(flags.feature_vlb_v3_enabled === true);
       })
-      .catch((error) => {
-        if (!cancelled) {
-          setFailed(true);
-          toast.error(apiMessage(error, 'Could not load your investments'));
-        }
+      .catch(() => {
+        if (!cancelled) setDashboardOn(false);
       });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const reloadInvestments = useCallback(() => {
+    if (dashboardOn !== true || !allowed) return;
+    load()
+      .then(() => setFailed(false))
+      .catch(() => setFailed(true));
+  }, [allowed, dashboardOn, load]);
+
+  useEffect(() => {
+    if (dashboardOn !== true || !allowed) return;
+    reloadInvestments();
     const timer = window.setInterval(() => {
-      if (cancelled || !allowed) return;
       load().catch(() => undefined);
     }, 90 * 1000);
     return () => {
-      cancelled = true;
       window.clearInterval(timer);
     };
-  }, [allowed]);
+  }, [allowed, dashboardOn, load, reloadInvestments]);
+
+  useOnlineRefetch(reloadInvestments);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,17 +124,39 @@ export default function AccountInvestmentsPage() {
       .catch((error) => toast.error(apiMessage(error, 'Could not load plans')));
   }, [upgradeOpen]);
 
+  if (dashboardOn === false) {
+    return (
+      <EmptyState
+        title="Investments aren't available yet"
+        description="This dashboard is turned off right now. Check back later, or contact VENTECH if you already invest with us."
+        primary={{ label: 'Go to your account', href: '/account' }}
+        secondary={{ label: 'Contact support', href: 'mailto:ventechgadgets@gmail.com', variant: 'ghost' }}
+      />
+    );
+  }
+
   if (!allowed) {
     return (
-      <div className="rounded-xl bg-white p-5 shadow-sm">
-        <h1 className="text-xl font-bold text-[#1A1A1A]">Investments</h1>
-        <p className="mt-2 text-sm text-[#3A3A3A]">This section is for active Laptop Banking investors.</p>
-      </div>
+      <AccessDenied
+        title="Investor access only"
+        description="This dashboard is for active Laptop Banking investors. If you already invest with VENTECH, ask an admin to enable your investor role."
+        primary={{ label: 'Go to your account', href: '/account' }}
+        secondary={{ label: 'Contact support', href: 'mailto:ventechgadgets@gmail.com', variant: 'ghost' }}
+      />
     );
   }
 
   if (!me) {
-    return <p className="text-sm text-[#3A3A3A]">{failed ? 'Could not load your investments.' : 'Loading your investments…'}</p>;
+    if (failed) {
+      return (
+        <ErrorState
+          title="We couldn't load your investments"
+          description="Try again in a moment. Your agreements and payouts are still saved."
+          primary={{ label: 'Try again', onClick: reloadInvestments }}
+        />
+      );
+    }
+    return <OverviewSkeleton />;
   }
 
   const payout = me.payout;
@@ -436,8 +473,9 @@ function DocumentsSection({
   reload: () => Promise<void>;
 }) {
   const agreements = docs.filter((doc) => doc.kind === 'agreement');
-  const others = docs.filter((doc) => doc.kind !== 'agreement' && doc.kind !== 'agreement_template');
+  const others = docs.filter((doc) => doc.kind !== 'agreement' && doc.kind !== 'agreement_template' && doc.kind !== 'guide');
   const template = docs.find((doc) => doc.kind === 'agreement_template');
+  const guide = docs.find((doc) => doc.kind === 'guide');
   const receipts = me.investments
     .flatMap((investment) =>
       (investment.paid_payouts || []).map((payout) => ({
@@ -539,6 +577,20 @@ function DocumentsSection({
         </ul>
       ) : (
         <p className="mt-2 text-sm text-[#3A3A3A]">The blank agreement template is not available yet.</p>
+      )}
+
+      <h3 className="mt-4 text-sm font-medium text-[#1A1A1A]">Laptop Banking guide</h3>
+      {guide ? (
+        <ul className="mt-1 divide-y divide-gray-100">
+          <DocRow
+            key={guide.id}
+            name={guide.title}
+            date={guide.created_at}
+            onDownload={() => openDocumentWithRefresh(guide.id, reload)}
+          />
+        </ul>
+      ) : (
+        <p className="mt-2 text-sm text-[#3A3A3A]">The Laptop Banking guide is not available yet.</p>
       )}
     </section>
   );

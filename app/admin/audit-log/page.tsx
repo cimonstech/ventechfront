@@ -25,6 +25,7 @@ export default function AuditLogPage() {
   const [rows, setRows] = useState<AuditRow[]>([]);
   const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -51,11 +52,41 @@ export default function AuditLogPage() {
     load();
   }, [page]);
 
+  const exportCsv = async () => {
+    try {
+      setExporting(true);
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/admin/audit-log?format=csv`, {
+        headers: await authHeaders(),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.message || 'Failed to export audit log');
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'audit-log.csv';
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to export audit log');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-      <div className="px-6 py-4 border-b">
-        <h2 className="text-lg font-bold text-[#1A1A1A]">Audit log</h2>
-        <p className="text-sm text-[#3A3A3A] mt-1">Changes recorded by the admin API</p>
+      <div className="px-6 py-4 border-b flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-[#1A1A1A]">Audit log</h2>
+          <p className="text-sm text-[#3A3A3A] mt-1">Changes recorded by the admin API</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={exportCsv} disabled={exporting || loading}>
+          Export CSV
+        </Button>
       </div>
       {loading ? (
         <div className="flex items-center justify-center py-20">

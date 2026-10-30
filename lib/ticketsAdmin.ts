@@ -40,6 +40,8 @@ export interface TicketListItem {
   serial_number: string | null;
   contact_phone: string;
   assigned_to: string | null;
+  assignee_name?: string | null;
+  assignee_locked?: boolean;
   warranty_status_at_submit: string | null;
   updated_at: string;
   issue: { id: string; name: string } | null;
@@ -107,7 +109,7 @@ export interface TicketDetail {
   order_number_text: string | null;
   issue_type: { id: string; name: string } | null;
   customer: { id: string; name: string | null; email: string | null } | null;
-  assignee: { id: string; name: string | null; email: string | null } | null;
+  assignee: { id: string | null; name: string | null; email: string | null; locked?: boolean } | null;
   device: { id: string; model_name: string; serial_number: string } | null;
   order: { id: string; order_number: string } | null;
   events: TicketEvent[];

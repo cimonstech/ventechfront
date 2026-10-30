@@ -30,6 +30,7 @@ import {
   loadAffiliateMe,
   payoutHoldUntil,
   payoutMethodLabel,
+  skipReasonCopy,
   withdrawalStatusTip,
   type AffiliateMe,
   type AffiliateProductHit,
@@ -432,7 +433,7 @@ export default function AffiliateDashboardPage() {
         </section>
 
         <section className="rounded-xl bg-white p-4 shadow-sm">
-          <h2 className="mb-3 text-lg font-semibold text-[#1A1A1A]">My sales</h2>
+          <h2 className="mb-3 text-lg font-semibold text-[#1A1A1A]">Referred sales</h2>
           <InfoNote className="mb-3">
             Customer names and contact details are never shown, to protect their privacy.
           </InfoNote>
@@ -457,6 +458,9 @@ export default function AffiliateDashboardPage() {
                         ),
                       },
                       { label: 'Commission', value: formatGhs(sale.amount_pesewas) },
+                      ...(sale.skip_reason
+                        ? [{ label: 'Note', value: skipReasonCopy(sale.skip_reason, info?.min_order_pesewas || 0) }]
+                        : []),
                     ]}
                   />
                 </div>
@@ -471,6 +475,7 @@ export default function AffiliateDashboardPage() {
                     <th className="pb-2 pr-3">Date</th>
                     <th className="pb-2 pr-3">Status</th>
                     <th className="pb-2">Commission</th>
+                    <th className="pb-2">Note</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -485,6 +490,7 @@ export default function AffiliateDashboardPage() {
                         </Badge>
                       </td>
                       <td className="py-2">{formatGhs(sale.amount_pesewas)}</td>
+                      <td className="py-2 text-[#3A3A3A]">{skipReasonCopy(sale.skip_reason, info?.min_order_pesewas || 0) || '—'}</td>
                     </tr>
                   ))}
                 </tbody>

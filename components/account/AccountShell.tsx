@@ -11,6 +11,8 @@ import { useAccess } from '@/context/AccessContext';
 import { signOut } from '@/services/auth.service';
 import { safeRedirectPath } from '@/lib/safeRedirect';
 import { accountNavActive, visibleAccountNav } from '@/lib/account';
+import { fetchPublicFeatures } from '@/lib/features';
+import { LoadingMessage } from '@/components/ui-states';
 
 const NAV_LINK =
   'block rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A19] focus-visible:ring-offset-2';
@@ -24,6 +26,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
   const { access } = useAccess();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [vlbDashboard, setVlbDashboard] = useState(false);
 
   useEffect(() => {
     if (isLoading) return;
@@ -37,9 +40,23 @@ export function AccountShell({ children }: { children: ReactNode }) {
     setDrawerOpen(false);
   }, [pathname]);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetchPublicFeatures()
+      .then((flags) => {
+        if (!cancelled) setVlbDashboard(flags.feature_vlb_v3_enabled === true);
+      })
+      .catch(() => {
+        if (!cancelled) setVlbDashboard(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const items = useMemo(
-    () => visibleAccountNav(access?.programRoles),
-    [access?.programRoles]
+    () => visibleAccountNav(access?.programRoles, { feature_vlb_v3_enabled: vlbDashboard }),
+    [access?.programRoles, vlbDashboard]
   );
   const current = items.find((item) => accountNavActive(pathname, item));
 
@@ -59,8 +76,8 @@ export function AccountShell({ children }: { children: ReactNode }) {
 
   if (isLoading || !isAuthenticated) {
     return (
-      <div className="min-h-[50vh] px-4 py-16 text-center text-sm text-[#3A3A3A]">
-        Loading your account…
+      <div className="min-h-[50vh]">
+        <LoadingMessage label="Loading your account" />
       </div>
     );
   }

@@ -69,7 +69,7 @@ export default function UserOrdersPage() {
       setUser(data);
     } catch (error: any) {
       console.error('Error fetching user:', error);
-      toast.error('Failed to load user data');
+      toast.error('User not found');
       router.push('/admin/users');
     }
   };

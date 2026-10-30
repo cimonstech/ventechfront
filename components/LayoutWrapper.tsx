@@ -6,19 +6,26 @@ import { Footer } from '@/components/Footer';
 import { MobileBottomNav } from '@/components/navigation/MobileBottomNav';
 import React, { Suspense } from 'react';
 import CheckmarkLoader from '@/components/loaders/CheckmarkLoader';
+import { OfflineBanner, SessionExpiredHost } from '@/components/ui-states';
 
 export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isAdminRoute = pathname.startsWith('/admin');
 
   if (isAdminRoute) {
-    // Admin routes: No NavBar, No Footer, No MobileBottomNav
-    return <>{children}</>;
+    return (
+      <>
+        <OfflineBanner />
+        <SessionExpiredHost />
+        {children}
+      </>
+    );
   }
 
-  // Regular routes: With NavBar, Footer, and MobileBottomNav
   return (
     <>
+      <OfflineBanner />
+      <SessionExpiredHost />
       <NavBar />
       <main className="flex-1 pb-20 md:pb-0">
         <Suspense

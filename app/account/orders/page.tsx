@@ -1,15 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Package, ChevronRight, Eye, Calendar, CreditCard } from 'lucide-react';
+import { Package, Eye, Calendar, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { AccountListSkeleton, EmptyState, ErrorState } from '@/components/ui-states';
+import { useOnlineRefetch } from '@/hooks/useOnlineRefetch';
 import { useAppSelector } from '@/store';
 import { orderService } from '@/services/order.service';
 import { formatCurrency } from '@/lib/helpers';
-import toast from 'react-hot-toast';
 
 interface Order {
   id: string;
@@ -26,28 +27,14 @@ export default function OrdersPage() {
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
 
-  useEffect(() => {
-    if (!isAuthenticated || !user) {
-      router.push('/login');
-      return;
-    }
-
-    fetchOrders();
-  }, [isAuthenticated, user, router]);
-
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
+    if (!user?.id) return;
     try {
       setIsLoading(true);
-      
-      if (!user?.id) {
-        toast.error('User not found');
-        return;
-      }
-
+      setFailed(false);
       const ordersData = await orderService.getUserOrders(user.id);
-      
-      // Transform orders to match Order interface
       const formattedOrders = (ordersData || []).map((order: any) => ({
         id: order.id,
         order_number: order.order_number,
@@ -57,16 +44,24 @@ export default function OrdersPage() {
         created_at: order.created_at,
         items: order.items || order.order_items || [],
       }));
-
       setOrders(formattedOrders);
     } catch (error: any) {
       console.error('Error fetching orders:', error);
-      toast.error('Failed to load orders');
-      setOrders([]);
+      setFailed(true);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !user) {
+      router.push('/login');
+      return;
+    }
+    void fetchOrders();
+  }, [isAuthenticated, user, router, fetchOrders]);
+
+  useOnlineRefetch(fetchOrders);
 
   const getStatusBadge = (status: Order['status']) => {
     const config = {
@@ -90,14 +85,11 @@ export default function OrdersPage() {
     return <Badge variant={variant}>{label}</Badge>;
   };
 
-  if (isLoading) {
+  if (isLoading && orders.length === 0) {
     return (
       <div>
         <div className="max-w-5xl">
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FF7A19]"></div>
-            <span className="ml-3 text-[#3A3A3A]">Loading orders...</span>
-          </div>
+          <AccountListSkeleton rows={4} />
         </div>
       </div>
     );
@@ -111,23 +103,19 @@ export default function OrdersPage() {
           <p className="text-[#3A3A3A]">View and track your order history</p>
         </div>
 
-        {/* Orders List */}
-        {orders.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-lg p-12 text-center">
-            <div className="bg-orange-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Package className="w-10 h-10 text-[#FF7A19]" />
-            </div>
-            <h2 className="text-2xl font-bold text-[#1A1A1A] mb-3">No Orders Yet</h2>
-            <p className="text-[#3A3A3A] mb-6 max-w-md mx-auto">
-              You haven't placed any orders yet. Start shopping to see your orders here!
-            </p>
-            <Link
-              href="/shop"
-              className="inline-flex min-h-11 w-full items-center justify-center bg-[#FF7A19] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#FF8C3A] transition-colors sm:w-auto"
-            >
-              Start Shopping
-            </Link>
-          </div>
+        {failed && orders.length === 0 ? (
+          <ErrorState
+            title="We couldn't load your orders"
+            description="Try again in a moment. If it keeps failing, contact support."
+            primary={{ label: 'Try again', onClick: () => void fetchOrders() }}
+          />
+        ) : orders.length === 0 ? (
+          <EmptyState
+            icon={Package}
+            title="No orders yet"
+            description="When you place an order, you'll track it here — from packing through delivery."
+            primary={{ label: 'Start shopping', href: '/shop' }}
+          />
         ) : (
           <div className="space-y-4">
             {orders.map((order) => (

@@ -227,12 +227,12 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                suggestions.categories.length === 0 && 
                suggestions.brands.length === 0 && (
                 <div className="px-4 py-6 text-center text-gray-500">
-                  <p className="text-sm">No results found for "{query}"</p>
+                  <p className="text-sm">No matches for “{query}”. Try a shorter term.</p>
                   <button
                     onClick={() => handleSearch()}
-                    className="mt-2 text-sm text-[#FF7A19] hover:underline"
+                    className="mt-2 min-h-11 text-sm font-semibold text-[#FF7A19] hover:underline"
                   >
-                    Search anyway
+                    Search the shop anyway
                   </button>
                 </div>
               )}

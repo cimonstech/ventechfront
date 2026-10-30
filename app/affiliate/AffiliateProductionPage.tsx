@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/Button';
 import { Laptop, ArrowRight, TrendingUp, Target, FileText, Users, Share2, DollarSign, FolderOpen } from 'lucide-react';
+import { fetchPublicAffiliateInfo } from '@/lib/affiliates';
 
 export default function AffiliatePage() {
   const [formData, setFormData] = useState({
@@ -20,6 +21,19 @@ export default function AffiliatePage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [commissionLine, setCommissionLine] = useState('Earn commission on every order. The minimum order is set in the programme settings.');
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPublicAffiliateInfo()
+      .then((info) => {
+        if (!cancelled && info?.commission_copy) setCommissionLine(info.commission_copy);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData({
@@ -163,7 +177,7 @@ export default function AffiliatePage() {
               </div>
               <h3 className="text-lg md:text-xl font-bold text-[#1A1A1A] mb-3 md:mb-4">Competitive Commissions</h3>
               <p className="text-sm md:text-base text-[#3A3A3A] leading-relaxed">
-                Earn up to 12% on every sale you refer. More sales mean higher commissions.
+                {commissionLine}
               </p>
             </div>
             
@@ -174,7 +188,7 @@ export default function AffiliatePage() {
               </div>
               <h3 className="text-lg md:text-xl font-bold text-[#1A1A1A] mb-3 md:mb-4">In-Demand Products</h3>
               <p className="text-sm md:text-base text-[#3A3A3A] leading-relaxed">
-                Promote the latest smartphones, laptops, earbuds, and gadgets your audience wants.
+                Promote every product in the shop — phones, laptops, accessories, and more.
               </p>
             </div>
             

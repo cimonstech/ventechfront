@@ -213,6 +213,7 @@ export default function AffiliateJoinPage() {
             {info
               ? `A one-time fee of ${formatGhs(info.fee_pesewas)} is charged after you submit this form.`
               : 'A one-time application fee is charged after you submit this form.'}
+            {info?.commission_copy ? ` ${info.commission_copy}` : ''}
           </p>
           <form onSubmit={(event) => void handleSubmit(event)} className="space-y-5">
             <fieldset>

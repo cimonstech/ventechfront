@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import type { User, Session } from '@supabase/supabase-js';
 import { linkPendingDevices } from '@/lib/devicesAdmin';
+import { clearRecoveryOnly } from '@/lib/recoverySession';
 
 interface SignUpData {
   email: string;
@@ -118,19 +119,28 @@ export const signIn = async (data: SignInData): Promise<AuthResponse> => {
 // Sign out
 export const signOut = async (): Promise<{ error: Error | null }> => {
   try {
+    clearRecoveryOnly();
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
     return { error: null };
   } catch (error: any) {
+    clearRecoveryOnly();
     return { error };
   }
 };
+
+function siteOrigin(): string {
+  const fromEnv = (process.env.NEXT_PUBLIC_SITE_URL || '').trim().replace(/\/$/, '');
+  if (fromEnv) return fromEnv;
+  if (typeof window !== 'undefined') return window.location.origin;
+  return '';
+}
 
 // Send password reset email
 export const resetPassword = async (data: ResetPasswordData): Promise<{ error: Error | null }> => {
   try {
     const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${siteOrigin()}/reset-password`,
     });
 
     if (error) throw error;

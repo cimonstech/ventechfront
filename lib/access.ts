@@ -1,3 +1,4 @@
+import { emitSessionExpired } from '@/lib/httpErrors';
 import { hasAdminEntry, isAdminRole } from '@/lib/roles';
 
 export const ACCESS_MODULES = [
@@ -89,7 +90,13 @@ export function isAccessDeniedStatus(status: number): boolean {
 }
 
 export function accessDeniedMessage(status: number, fallback = 'Request failed'): string {
-  return isAccessDeniedStatus(status) ? ADMIN_DATA_DENIED : fallback;
+  if (status === 401) {
+    emitSessionExpired();
+    return 'Your session expired. Sign in again.';
+  }
+  if (status === 403) return ADMIN_DATA_DENIED;
+  if (status === 429) return 'Too many requests. Wait a moment and try again.';
+  return fallback;
 }
 
 export function isFullAdmin(role: string | null | undefined): boolean {
@@ -120,7 +127,6 @@ function matchesPrefix(pathname: string, prefix: string): boolean {
 export function canOpenAdminPath(pathname: string, access: AccessProfile | null): boolean {
   if (!access || !hasAdminEntry(access.role)) return false;
   if (access.role === 'superadmin') return true;
-  if (matchesPrefix(pathname, '/admin/audit-log')) return false;
   if (access.role === 'admin') return true;
   if (pathname === '/admin') return true;
   if (FULL_ADMIN_PREFIXES.some((prefix) => matchesPrefix(pathname, prefix))) return false;

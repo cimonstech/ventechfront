@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { DeviceWarrantyBadge } from '@/components/admin/DeviceWarrantyBadge';
 import { Badge } from '@/components/ui/Badge';
 import { CopyValue } from '@/components/ui/CopyValue';
+import { ErrorState, OverviewSkeleton } from '@/components/ui-states';
+import { useOnlineRefetch } from '@/hooks/useOnlineRefetch';
 import { useAccess } from '@/context/AccessContext';
 import {
   fetchAccountOverview,
@@ -14,6 +16,7 @@ import {
   type AccountOverview,
 } from '@/lib/account';
 import { formatGhs } from '@/lib/affiliates';
+import { fetchPublicFeatures } from '@/lib/features';
 import {
   formatDeviceDate,
   formatGhs as formatVlbGhs,
@@ -28,10 +31,12 @@ export default function AccountOverviewPage() {
   const investor = hasActiveInvestorRole(access?.programRoles);
   const [overview, setOverview] = useState<AccountOverview | null>(null);
   const [vlb, setVlb] = useState<VlbMe | null>(null);
+  const [dashboardOn, setDashboardOn] = useState(false);
   const [failed, setFailed] = useState(false);
 
-  useEffect(() => {
+  const loadOverview = useCallback(() => {
     let cancelled = false;
+    setFailed(false);
     fetchAccountOverview()
       .then((result) => {
         if (!cancelled) {
@@ -39,11 +44,25 @@ export default function AccountOverviewPage() {
           setFailed(false);
         }
       })
-      .catch((error) => {
-        if (!cancelled) {
-          setFailed(true);
-          toast.error(apiMessage(error, 'Could not load your account'));
-        }
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => loadOverview(), [loadOverview]);
+  useOnlineRefetch(loadOverview);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPublicFeatures()
+      .then((flags) => {
+        if (!cancelled) setDashboardOn(flags.feature_vlb_v3_enabled === true);
+      })
+      .catch(() => {
+        if (!cancelled) setDashboardOn(false);
       });
     return () => {
       cancelled = true;
@@ -51,7 +70,7 @@ export default function AccountOverviewPage() {
   }, []);
 
   useEffect(() => {
-    if (!investor) {
+    if (!investor || !dashboardOn) {
       setVlb(null);
       return;
     }
@@ -66,14 +85,19 @@ export default function AccountOverviewPage() {
     return () => {
       cancelled = true;
     };
-  }, [investor]);
+  }, [investor, dashboardOn]);
 
   if (!overview) {
-    return (
-      <p className="text-sm text-[#3A3A3A]">
-        {failed ? 'Could not load your account.' : 'Loading your account…'}
-      </p>
-    );
+    if (failed) {
+      return (
+        <ErrorState
+          title="We couldn't load your account"
+          description="Try again in a moment. If it keeps failing, contact support."
+          primary={{ label: 'Try again', onClick: () => loadOverview() }}
+        />
+      );
+    }
+    return <OverviewSkeleton />;
   }
 
   const showAffiliateCta = !hasAffiliateRole(access?.programRoles) && !overview.affiliate;

@@ -26,6 +26,7 @@ import { Button } from '../ui/Button';
 import { MegaMenu } from './MegaMenu';
 import { SearchBar } from '../search/SearchBar';
 import { signOut } from '@/services/auth.service';
+import { useRecoverySession } from '@/components/RecoverySessionGuard';
 import toast from 'react-hot-toast';
 
 export const NavBar = () => {
@@ -82,6 +83,8 @@ export const NavBar = () => {
   const { itemCount } = useAppSelector((state) => state.cart);
   const { count: wishlistCount } = useAppSelector((state) => state.wishlist);
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+  const { recoveryOnly } = useRecoverySession();
+  const showAccount = isAuthenticated && !recoveryOnly;
 
   const navLinks = [
     { href: '/', label: 'Home' },
@@ -182,7 +185,7 @@ export const NavBar = () => {
               </a>
             </div>
 
-            {isAuthenticated ? (
+            {showAccount ? (
               <>
                 <Link href="/account/wishlist">
                   <Button variant="ghost" size="sm" className="relative">
@@ -427,7 +430,7 @@ export const NavBar = () => {
           </div>
 
           {/* User Actions */}
-          {isAuthenticated ? (
+          {showAccount ? (
             <>
               {/* Account Section */}
               <div className="border-t border-gray-200 py-4">

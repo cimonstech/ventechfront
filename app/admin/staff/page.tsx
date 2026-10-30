@@ -92,10 +92,11 @@ export default function AdminStaffPage() {
   });
 
   const actorRole = user?.role || '';
-  const roleOptions: StaffRole[] = actorRole === 'superadmin'
+  const viewerIsOwner = actorRole === 'superadmin';
+  const roleOptions: StaffRole[] = viewerIsOwner
     ? ['staff', 'admin', 'superadmin']
     : ['staff'];
-  const superadminCount = staff.filter((member) => member.role === 'superadmin').length;
+  const ownerCount = viewerIsOwner ? staff.filter((member) => member.role === 'superadmin').length : 0;
 
   useEffect(() => {
     if (isAuthenticated && !hasAdminEntry(user?.role)) {
@@ -228,7 +229,7 @@ export default function AdminStaffPage() {
   };
 
   const canManage = (member: StaffMember) => {
-    if (actorRole === 'superadmin') return true;
+    if (viewerIsOwner) return true;
     return member.role === 'staff';
   };
 
@@ -287,7 +288,7 @@ export default function AdminStaffPage() {
                 </thead>
                 <tbody className="divide-y">
                   {staff.map((member) => {
-                    const lastSuperadmin = member.role === 'superadmin' && superadminCount <= 1;
+                    const lastOwner = viewerIsOwner && member.role === 'superadmin' && ownerCount <= 1;
                     const manageable = canManage(member);
                     return (
                       <tr key={member.id} className="hover:bg-gray-50">
@@ -299,7 +300,7 @@ export default function AdminStaffPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <Badge variant={member.role === 'superadmin' ? 'error' : member.role === 'admin' ? 'warning' : 'info'}>
+                          <Badge variant={member.role === 'admin' ? 'warning' : member.role === 'staff' ? 'info' : 'error'}>
                             {member.role}
                           </Badge>
                         </td>
@@ -312,7 +313,7 @@ export default function AdminStaffPage() {
                             <Button
                               variant="danger"
                               size="sm"
-                              disabled={!manageable || member.id === user?.id || lastSuperadmin}
+                              disabled={!manageable || member.id === user?.id || lastOwner}
                               onClick={() => setRemoveTarget(member)}
                             >
                               Remove
@@ -359,7 +360,7 @@ export default function AdminStaffPage() {
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
                 >
                   {roleOptions
-                    .filter((role) => !(editing?.role === 'superadmin' && editing.id === user?.id && superadminCount <= 1 && role !== 'superadmin'))
+                    .filter((role) => !(viewerIsOwner && editing?.role === 'superadmin' && editing.id === user?.id && ownerCount <= 1 && role !== 'superadmin'))
                     .map((role) => (
                       <option key={role} value={role}>{role}</option>
                     ))}

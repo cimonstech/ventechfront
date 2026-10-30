@@ -102,7 +102,7 @@ export const seoConfig = {
     },
     laptopBanking: {
       title: 'Laptop Banking - VENTECH Investment Program Ghana',
-      description: 'Invest in VENTECH\'s laptop trade business. Earn 8-9% monthly returns over 6 months. Safe investment backed by real laptop inventory. Starting from GHS 2,500. Sign up now!',
+      description: 'Invest in VENTECH\'s laptop trade business. Current plans, terms, and returns are listed on this page. Trade-backed investment backed by real laptop inventory. Sign up now!',
       keywords: 'laptop banking Ghana, ventech investment, tech investment Ghana, laptop trade investment, investment program Ghana, tech business investment',
     },
   },

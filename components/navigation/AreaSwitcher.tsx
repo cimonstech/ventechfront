@@ -1,11 +1,13 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { ChevronDown } from 'lucide-react';
 import { useAppSelector } from '@/store';
 import { useAccess } from '@/context/AccessContext';
 import { PROGRAM_AREAS, hasAdminEntry } from '@/lib/access';
+import { fetchPublicFeatures } from '@/lib/features';
 import { getRoleLabel } from '@/lib/roles';
 
 interface AreaLink {
@@ -24,6 +26,21 @@ export function AreaSwitcher({
   const pathname = usePathname();
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const { access } = useAccess();
+  const [vlbDashboard, setVlbDashboard] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPublicFeatures()
+      .then((flags) => {
+        if (!cancelled) setVlbDashboard(flags.feature_vlb_v3_enabled === true);
+      })
+      .catch(() => {
+        if (!cancelled) setVlbDashboard(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   if (!isAuthenticated || !user) return null;
 
@@ -40,6 +57,7 @@ export function AreaSwitcher({
       (row) => row.role === area.role && row.status === 'active'
     );
     if (!active) continue;
+    if (area.role === 'investor' && !vlbDashboard) continue;
     areas.push({ id: area.role, label: area.label, href: area.href });
   }
 

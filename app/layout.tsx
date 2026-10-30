@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import "./globals.css";
 import { ReduxProvider } from "@/store/Provider";
 import { LayoutWrapper } from "@/components/LayoutWrapper";
+import { RecoverySessionGuard } from "@/components/RecoverySessionGuard";
 import { ReferralCapture } from "@/components/ReferralCapture";
 import { Toaster } from "react-hot-toast";
 import { seoConfig } from "@/lib/seo.config";
@@ -76,6 +77,7 @@ export default function RootLayout({
       </head>
       <body className="font-sans antialiased bg-gray-50" suppressHydrationWarning>
         <ReduxProvider>
+          <RecoverySessionGuard>
           <Suspense fallback={null}>
             <ReferralCapture />
           </Suspense>
@@ -106,6 +108,7 @@ export default function RootLayout({
               },
             }}
           />
+          </RecoverySessionGuard>
         </ReduxProvider>
       </body>
     </html>

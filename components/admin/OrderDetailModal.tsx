@@ -42,6 +42,13 @@ interface Order {
     phone: string;
   };
   notes?: string;
+  timeline?: Array<{
+    id: string;
+    created_at: string;
+    action: string;
+    actor_name: string;
+    actor_role: string | null;
+  }>;
   created_at: string;
   updated_at: string;
   user_id?: string;
@@ -680,6 +687,22 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                   <h3 className="font-semibold text-[#1A1A1A] mb-2">Order Notes</h3>
                   <p className="text-sm text-[#3A3A3A]">{order.notes}</p>
+                </div>
+              )}
+
+              {order.timeline && order.timeline.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <h3 className="font-semibold text-[#1A1A1A] mb-3">Timeline</h3>
+                  <ol className="space-y-3">
+                    {order.timeline.map((entry) => (
+                      <li key={entry.id} className="text-sm">
+                        <p className="font-medium text-[#1A1A1A]">{entry.action.replace(/_/g, ' ')}</p>
+                        <p className="text-xs text-[#3A3A3A]">
+                          {entry.actor_name}{entry.actor_role ? ` · ${entry.actor_role}` : ''} · {new Date(entry.created_at).toLocaleString()}
+                        </p>
+                      </li>
+                    ))}
+                  </ol>
                 </div>
               )}
             </div>

@@ -230,11 +230,27 @@ export function vlbRequest<T>(path: string, init: RequestInit = {}) {
   return deviceRequest<T>(path, init);
 }
 
-export async function fetchPublicAgreementTemplate(): Promise<{ url: string; title: string } | null> {
-  const response = await fetch(`${API_URL}/api/vlb/agreement-template`, { cache: 'no-store' });
+export interface VlbPublicDocs {
+  guide?: { title: string; url: string };
+  agreement_template?: { title: string; url: string };
+}
+
+export async function fetchPublicVlbDocs(): Promise<VlbPublicDocs> {
+  const response = await fetch(`${API_URL}/api/vlb/public-docs`, { cache: 'no-store' });
   const body = await response.json().catch(() => ({}));
-  if (!response.ok || body?.success === false || !body?.data?.url) return null;
-  return body.data as { url: string; title: string };
+  if (!response.ok || body?.success === false) {
+    throw new Error(typeof body?.message === 'string' ? body.message : 'Could not load documents.');
+  }
+  const data = (body.data || {}) as VlbPublicDocs;
+  return {
+    guide: data.guide?.url ? data.guide : undefined,
+    agreement_template: data.agreement_template?.url ? data.agreement_template : undefined,
+  };
+}
+
+export async function fetchPublicAgreementTemplate(): Promise<{ url: string; title: string } | null> {
+  const docs = await fetchPublicVlbDocs().catch(() => ({} as VlbPublicDocs));
+  return docs.agreement_template || null;
 }
 
 export async function openSignedVlbDocument(documentId: string) {

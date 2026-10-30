@@ -7,12 +7,15 @@ import { fetchPublicAffiliateInfo, formatGhs, payoutMethodLabel } from '@/lib/af
 export default async function AffiliatePage() {
   const info = await fetchPublicAffiliateInfo();
   const fee = info ? formatGhs(info.fee_pesewas) : null;
-  const commission = info ? formatGhs(info.commission_pesewas) : null;
+  const commissionLine = info?.commission_copy || null;
   const categories = info?.eligible_category_names?.filter(Boolean) || [];
   const minWithdrawal = info ? formatGhs(info.min_withdrawal_pesewas) : null;
   const payouts = (info?.payout_methods || ['momo', 'bank']).map(payoutMethodLabel);
   const payoutList = payouts.join(' or ');
-  const categoryList = categories.length ? categories.join(', ') : 'selected product categories';
+  const categoryLine =
+    info?.eligible_scope === 'categories' && categories.length
+      ? `Commission applies to ${categories.join(', ')}.`
+      : 'Commission applies to every product in the shop.';
 
   const joinClass =
     'inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all duration-200 text-lg px-6 py-3';
@@ -83,9 +86,7 @@ export default async function AffiliatePage() {
               </div>
               <h3 className="text-lg md:text-xl font-bold text-[#1A1A1A] mb-3 md:mb-4">Competitive Commissions</h3>
               <p className="text-sm md:text-base text-[#3A3A3A] leading-relaxed">
-                {commission
-                  ? `Earn ${commission} on every eligible sale you refer.`
-                  : 'Earn a fixed commission on every eligible sale you refer.'}
+                {commissionLine || 'Earn commission on every order you refer.'}
               </p>
             </div>
 
@@ -95,7 +96,7 @@ export default async function AffiliatePage() {
               </div>
               <h3 className="text-lg md:text-xl font-bold text-[#1A1A1A] mb-3 md:mb-4">In-Demand Products</h3>
               <p className="text-sm md:text-base text-[#3A3A3A] leading-relaxed">
-                Commission applies to {categoryList}.
+                {categoryLine}
               </p>
             </div>
 
@@ -148,9 +149,7 @@ export default async function AffiliatePage() {
               </div>
               <h3 className="text-lg md:text-xl font-bold text-[#1A1A1A] mb-3 md:mb-4">Earn</h3>
               <p className="text-sm md:text-base text-[#3A3A3A] leading-relaxed">
-                {commission
-                  ? `Earn ${commission} for every verified eligible sale.`
-                  : 'Earn a commission for every verified eligible sale.'}
+                {commissionLine || 'Earn a commission for every verified sale.'}
               </p>
             </div>
           </div>

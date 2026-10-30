@@ -38,6 +38,8 @@ import { signOut } from '@/services/auth.service';
 import { supabase } from '@/lib/supabase';
 import { getRoleLabel, hasAdminEntry } from '@/lib/roles';
 import { canOpenAdminPath, canViewModule, isFullAdmin } from '@/lib/access';
+import { AccessDenied, ErrorState, LoadingMessage } from '@/components/ui-states';
+import { rememberRedirect } from '@/lib/safeRedirect';
 import { useAccess } from '@/context/AccessContext';
 import { AreaSwitcher } from '@/components/navigation/AreaSwitcher';
 import { AdminHeadingProvider, useAdminHeadingValue } from '@/components/admin/AdminHeading';
@@ -186,31 +188,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         // Check session directly from Supabase as a fallback
         supabase.auth.getSession().then(({ data: { session } }) => {
           if (!session) {
-            // No session - redirect to login
             if (pathname !== '/login' && pathname !== '/register') {
-              router.replace('/login');
+              rememberRedirect(pathname);
+              router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
             }
           }
         });
         return;
       }
-      
-      // After loading is complete, check authentication status
-      // Only redirect if we're absolutely certain the user is not authenticated or not admin
+
       if (!isAuthenticated || !user) {
-        // User is not authenticated after loading completed
-        // Only redirect if we're not already on login page to avoid loops
         if (pathname !== '/login' && pathname !== '/register') {
-          router.replace('/login');
-        }
-        return;
-      }
-      
-      if (!hasAdminEntry(user.role)) {
-        // User is authenticated but not admin
-        if (pathname !== '/') {
-          router.replace('/');
-          toast.error('Access denied. Admin only.');
+          rememberRedirect(pathname);
+          router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
         }
         return;
       }
@@ -401,36 +391,40 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   // Prevent hydration mismatch by not rendering until mounted
   if (!mounted) {
-    // Render a minimal loading state that matches server-side rendering
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50" suppressHydrationWarning>
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF7A19] mx-auto mb-4"></div>
-          <p className="text-[#3A3A3A]">Loading...</p>
-        </div>
+      <div className="min-h-screen bg-gray-50" suppressHydrationWarning>
+        <LoadingMessage label="Loading" />
       </div>
     );
   }
 
-  // Show loading state while auth is being checked
-  // This prevents unnecessary redirects during page refresh
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF7A19] mx-auto mb-4"></div>
-          <p className="text-[#3A3A3A]">Verifying admin access...</p>
-        </div>
+      <div className="min-h-screen bg-gray-50">
+        <LoadingMessage label="Verifying admin access" />
       </div>
     );
   }
 
-  // After loading is complete, check if user is authenticated and is admin
-  // Only render if authenticated as admin, otherwise useEffect will handle redirect
-  if (!isAuthenticated || !user || !hasAdminEntry(user.role)) {
-    // Don't render anything while redirect is happening
-    // This prevents flash of content
-    return null;
+  if (!isAuthenticated || !user) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <LoadingMessage label="Checking your session" />
+      </div>
+    );
+  }
+
+  if (!hasAdminEntry(user.role)) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <AccessDenied
+          title="Admin only"
+          description="This area is for VENTECH staff. Your account doesn't have admin access."
+          primary={{ label: 'Go to your account', href: '/account' }}
+          secondary={{ label: 'Back to shop', href: '/shop', variant: 'outline' }}
+        />
+      </div>
+    );
   }
 
   return (
@@ -618,21 +612,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* Page Content */}
         <div className="p-4 lg:p-8 print:p-0 max-w-full overflow-x-hidden">
           {accessLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF7A19]" />
-            </div>
+            <LoadingMessage label="Checking what you can open" />
           ) : !access ? (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-10 text-center">
-              <h2 className="text-xl font-bold text-[#1A1A1A]">Could not confirm your access</h2>
-              <p className="text-sm text-[#3A3A3A] mt-2">Refresh the page and try again.</p>
-            </div>
+            <ErrorState
+              title="We couldn't confirm your access"
+              description="Refresh the page and try again."
+              primary={{ label: 'Refresh', onClick: () => window.location.reload() }}
+            />
           ) : canOpenAdminPath(pathname, access) ? (
             children
           ) : (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-10 text-center">
-              <h2 className="text-xl font-bold text-[#1A1A1A]">You do not have access to this section</h2>
-              <p className="text-sm text-[#3A3A3A] mt-2">Choose a section from the sidebar.</p>
-            </div>
+            <AccessDenied
+              title="You don't have access to this section"
+              description="Your role can't open this page. Pick another section from the sidebar, or ask an admin if you need it."
+              primary={{ label: 'Admin home', href: '/admin' }}
+            />
           )}
         </div>
       </main>

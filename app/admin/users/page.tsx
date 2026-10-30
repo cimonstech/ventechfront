@@ -7,8 +7,6 @@ import {
   Users, 
   Search, 
   ChevronLeft,
-  Shield,
-  User,
   Mail,
   Phone,
   Calendar,
@@ -18,7 +16,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { useAppSelector } from '@/store';
-import { hasAdminEntry, isAdminRole } from '@/lib/roles';
+import { hasAdminEntry } from '@/lib/roles';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 import { CSVExporter, CustomerColumns } from '@/lib/csvExport';
@@ -40,7 +38,6 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState<string>('all');
 
   useEffect(() => {
     if (isAuthenticated && !hasAdminEntry(user?.role)) {
@@ -53,124 +50,22 @@ export default function AdminUsersPage() {
   const fetchUsers = async () => {
     try {
       setIsLoading(true);
-      
-      // First, check current user's role and session
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log('Current session:', session?.user?.id);
-      
-      // Try fetching all users first (to debug RLS)
-      const { data: allUsersData, error: allUsersError } = await supabase
-        .from('users')
-        .select('*')
-        .order('created_at', { ascending: false });
 
-      console.log('All users fetch:', {
-        count: allUsersData?.length || 0,
-        error: allUsersError?.message,
-        sampleUsers: allUsersData?.slice(0, 3).map((u: any) => ({
-          id: u.id,
-          email: u.email,
-          role: u.role,
-          name: u.name || u.full_name,
-        })),
-      });
-
-      // Now try fetching customers specifically
       const { data, error } = await supabase
         .from('users')
-        .select('*')
+        .select('id, email, first_name, last_name, phone, role, created_at, newsletter_subscribed')
         .eq('role', 'customer')
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching customers:', {
-          error,
-          message: error.message,
-          code: error.code,
-          details: error.details,
-          hint: error.hint,
-        });
-        
-        // Check if it's an RLS policy error
-        const errorMessage = error.message || '';
-        const isRLSError = 
-          errorMessage.includes('policy') ||
-          errorMessage.includes('RLS') ||
-          errorMessage.includes('permission denied') ||
-          error.code === 'PGRST301';
-        
-        if (isRLSError) {
-          toast.error('Permission denied. Please check your admin access.');
-          // Try fallback: filter client-side if we got all users
-          if (allUsersData && allUsersData.length > 0) {
-            const customers = allUsersData.filter((u: any) => 
-              u.role === 'customer' || u.role?.toLowerCase() === 'customer'
-            );
-            console.log('Filtered customers from all users:', {
-              count: customers.length,
-              roles: allUsersData.map((u: any) => u.role),
-            });
-            setUsers(customers);
-            return;
-          }
-        } else {
-          toast.error(`Failed to load users: ${error.message || 'Unknown error'}`);
-        }
+        toast.error(error.message || 'Failed to load users');
         setUsers([]);
         return;
       }
-      
-      console.log('Customers fetched:', {
-        count: data?.length || 0,
-        roles: data?.map((u: any) => u.role),
-        sampleCustomers: data?.slice(0, 2).map((u: any) => ({
-          id: u.id,
-          email: u.email,
-          role: u.role,
-        })),
-      });
-      
-      // If customer query failed but we got all users, filter client-side
-      if ((!data || data.length === 0) && allUsersData && allUsersData.length > 0) {
-        console.log('Customer query returned 0, but we have all users. Filtering client-side...');
-        const customers = allUsersData.filter((u: any) => 
-          u.role === 'customer' || u.role?.toLowerCase() === 'customer'
-        );
-        
-        console.log('Filtered customers from all users:', {
-          count: customers.length,
-          allUsersRoles: allUsersData.map((u: any) => u.role),
-          filteredRoles: customers.map((u: any) => u.role),
-        });
-        
-        if (customers.length > 0) {
-          setUsers(customers);
-          return;
-        }
-      }
-      
+
       setUsers(data || []);
-      
-      if (!data || data.length === 0) {
-        console.warn('No customers found in database. Debug info:', {
-          allUsersCount: allUsersData?.length || 0,
-          allUsersRoles: allUsersData?.map((u: any) => u.role),
-          queryRole: 'customer',
-          sessionUser: session?.user?.id,
-          currentUserRole: user?.role,
-        });
-        
-        // If we got all users but no customers, show helpful message
-        if (allUsersData && allUsersData.length > 0) {
-          const uniqueRoles = [...new Set(allUsersData.map((u: any) => u.role))];
-          toast.error(`No customers found. Found ${allUsersData.length} users with roles: ${uniqueRoles.join(', ')}`);
-        } else {
-          toast.error('No customers found in database');
-        }
-      }
     } catch (error: any) {
-      console.error('Error fetching users:', error);
-      toast.error(`Failed to load users: ${error.message || 'Unknown error'}`);
+      toast.error(error.message || 'Failed to load users');
       setUsers([]);
     } finally {
       setIsLoading(false);
@@ -201,20 +96,6 @@ export default function AdminUsersPage() {
 
     CSVExporter.export(exportData, CustomerColumns, 'customers');
     toast.success(`Exported ${exportData.length} customer(s)!`);
-  };
-
-  const getRoleBadge = (role: string) => {
-    return isAdminRole(role) ? (
-      <Badge variant="error" className="flex items-center gap-1">
-        <Shield size={12} />
-        Admin
-      </Badge>
-    ) : (
-      <Badge variant="default" className="flex items-center gap-1">
-        <User size={12} />
-        Customer
-      </Badge>
-    );
   };
 
   return (

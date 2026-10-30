@@ -22,6 +22,7 @@ export const COMMISSION_STATUS_LABEL: Record<string, string> = {
   pending: 'Pending',
   approved: 'Approved',
   reversed: 'Reversed',
+  none: 'No commission',
 };
 
 export const WITHDRAWAL_STATUS_LABEL: Record<string, string> = {
@@ -193,12 +194,17 @@ export interface AffiliateSettings {
   affiliate_commission_pesewas: number;
   affiliate_activation_mode: 'approval' | 'automatic' | string;
   affiliate_fee_refund_on_rejection: boolean;
+  affiliate_eligible_scope?: 'all' | 'categories' | string;
   affiliate_eligible_category_slugs: string[];
+  affiliate_commission_mode?: 'flat' | 'percent' | string;
+  affiliate_commission_percent_bp?: number;
+  affiliate_commission_cap_pesewas?: number | null;
   affiliate_min_order_pesewas: number;
   affiliate_attribution_days: number;
   affiliate_return_window_days: number;
   affiliate_withdrawal_min_pesewas: number;
   affiliate_payout_change_hold_hours: number;
+  commission_copy?: string;
 }
 
 export function nested<T>(value: T | T[] | null | undefined): T | null {

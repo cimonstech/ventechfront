@@ -1,9 +1,10 @@
 import { Suspense } from 'react';
 import { AccountShell } from '@/components/account/AccountShell';
+import { LoadingMessage } from '@/components/ui-states';
 
 export default function AccountLayout({ children }: { children: React.ReactNode }) {
   return (
-    <Suspense fallback={<div className="px-4 py-16 text-center text-sm text-[#3A3A3A]">Loading your account…</div>}>
+    <Suspense fallback={<LoadingMessage label="Loading your account" />}>
       <AccountShell>{children}</AccountShell>
     </Suspense>
   );

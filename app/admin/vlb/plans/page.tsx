@@ -8,7 +8,20 @@ import { VlbNav } from '@/components/admin/VlbNav';
 import { useSetAdminHeading } from '@/components/admin/AdminHeading';
 import { useAccess } from '@/context/AccessContext';
 import { formatGhs } from '@/lib/vlb';
-import { apiMessage, deviceRequest, openAdminVlbDocument, pesewasFromGhs, uploadAgreementTemplate, type VlbAdminPlan } from '@/lib/vlbAdmin';
+import {
+  apiMessage,
+  deviceRequest,
+  fetchAdminPublicDocs,
+  openAdminVlbDocument,
+  pesewasFromGhs,
+  removePublicDocument,
+  uploadPublicDocument,
+  type VlbAdminPlan,
+  type VlbPublicDocKind,
+  type VlbPublicDocSlot,
+  type VlbPublicDocsAdmin,
+} from '@/lib/vlbAdmin';
+import { formatDeviceDate } from '@/lib/devicesAdmin';
 
 const EMPTY = {
   plan_group: 'vts',
@@ -44,22 +57,22 @@ export default function AdminVlbPlansPage() {
   const [open, setOpen] = useState<VlbAdminPlan | 'new' | null>(null);
   const [form, setForm] = useState(EMPTY);
   const [busy, setBusy] = useState(false);
-  const [template, setTemplate] = useState<{ id: string; title: string; created_at: string; url: string | null } | null>(null);
-  const [templateFile, setTemplateFile] = useState<File | null>(null);
+  const [publicDocs, setPublicDocs] = useState<VlbPublicDocsAdmin>({ guide: null, agreement_template: null });
+  const [publicFiles, setPublicFiles] = useState<Partial<Record<VlbPublicDocKind, File | null>>>({});
 
   const load = () =>
     deviceRequest<VlbAdminPlan[]>('/api/admin/vlb/plans')
       .then((result) => setRows(result.data || []))
       .catch((error) => toast.error(apiMessage(error, 'Could not load plans')));
 
-  const loadTemplate = () =>
-    deviceRequest<{ id: string; title: string; created_at: string; url: string | null } | null>('/api/admin/vlb/agreement-template')
-      .then((result) => setTemplate(result.data || null))
-      .catch(() => setTemplate(null));
+  const loadPublicDocs = () =>
+    fetchAdminPublicDocs()
+      .then((result) => setPublicDocs(result.data || { guide: null, agreement_template: null }))
+      .catch(() => setPublicDocs({ guide: null, agreement_template: null }));
 
   useEffect(() => {
     void load();
-    void loadTemplate();
+    void loadPublicDocs();
   }, []);
 
   const startEdit = (plan: VlbAdminPlan) => {
@@ -133,56 +146,41 @@ export default function AdminVlbPlansPage() {
   return (
     <div className="space-y-6">
       <VlbNav current="/admin/vlb/plans" />
-      <section className="rounded-xl bg-white p-6 shadow-sm space-y-3">
-        <h2 className="font-semibold text-[#1A1A1A]">Agreement template</h2>
-        <p className="text-sm text-[#3A3A3A]">
-          Blank template shown on the public Laptop Banking page and in investor documents.
-        </p>
-        {template ? (
-          <p className="text-sm text-[#1A1A1A]">
-            Current:{' '}
-            <button
-              type="button"
-              className="font-medium text-[#FF7A19]"
-              onClick={() => openAdminVlbDocument(template.id).catch((error) => toast.error(apiMessage(error, 'Could not download this file.')))}
-            >
-              {template.title}
-            </button>
+      <section className="rounded-xl bg-white p-6 shadow-sm space-y-5">
+        <div>
+          <h2 className="font-semibold text-[#1A1A1A]">Public documents</h2>
+          <p className="mt-1 text-sm text-[#3A3A3A]">
+            PDF files for the public Laptop Banking page. Learn More uses the guide; Read Agreement uses the template.
           </p>
-        ) : (
-          <p className="text-sm text-[#3A3A3A]">No template uploaded yet.</p>
-        )}
-        {editable && (
-          <form
-            className="flex flex-wrap gap-2"
-            onSubmit={async (event) => {
-              event.preventDefault();
-              if (!templateFile) {
-                toast.error('Choose a PDF.');
-                return;
-              }
-              setBusy(true);
-              try {
-                await uploadAgreementTemplate(templateFile, 'Laptop Banking agreement');
-                toast.success(template ? 'Template replaced.' : 'Template uploaded.');
-                setTemplateFile(null);
-                await loadTemplate();
-              } catch (error) {
-                toast.error(apiMessage(error, 'Could not store this file.'));
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            <input
-              className="rounded-lg border px-3 py-2 text-sm"
-              type="file"
-              accept="application/pdf"
-              onChange={(e) => setTemplateFile(e.target.files?.[0] || null)}
-            />
-            <Button type="submit" disabled={busy}>{template ? 'Replace template' : 'Upload template'}</Button>
-          </form>
-        )}
+        </div>
+        <PublicDocSlot
+          label="Laptop Banking guide (Learn More)"
+          kind="guide"
+          doc={publicDocs.guide}
+          file={publicFiles.guide || null}
+          editable={editable}
+          busy={busy}
+          onFile={(file) => setPublicFiles((current) => ({ ...current, guide: file }))}
+          onSaved={async () => {
+            setPublicFiles((current) => ({ ...current, guide: null }));
+            await loadPublicDocs();
+          }}
+          onBusy={setBusy}
+        />
+        <PublicDocSlot
+          label="Agreement template (Read Agreement)"
+          kind="agreement_template"
+          doc={publicDocs.agreement_template}
+          file={publicFiles.agreement_template || null}
+          editable={editable}
+          busy={busy}
+          onFile={(file) => setPublicFiles((current) => ({ ...current, agreement_template: file }))}
+          onSaved={async () => {
+            setPublicFiles((current) => ({ ...current, agreement_template: null }));
+            await loadPublicDocs();
+          }}
+          onBusy={setBusy}
+        />
       </section>
       {editable && (
         <Button onClick={() => { setOpen('new'); setForm(EMPTY); }}>New plan</Button>
@@ -290,6 +288,101 @@ export default function AdminVlbPlansPage() {
             </div>
           </form>
         </div>
+      )}
+    </div>
+  );
+}
+
+function PublicDocSlot({
+  label,
+  kind,
+  doc,
+  file,
+  editable,
+  busy,
+  onFile,
+  onSaved,
+  onBusy,
+}: {
+  label: string;
+  kind: VlbPublicDocKind;
+  doc: VlbPublicDocSlot | null;
+  file: File | null;
+  editable: boolean;
+  busy: boolean;
+  onFile: (file: File | null) => void;
+  onSaved: () => Promise<void>;
+  onBusy: (value: boolean) => void;
+}) {
+  return (
+    <div className="rounded-lg border border-gray-200 p-4 space-y-3">
+      <h3 className="font-medium text-[#1A1A1A]">{label}</h3>
+      {doc ? (
+        <p className="text-sm text-[#1A1A1A]">
+          Current:{' '}
+          <button
+            type="button"
+            className="font-medium text-[#FF7A19]"
+            onClick={() => openAdminVlbDocument(doc.id).catch((error) => toast.error(apiMessage(error, 'Could not download this file.')))}
+          >
+            {doc.title}
+          </button>
+          <span className="text-[#3A3A3A]"> · {formatDeviceDate(doc.created_at)}</span>
+        </p>
+      ) : (
+        <p className="text-sm text-[#3A3A3A]">No file uploaded yet.</p>
+      )}
+      {editable && (
+        <form
+          className="flex flex-wrap gap-2"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            if (!file) {
+              toast.error('Choose a PDF.');
+              return;
+            }
+            onBusy(true);
+            try {
+              await uploadPublicDocument(kind, file, file.name);
+              toast.success(doc ? 'File replaced.' : 'File uploaded.');
+              onFile(null);
+              await onSaved();
+            } catch (error) {
+              toast.error(apiMessage(error, 'Could not store this file.'));
+            } finally {
+              onBusy(false);
+            }
+          }}
+        >
+          <input
+            className="rounded-lg border px-3 py-2 text-sm"
+            type="file"
+            accept="application/pdf"
+            onChange={(e) => onFile(e.target.files?.[0] || null)}
+          />
+          <Button type="submit" disabled={busy}>{doc ? 'Replace' : 'Upload'}</Button>
+          {doc ? (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={async () => {
+                onBusy(true);
+                try {
+                  await removePublicDocument(kind);
+                  toast.success('File removed.');
+                  await onSaved();
+                } catch (error) {
+                  toast.error(apiMessage(error, 'Could not remove this file.'));
+                } finally {
+                  onBusy(false);
+                }
+              }}
+            >
+              Remove
+            </Button>
+          ) : null}
+        </form>
       )}
     </div>
   );

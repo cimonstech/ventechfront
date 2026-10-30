@@ -118,9 +118,10 @@ function ServiceRequestsList() {
     };
   }, [tab, page, query, issueTypeId, warranty, from, to, status, assigneeFilter, userId]);
 
-  const assigneeName = (id: string | null) => {
-    if (!id) return 'Unassigned';
-    return assignees.find((person) => person.id === id)?.name || 'Assigned';
+  const assigneeName = (row: { assigned_to: string | null; assignee_name?: string | null }) => {
+    if (row.assignee_name) return row.assignee_name;
+    if (!row.assigned_to) return 'Unassigned';
+    return assignees.find((person) => person.id === row.assigned_to)?.name || 'Assigned';
   };
 
   const openCounts = TICKET_STAGES.filter((item) => item !== 'completed').map((item) => ({
@@ -253,7 +254,7 @@ function ServiceRequestsList() {
                 <td className="px-4 py-3 text-[#1A1A1A]">{row.laptop_model}</td>
                 <td className="px-4 py-3">{row.issue?.name || '—'}</td>
                 <td className="px-4 py-3"><Badge size="sm" variant={statusVariant(row.status)}>{STATUS_LABEL[row.status] || row.status}</Badge></td>
-                <td className="px-4 py-3">{assigneeName(row.assigned_to)}</td>
+                <td className="px-4 py-3">{assigneeName(row)}</td>
                 <td className="px-4 py-3 capitalize">{row.warranty_status_at_submit || '—'}</td>
                 <td className="px-4 py-3 whitespace-nowrap">{formatTicketWhen(row.updated_at)}</td>
               </tr>

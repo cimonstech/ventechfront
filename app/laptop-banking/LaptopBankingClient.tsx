@@ -20,13 +20,11 @@ import {
   Headphones,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { fetchPublicAgreementTemplate, submitVlbApplication, vlbGhs, type VlbPublicPlan } from '@/lib/vlb';
+import { fetchPublicVlbDocs, submitVlbApplication, vlbGhs, type VlbPublicPlan } from '@/lib/vlb';
 
 export default function LaptopBankingPage({
-  termsPublished,
   plans,
 }: {
-  termsPublished: boolean;
   plans: VlbPublicPlan[];
 }) {
   const [selectedPlanId, setSelectedPlanId] = useState('');
@@ -71,6 +69,30 @@ export default function LaptopBankingPage({
   const handleSelectPlan = (planId: string) => {
     setSelectedPlanId(planId);
     setShowModal(true);
+  };
+
+  const openPublicDoc = async (slot: 'guide' | 'agreement_template') => {
+    try {
+      const docs = await fetchPublicVlbDocs();
+      const file = docs[slot];
+      if (file?.url) {
+        window.open(file.url, '_blank', 'noopener,noreferrer');
+        return true;
+      }
+    } catch (error) {
+      console.error('vlb public document', error);
+    }
+    return false;
+  };
+
+  const handleLearnMore = async () => {
+    if (await openPublicDoc('guide')) return;
+    scrollToSection('how-it-works');
+  };
+
+  const handleReadAgreement = async () => {
+    if (await openPublicDoc('agreement_template')) return;
+    window.location.href = '/laptop-banking/terms';
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -285,43 +307,19 @@ export default function LaptopBankingPage({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.open('https://files.ventechgadgets.com/laptopbanking.pdf', '_blank', 'noopener,noreferrer')}
+              onClick={() => void handleLearnMore()}
               className="w-full px-3 py-2 sm:px-4 sm:py-2 text-sm border-2 border-[#FF7A19] text-[#FF7A19] hover:!bg-[#FF7A19] hover:!text-white transition-colors"
             >
               Learn More
             </Button>
-            {termsPublished ? (
-              <button
-                type="button"
-                onClick={async () => {
-                  const template = await fetchPublicAgreementTemplate();
-                  if (template?.url) {
-                    window.open(template.url, '_blank', 'noopener,noreferrer');
-                    return;
-                  }
-                  window.location.href = '/laptop-banking/terms';
-                }}
-                className="inline-flex w-full items-center justify-center rounded-lg border-2 border-[#FF7A19] px-3 py-2 text-sm font-medium text-[#FF7A19] transition-colors hover:bg-[#FF7A19] hover:text-white sm:px-4"
-              >
-                Read Agreement
-              </button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  const template = await fetchPublicAgreementTemplate();
-                  if (template?.url) {
-                    window.open(template.url, '_blank', 'noopener,noreferrer');
-                    return;
-                  }
-                  window.open('https://files.ventechgadgets.com/VENTECH%20LAPTOP%20BANKING%20INVESTMENT%20AGREEMENT.pdf', '_blank', 'noopener,noreferrer');
-                }}
-                className="w-full px-3 py-2 sm:px-4 sm:py-2 text-sm border-2 border-[#FF7A19] text-[#FF7A19] hover:!bg-[#FF7A19] hover:!text-white transition-colors"
-              >
-                Read Agreement
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void handleReadAgreement()}
+              className="w-full px-3 py-2 sm:px-4 sm:py-2 text-sm border-2 border-[#FF7A19] text-[#FF7A19] hover:!bg-[#FF7A19] hover:!text-white transition-colors"
+            >
+              Read Agreement
+            </Button>
           </div>
         </div>
       </section>

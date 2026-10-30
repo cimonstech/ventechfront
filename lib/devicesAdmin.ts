@@ -1,5 +1,6 @@
+import { ADMIN_DATA_DENIED } from '@/lib/access';
 import { authHeaders } from '@/lib/authHeaders';
-import { accessDeniedMessage } from '@/lib/access';
+import { ApiError, emitSessionExpired, failNetwork } from '@/lib/httpErrors';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
@@ -104,19 +105,34 @@ export async function deviceRequest<T>(
   init: RequestInit = {}
 ): Promise<{ data: T; message: string; pagination?: DevicePage; pending_count?: number }> {
   const headers = await authHeaders();
-  const response = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: {
-      ...headers,
-      'Content-Type': 'application/json',
-      ...(init.headers || {}),
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      ...init,
+      headers: {
+        ...headers,
+        'Content-Type': 'application/json',
+        ...(init.headers || {}),
+      },
+    });
+  } catch {
+    throw failNetwork();
+  }
 
   const body = await response.json().catch(() => ({}));
   if (!response.ok || body?.success === false) {
     const fallback = typeof body?.message === 'string' ? body.message : 'Request failed';
-    throw new Error(accessDeniedMessage(response.status, fallback));
+    if (response.status === 401) {
+      emitSessionExpired();
+      throw new ApiError(401, 'Your session expired. Sign in again.');
+    }
+    if (response.status === 403) {
+      throw new ApiError(403, ADMIN_DATA_DENIED);
+    }
+    if (response.status === 429) {
+      throw new ApiError(429, 'Too many requests. Wait a moment and try again.');
+    }
+    throw new ApiError(response.status || 500, fallback);
   }
 
   return {

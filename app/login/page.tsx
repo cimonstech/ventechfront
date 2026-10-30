@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { FieldError } from '@/components/ui-states';
 import { signIn, signOut, getUserProfile } from '@/services/auth.service';
 import { useAppDispatch } from '@/store';
 import { setUser } from '@/store/authSlice';
@@ -185,14 +186,14 @@ export default function LoginPage() {
                   required
                   value={formData.email}
                   onChange={handleChange}
+                  aria-invalid={errors.email ? true : undefined}
+                  aria-describedby={errors.email ? 'login-email-error' : undefined}
                   suppressHydrationWarning
-                  className="appearance-none rounded-t-lg relative block w-full px-3 py-3 pl-10 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-[#FF7A19] focus:border-[#FF7A19] focus:z-10 sm:text-sm"
+                  className={`appearance-none rounded-t-lg relative block w-full px-3 py-3 pl-10 border placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-[#FF7A19] focus:border-[#FF7A19] focus:z-10 sm:text-sm ${errors.email ? 'border-red-500' : 'border-gray-300'}`}
                   placeholder="Email address"
                 />
               </div>
-              {errors.email && (
-                <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-              )}
+              <FieldError id="login-email-error" message={errors.email} />
             </div>
             <div>
               <label htmlFor="password" className="sr-only">
@@ -210,8 +211,10 @@ export default function LoginPage() {
                   required
                   value={formData.password}
                   onChange={handleChange}
+                  aria-invalid={errors.password ? true : undefined}
+                  aria-describedby={errors.password ? 'login-password-error' : undefined}
                   suppressHydrationWarning
-                  className="appearance-none rounded-b-lg relative block w-full px-3 py-3 pl-10 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-[#FF7A19] focus:border-[#FF7A19] focus:z-10 sm:text-sm"
+                  className={`appearance-none rounded-b-lg relative block w-full px-3 py-3 pl-10 pr-10 border placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-[#FF7A19] focus:border-[#FF7A19] focus:z-10 sm:text-sm ${errors.password ? 'border-red-500' : 'border-gray-300'}`}
                   placeholder="Password"
                 />
                 <button
@@ -223,9 +226,7 @@ export default function LoginPage() {
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
-              {errors.password && (
-                <p className="mt-1 text-sm text-red-600">{errors.password}</p>
-              )}
+              <FieldError id="login-password-error" message={errors.password} />
             </div>
           </div>
 
@@ -252,11 +253,7 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {errors.form && (
-            <div className="rounded-md bg-red-50 p-4">
-              <p className="text-sm text-red-800">{errors.form}</p>
-            </div>
-          )}
+          <FieldError id="login-form-error" message={errors.form} />
 
           <div>
             <Button

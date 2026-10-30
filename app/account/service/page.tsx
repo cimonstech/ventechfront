@@ -1,14 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import toast from 'react-hot-toast';
+import { Wrench } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
+import { AccountListSkeleton, EmptyState, ErrorState } from '@/components/ui-states';
+import { useOnlineRefetch } from '@/hooks/useOnlineRefetch';
 import { useAppSelector } from '@/store';
 import { safeRedirectPath } from '@/lib/safeRedirect';
 import {
-  apiMessage,
   deviceRequest,
   formatTicketWhen,
   statusVariant,
@@ -28,6 +29,21 @@ export default function MyServiceRequestsPage() {
   const { isAuthenticated, isLoading } = useAppSelector((state) => state.auth);
   const [tickets, setTickets] = useState<MyTicket[]>([]);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+
+  const loadTickets = useCallback(async () => {
+    if (!isAuthenticated) return;
+    setLoading(true);
+    setFailed(false);
+    try {
+      const result = await deviceRequest<MyTicket[]>('/api/tickets/mine');
+      setTickets(result.data || []);
+    } catch {
+      setFailed(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (isLoading) return;
@@ -36,30 +52,13 @@ export default function MyServiceRequestsPage() {
       router.replace(next ? `/login?redirect=${encodeURIComponent(next)}` : '/login');
       return;
     }
-    let cancelled = false;
-    const load = async () => {
-      setLoading(true);
-      try {
-        const result = await deviceRequest<MyTicket[]>('/api/tickets/mine');
-        if (!cancelled) setTickets(result.data || []);
-      } catch (error) {
-        if (!cancelled) toast.error(apiMessage(error, 'Failed to load your requests'));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthenticated, isLoading, router]);
+    void loadTickets();
+  }, [isAuthenticated, isLoading, router, loadTickets]);
 
-  if (isLoading || !isAuthenticated || loading) {
-    return (
-      <div className="min-h-[50vh] flex items-center justify-center bg-gray-50 px-4">
-        <p className="text-sm text-[#3A3A3A]">Loading your requests…</p>
-      </div>
-    );
+  useOnlineRefetch(loadTickets);
+
+  if (isLoading || !isAuthenticated || (loading && tickets.length === 0)) {
+    return <AccountListSkeleton rows={3} />;
   }
 
   return (
@@ -68,11 +67,20 @@ export default function MyServiceRequestsPage() {
           <h1 className="hidden text-2xl font-bold text-[#1A1A1A] md:block">Service requests</h1>
           <Link href="/account/service/new" className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-[#FF7A19] px-4 text-sm font-semibold text-white sm:w-auto">New request</Link>
         </div>
-        {tickets.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-xl p-6 text-sm text-[#3A3A3A]">
-            <p>No service requests yet.</p>
-            <Link href="/account/devices" className="inline-block mt-3 font-semibold text-[#FF7A19]">My devices</Link>
-          </div>
+        {failed && tickets.length === 0 ? (
+          <ErrorState
+            title="We couldn't load your requests"
+            description="Try again in a moment. Existing tickets are still with our team."
+            primary={{ label: 'Try again', onClick: () => void loadTickets() }}
+          />
+        ) : tickets.length === 0 ? (
+          <EmptyState
+            icon={Wrench}
+            title="No service requests yet"
+            description="When a laptop needs care, start a request here. We'll keep you posted as it moves."
+            primary={{ label: 'New request', href: '/account/service/new' }}
+            secondary={{ label: 'My devices', href: '/account/devices', variant: 'outline' }}
+          />
         ) : (
           <ul className="space-y-3">
             {tickets.map((ticket) => (

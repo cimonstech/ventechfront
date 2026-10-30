@@ -123,7 +123,7 @@ export default function ServiceRequestDetailPage() {
     setWorking(true);
     try {
       const assigned = assigneeId || null;
-      if (assigned !== (ticket.assignee?.id || null)) {
+      if (!ticket.assignee?.locked && assigned !== (ticket.assignee?.id || null)) {
         const assignResult = await deviceRequest(`/api/admin/tickets/${id}/assign`, {
           method: 'POST',
           body: JSON.stringify({ user_id: assigned }),
@@ -299,7 +299,9 @@ export default function ServiceRequestDetailPage() {
           <h3 className="font-semibold text-[#1A1A1A]">Handling</h3>
           <label className="block text-sm">
             <span className="font-medium text-[#1A1A1A]">Assign to</span>
-            {editable ? (
+            {ticket.assignee?.locked ? (
+              <p className="mt-1 text-[#3A3A3A]">{ticket.assignee.name || 'VENTECH Team'}</p>
+            ) : editable ? (
               <select value={assigneeId} onChange={(event) => setAssigneeId(event.target.value)} className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg">
                 <option value="">Unassigned</option>
                 {assignees.map((person) => (

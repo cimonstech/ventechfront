@@ -22,7 +22,7 @@ const FLAGS: Array<{
   {
     key: 'feature_vlb_v3_enabled',
     label: 'Laptop Banking V3.0',
-    warning: 'Turning this on publishes Laptop Banking V3.0 terms and returns',
+    warning: 'Turning this on lets staff activate investments and gives investors their dashboard.',
   },
 ];
 

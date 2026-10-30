@@ -12,7 +12,13 @@ export type WithdrawalMode = 'anytime' | 'month_end';
 export interface PublicAffiliateInfo {
   fee_pesewas: number;
   commission_pesewas: number;
+  commission_copy?: string;
+  eligible_scope?: 'all' | 'categories';
   eligible_category_names: string[];
+  commission_mode?: 'flat' | 'percent';
+  commission_percent_bp?: number;
+  commission_cap_pesewas?: number | null;
+  min_order_pesewas?: number;
   min_withdrawal_pesewas: number;
   payout_methods: PayoutMethod[];
   return_window_days?: number;
@@ -64,6 +70,7 @@ export interface AffiliateSale {
   date: string;
   commission_status: string;
   amount_pesewas: number;
+  skip_reason?: string | null;
 }
 
 export interface AffiliateWithdrawal {
@@ -81,6 +88,15 @@ export interface AffiliateWithdrawal {
 export interface AffiliateProductHit {
   name: string;
   slug: string | null;
+}
+
+export function skipReasonCopy(reason: string | null | undefined, minOrderPesewas = 0): string {
+  if (reason === 'below_minimum') return `Below the ${formatCopyGhs(minOrderPesewas)} minimum order`;
+  if (reason === 'category_not_eligible') return 'Product not included in the programme';
+  if (reason === 'self_referral') return 'You cannot earn commission on your own order';
+  if (reason === 'refunded') return 'Order refunded';
+  if (reason === 'settings_error') return 'This sale could not be processed';
+  return '';
 }
 
 export function payoutMethodLabel(method: string): string {

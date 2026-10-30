@@ -13,11 +13,17 @@ if (!supabaseUrl || !supabaseAnonKey) {
   }
 }
 
+function detectSessionInUrl(): boolean {
+  if (typeof window === 'undefined') return true;
+  if (window.location.pathname !== '/reset-password') return true;
+  return !new URLSearchParams(window.location.search).get('token_hash');
+}
+
 export const supabase = createClient(buildSafeUrl, buildSafeKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
+    detectSessionInUrl: detectSessionInUrl(),
   },
 });
 

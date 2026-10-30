@@ -195,7 +195,7 @@ export default function AdminVlbApplicationDetailPage() {
               readOnly={!superadmin}
             />
           </label>
-          <p className="text-xs text-[#3A3A3A]">Principal must match the plan unless you are a superadmin.</p>
+          <p className="text-xs text-[#3A3A3A]">{superadmin ? 'Principal must match the plan. You can override it.' : 'Principal must match the plan.'}</p>
           <label className="block text-sm">Start date
             <input className="mt-1 w-full rounded-lg border px-3 py-2" type="date" required value={startDate} onChange={(e) => setStartDate(e.target.value)} />
           </label>

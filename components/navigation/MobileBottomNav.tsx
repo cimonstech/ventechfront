@@ -5,11 +5,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, ShoppingBag, Heart, Tag, User, Package } from 'lucide-react';
 import { useAppSelector } from '@/store';
+import { useRecoverySession } from '@/components/RecoverySessionGuard';
 
 export const MobileBottomNav = () => {
   const pathname = usePathname();
   const { count: wishlistCount } = useAppSelector((state) => state.wishlist);
   const { isAuthenticated } = useAppSelector((state) => state.auth);
+  const { recoveryOnly } = useRecoverySession();
+  const showAccount = isAuthenticated && !recoveryOnly;
 
   const navItems = [
     {
@@ -38,7 +41,7 @@ export const MobileBottomNav = () => {
       badge: wishlistCount > 0 ? wishlistCount : undefined,
     },
     {
-      href: isAuthenticated ? '/account' : '/login?redirect=%2Faccount',
+      href: showAccount ? '/account' : '/login?redirect=%2Faccount',
       label: 'My Account',
       icon: User,
       exact: false,

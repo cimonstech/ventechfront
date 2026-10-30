@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Heart, ChevronRight, Trash2, Star, ShoppingCart } from 'lucide-react';
+import { Heart, Trash2, Star, ShoppingCart } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '@/store';
 import { wishlistService } from '@/services/wishlist.service';
 import { ProductCard } from '@/components/cards/ProductCard';
@@ -12,6 +12,8 @@ import { formatCurrency, calculateDiscountPercentage } from '@/lib/helpers';
 import { addToCart } from '@/store/cartSlice';
 import { useWishlist } from '@/hooks/useWishlist';
 import { Badge } from '@/components/ui/Badge';
+import { AccessDenied, EmptyState, ErrorState, ProductGridSkeleton } from '@/components/ui-states';
+import { useOnlineRefetch } from '@/hooks/useOnlineRefetch';
 import toast from 'react-hot-toast';
 
 interface WishlistItem {
@@ -28,22 +30,14 @@ export default function WishlistPage() {
   const { toggleItem } = useWishlist();
   const [wishlistItems, setLocalWishlistItems] = useState<WishlistItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
 
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      fetchWishlist();
-    } else {
-      setIsLoading(false);
-    }
-  }, [isAuthenticated, user]);
-
-  const fetchWishlist = async () => {
+  const fetchWishlist = useCallback(async () => {
     if (!user) return;
-    
     setIsLoading(true);
+    setFailed(false);
     try {
       const items = await wishlistService.getWishlist(user.id);
-      // Filter out items with invalid product data - ensure product exists and has required fields
       const validItems = items.filter(item => 
         item.product && 
         item.product.id &&
@@ -51,16 +45,25 @@ export default function WishlistPage() {
         (item.product.original_price !== undefined || item.product.discount_price !== undefined || (item.product as any).price !== undefined)
       );
       setLocalWishlistItems(validItems);
-      // Update Redux state to sync wishlist count
       const productIds = validItems.map(item => item.product_id).filter(Boolean);
       dispatch(setWishlistItems(productIds));
     } catch (error) {
       console.error('Error fetching wishlist:', error);
-      toast.error('Failed to load wishlist');
+      setFailed(true);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, dispatch]);
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      void fetchWishlist();
+    } else {
+      setIsLoading(false);
+    }
+  }, [isAuthenticated, user, fetchWishlist]);
+
+  useOnlineRefetch(fetchWishlist);
 
   const handleRemoveFromWishlist = async (productId: string) => {
     if (!user) return;
@@ -124,39 +127,20 @@ export default function WishlistPage() {
 
   if (!isAuthenticated) {
     return (
-      <div>
-        <div className="max-w-5xl">
-          <div className="bg-white rounded-xl shadow-lg p-12 text-center">
-            <h2 className="text-2xl font-bold text-[#1A1A1A] mb-3">Please Login</h2>
-            <p className="text-[#3A3A3A] mb-6">You need to be logged in to view your wishlist.</p>
-            <Link
-              href="/login"
-              className="inline-block bg-[#FF7A19] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#FF8C3A] transition-colors"
-            >
-              Login
-            </Link>
-          </div>
-        </div>
-      </div>
+      <AccessDenied
+        title="Sign in to see your wishlist"
+        description="Saved items are tied to your account. Sign in and we'll bring you back here."
+        primary={{ label: 'Sign in', href: '/login' }}
+        secondary={{ label: 'Browse the shop', href: '/shop', variant: 'outline' }}
+      />
     );
   }
 
-  if (isLoading) {
+  if (isLoading && wishlistItems.length === 0) {
     return (
       <div>
         <div className="max-w-5xl">
-          <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="bg-white rounded-xl shadow-sm p-4">
-                  <div className="h-48 bg-gray-200 rounded-lg mb-4"></div>
-                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                  <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <ProductGridSkeleton count={4} />
         </div>
       </div>
     );
@@ -172,23 +156,19 @@ export default function WishlistPage() {
           </p>
         </div>
 
-        {wishlistItems.length === 0 ? (
-          /* Empty State */
-          <div className="bg-white rounded-xl shadow-lg p-12 text-center">
-            <div className="bg-orange-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Heart className="w-10 h-10 text-[#FF7A19]" />
-            </div>
-            <h2 className="text-2xl font-bold text-[#1A1A1A] mb-3">Your Wishlist is Empty</h2>
-            <p className="text-[#3A3A3A] mb-6 max-w-md mx-auto">
-              Save products you love so you can easily find them later!
-            </p>
-            <Link
-              href="/shop"
-              className="inline-flex min-h-11 w-full items-center justify-center bg-[#FF7A19] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#FF8C3A] transition-colors sm:w-auto"
-            >
-              Browse Products
-            </Link>
-          </div>
+        {failed && wishlistItems.length === 0 ? (
+          <ErrorState
+            title="We couldn't load your wishlist"
+            description="Try again in a moment. Saved items are still in your account."
+            primary={{ label: 'Try again', onClick: () => void fetchWishlist() }}
+          />
+        ) : wishlistItems.length === 0 ? (
+          <EmptyState
+            icon={Heart}
+            title="No saved items yet"
+            description="Tap the heart on a product to save it here. We'll keep it ready for later."
+            primary={{ label: 'Browse products', href: '/shop' }}
+          />
         ) : (
           /* Wishlist Items */
           <>

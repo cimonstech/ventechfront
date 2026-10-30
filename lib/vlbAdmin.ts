@@ -107,12 +107,31 @@ export async function saveInvestorPayout(
   });
 }
 
-export async function uploadAgreementTemplate(file: File, title?: string) {
+export type VlbPublicDocKind = 'guide' | 'agreement_template';
+
+export interface VlbPublicDocSlot {
+  id: string;
+  kind: string;
+  title: string;
+  created_at: string;
+  url: string | null;
+}
+
+export interface VlbPublicDocsAdmin {
+  guide: VlbPublicDocSlot | null;
+  agreement_template: VlbPublicDocSlot | null;
+}
+
+export async function fetchAdminPublicDocs() {
+  return deviceRequest<VlbPublicDocsAdmin>('/api/admin/vlb/public-docs');
+}
+
+export async function uploadPublicDocument(kind: VlbPublicDocKind, file: File, title?: string) {
   const headers = await authHeaders();
   const body = new FormData();
   body.append('file', file);
   if (title) body.append('title', title);
-  const response = await fetch(`${API_URL}/api/admin/vlb/agreement-template`, {
+  const response = await fetch(`${API_URL}/api/admin/vlb/public-docs/${kind}`, {
     method: 'POST',
     headers,
     body,
@@ -122,6 +141,14 @@ export async function uploadAgreementTemplate(file: File, title?: string) {
     throw new Error(accessDeniedMessage(response.status, typeof payload?.message === 'string' ? payload.message : 'Could not store this file.'));
   }
   return payload.data;
+}
+
+export async function removePublicDocument(kind: VlbPublicDocKind) {
+  return deviceRequest(`/api/admin/vlb/public-docs/${kind}`, { method: 'DELETE' });
+}
+
+export async function uploadAgreementTemplate(file: File, title?: string) {
+  return uploadPublicDocument('agreement_template', file, title);
 }
 
 export async function openAdminVlbDocument(documentId: string) {

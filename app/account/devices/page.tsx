@@ -1,15 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import toast from 'react-hot-toast';
-import { QrCode, X } from 'lucide-react';
+import { Laptop, QrCode, X } from 'lucide-react';
 import { DeviceWarrantyBadge } from '@/components/admin/DeviceWarrantyBadge';
 import { OwnerQrCard } from '@/components/devices/OwnerQrCard';
+import { AccountListSkeleton, EmptyState, ErrorState } from '@/components/ui-states';
+import { useOnlineRefetch } from '@/hooks/useOnlineRefetch';
 import { useAppSelector } from '@/store';
 import { settingsService } from '@/lib/settings.service';
-import { apiMessage, deviceRequest, formatDeviceDate, type DeviceWarranty } from '@/lib/devicesAdmin';
+import { deviceRequest, formatDeviceDate, type DeviceWarranty } from '@/lib/devicesAdmin';
 import { recordPortalEvent } from '@/lib/portalEvents';
 
 interface MineDevice {
@@ -31,6 +32,7 @@ export default function MyDevicesPage() {
   const { isAuthenticated, isLoading } = useAppSelector((state) => state.auth);
   const [devices, setDevices] = useState<MineDevice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
   const [qrDevice, setQrDevice] = useState<MineDevice | null>(null);
   const [phone, setPhone] = useState(FALLBACK_PHONE);
 
@@ -46,45 +48,52 @@ export default function MyDevicesPage() {
     };
   }, []);
 
+  const loadDevices = useCallback(async () => {
+    if (!isAuthenticated) return;
+    setLoading(true);
+    setFailed(false);
+    try {
+      const result = await deviceRequest<MineDevice[]>('/api/devices/mine');
+      setDevices(result.data || []);
+    } catch {
+      setFailed(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [isAuthenticated]);
+
   useEffect(() => {
     if (isLoading) return;
     if (!isAuthenticated) {
       router.replace('/login?redirect=%2Faccount%2Fdevices');
       return;
     }
-    let cancelled = false;
-    const load = async () => {
-      setLoading(true);
-      try {
-        const result = await deviceRequest<MineDevice[]>('/api/devices/mine');
-        if (!cancelled) setDevices(result.data || []);
-      } catch (error) {
-        if (!cancelled) toast.error(apiMessage(error, 'Could not load your laptops'));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthenticated, isLoading, router]);
+    void loadDevices();
+  }, [isAuthenticated, isLoading, router, loadDevices]);
 
-  if (isLoading || !isAuthenticated || loading) {
-    return (
-      <div className="min-h-[50vh] flex items-center justify-center bg-gray-50">
-        <p className="text-sm text-[#3A3A3A]">Loading your laptops…</p>
-      </div>
-    );
+  useOnlineRefetch(loadDevices);
+
+  if (isLoading || !isAuthenticated || (loading && devices.length === 0)) {
+    return <AccountListSkeleton rows={3} />;
   }
 
   return (
     <div>
         <h1 className="mb-6 hidden text-2xl font-bold text-[#1A1A1A] md:block">My devices</h1>
-        {devices.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-xl p-6 text-sm text-[#3A3A3A]">
-            No laptops linked yet. Scan the QR sticker on your VENTECH laptop to add it.
-          </div>
+        {failed && devices.length === 0 ? (
+          <ErrorState
+            title="We couldn't load your laptops"
+            description="Try again in a moment. If it keeps failing, contact support."
+            primary={{ label: 'Try again', onClick: () => void loadDevices() }}
+          />
+        ) : devices.length === 0 ? (
+          <EmptyState
+            icon={Laptop}
+            title="No laptops linked yet"
+            description="Scan the QR sticker on your VENTECH laptop to add it here. You'll get setup, warranty, and support in one place."
+            primary={{ label: 'Browse laptops', href: '/shop' }}
+            secondary={{ label: 'Contact support', href: 'mailto:ventechgadgets@gmail.com', variant: 'ghost' }}
+          />
         ) : (
           <ul className="space-y-3">
             {devices.map((device) => (

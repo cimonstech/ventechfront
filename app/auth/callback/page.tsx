@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { postSignInPath } from '@/lib/landing';
 import { peekRememberedRedirect, clearRememberedRedirect, safeRedirectPath } from '@/lib/safeRedirect';
 import { linkPendingDevices } from '@/lib/devicesAdmin';
+import { isRecoveryLinkType, markRecoveryOnly } from '@/lib/recoverySession';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -121,10 +122,8 @@ export default function AuthCallbackPage() {
           }
 
           if (session && session.user) {
-            // If it's a password reset, redirect to reset password page
-            // Note: Session is already set, so reset-password page will detect it
-            if (type === 'recovery') {
-              // Use window.location to preserve any hash fragments
+            if (isRecoveryLinkType(type)) {
+              markRecoveryOnly();
               window.location.href = '/reset-password';
               return;
             }
@@ -159,10 +158,8 @@ export default function AuthCallbackPage() {
           }
 
           if (data.session && data.user) {
-            // If it's a password reset, redirect to reset password page
-            // Note: Session is already set, so reset-password page will detect it
-            if (type === 'recovery') {
-              // Use window.location to ensure proper redirect
+            if (isRecoveryLinkType(type)) {
+              markRecoveryOnly();
               window.location.href = '/reset-password';
               return;
             }

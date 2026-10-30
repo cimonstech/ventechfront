@@ -105,7 +105,7 @@ export default function DeviceDetailPage() {
     const changingStart = device?.warranty_start?.slice(0, 10) !== warrantyStart;
     if (changingStart) {
       if (!isSuperadmin) {
-        toast.error('Only a superadmin can change the warranty start date');
+        toast.error('This date cannot be changed');
         return;
       }
       if (!warrantyStartReason.trim()) {

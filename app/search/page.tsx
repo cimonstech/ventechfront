@@ -1,22 +1,20 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ProductCard } from '@/components/cards/ProductCard';
 import { SearchBar } from '@/components/search/SearchBar';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { EmptyState, ErrorState, NoResults, ProductGridSkeleton } from '@/components/ui-states';
+import { useOnlineRefetch } from '@/hooks/useOnlineRefetch';
 import { 
-  Filter, 
-  SortAsc, 
-  SortDesc, 
   Grid, 
   List,
   X,
   SlidersHorizontal
 } from 'lucide-react';
 import { searchService, SearchResult } from '@/services/search.service';
-import { Product } from '@/types/product';
 import { getCategories } from '@/services/category.service';
 import { getBrands } from '@/services/brand.service';
 import { Category } from '@/types/product';
@@ -45,6 +43,7 @@ export default function SearchPage() {
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [allBrands, setAllBrands] = useState<Brand[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [searchError, setSearchError] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showFilters, setShowFilters] = useState(false);
@@ -69,10 +68,8 @@ export default function SearchPage() {
     loadFilterData();
   }, []);
 
-  // Search products
-  const searchProducts = async (searchQuery: string, page: number = 1) => {
+  const searchProducts = useCallback(async (searchQuery: string, page: number = 1) => {
     if (!searchQuery.trim()) return;
-    
     setIsLoading(true);
     try {
       const offset = (page - 1) * productsPerPage;
@@ -81,29 +78,27 @@ export default function SearchPage() {
         limit: productsPerPage,
         offset
       });
-      
       setSearchResults(results);
       setCurrentPage(page);
+      setSearchError(false);
     } catch (error) {
       console.error('Search error:', error);
+      setSearchError(true);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // Initial search
-  useEffect(() => {
-    if (query) {
-      searchProducts(query);
-    }
-  }, [query]);
-
-  // Search when filters change
-  useEffect(() => {
-    if (query) {
-      searchProducts(query, 1);
-    }
   }, [filters]);
+
+  useEffect(() => {
+    if (query) {
+      void searchProducts(query);
+    }
+  }, [query, searchProducts]);
+
+  const retrySearch = useCallback(() => {
+    if (query) void searchProducts(query, currentPage);
+  }, [query, currentPage, searchProducts]);
+  useOnlineRefetch(retrySearch);
 
   const handleFilterChange = (key: keyof SearchFilters, value: any) => {
     setFilters(prev => ({
@@ -332,16 +327,14 @@ export default function SearchPage() {
 
           {/* Results */}
           <div className="flex-1">
-            {isLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className="bg-white rounded-lg p-4 animate-pulse">
-                    <div className="w-full h-48 bg-gray-200 rounded mb-4"></div>
-                    <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                  </div>
-                ))}
-              </div>
+            {isLoading && searchResults.products.length === 0 ? (
+              <ProductGridSkeleton count={8} />
+            ) : searchError && searchResults.products.length === 0 ? (
+              <ErrorState
+                title="We couldn't search right now"
+                description="Check your connection and try again."
+                primary={{ label: 'Try again', onClick: () => void searchProducts(query, currentPage) }}
+              />
             ) : searchResults.products.length > 0 ? (
               <>
                 {/* Products Grid */}
@@ -396,14 +389,17 @@ export default function SearchPage() {
                 )}
               </>
             ) : query ? (
-              <div className="text-center py-12">
-                <p className="text-gray-500 mb-4">No products found for "{query}"</p>
-                <p className="text-sm text-gray-400">Try adjusting your search terms or filters</p>
-              </div>
+              <NoResults
+                query={query}
+                description="Try a different spelling, a shorter term, or clear filters."
+                primary={Object.keys(filters).length > 0 ? { label: 'Clear filters', onClick: clearFilters } : { label: 'Browse the shop', href: '/shop' }}
+              />
             ) : (
-              <div className="text-center py-12">
-                <p className="text-gray-500">Enter a search term to find products</p>
-              </div>
+              <EmptyState
+                title="Search VENTECH"
+                description="Type a product, brand, or model to find laptops and accessories."
+                primary={{ label: 'Browse the shop', href: '/shop' }}
+              />
             )}
           </div>
         </div>
