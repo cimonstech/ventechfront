@@ -134,7 +134,7 @@ export default function AdminAffiliatesPage() {
       />
       <AffiliatesNav current="/admin/affiliates" />
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-5">
         {cards.map((card) => (
           <div key={card.label} className="bg-white border border-gray-200 rounded-xl p-3">
             <p className="text-xs text-[#3A3A3A]">{card.label}</p>

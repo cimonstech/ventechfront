@@ -158,7 +158,7 @@ function ServiceRequestsList() {
         secondary={[{ label: 'Issue types', href: '/admin/tickets/issue-types' }]}
       />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
+      <div className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
         {openCounts.map((item) => (
           <div key={item.label} className="bg-white border border-gray-200 rounded-xl p-3">
             <p className="text-xs text-[#3A3A3A]">{item.label}</p>

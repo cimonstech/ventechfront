@@ -31,10 +31,10 @@ export function FilterBar({
   };
 
   return (
-    <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4">
-      <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
+    <div className="mb-6 min-w-0 max-w-full rounded-xl border border-gray-200 bg-white p-4">
+      <div className="flex min-w-0 max-w-full flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
         <div className="relative min-w-0 w-full md:min-w-[16rem] md:flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" aria-hidden />
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 shrink-0 -translate-y-1/2 text-gray-400" aria-hidden />
           <input
             type="search"
             value={search}
