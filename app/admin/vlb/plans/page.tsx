@@ -14,8 +14,9 @@ import {
 } from '@/components/admin/list';
 import { useAccess } from '@/context/AccessContext';
 import { formatGhs } from '@/lib/vlb';
-import { AccessDenied, EmptyState, ErrorState } from '@/components/ui-states';
-import { noteQueryFail } from '@/lib/queryState';
+import { EmptyState } from '@/components/ui-states';
+import { applyQueryFail } from '@/lib/queryState';
+import { AdminQueryFail } from '@/components/admin/AdminQueryFail';
 import {
   apiMessage,
   deviceRequest,
@@ -30,6 +31,7 @@ import {
   type VlbPublicDocsAdmin,
 } from '@/lib/vlbAdmin';
 import { formatDeviceDate } from '@/lib/devicesAdmin';
+import { FilePick } from '@/components/ui/FilePick';
 
 const EMPTY = {
   plan_group: 'vts',
@@ -69,6 +71,7 @@ export default function AdminVlbPlansPage() {
 
   const [failed, setFailed] = useState(false);
   const [forbidden, setForbidden] = useState(false);
+  const [featureOff, setFeatureOff] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   const load = () =>
@@ -78,11 +81,10 @@ export default function AdminVlbPlansPage() {
         setLoaded(true);
         setFailed(false);
         setForbidden(false);
+        setFeatureOff(false);
       })
       .catch((error) => {
-        const kind = noteQueryFail(error);
-        if (kind === 'forbidden') setForbidden(true);
-        else if (kind !== 'unauthorized') setFailed(true);
+        applyQueryFail(error, { setFeatureOff, setForbidden, setFailed });
       });
 
   const loadPublicDocs = () =>
@@ -164,7 +166,7 @@ export default function AdminVlbPlansPage() {
     setForm((current) => ({ ...current, [key]: event.target.value }));
 
   return (
-    <div className="min-w-0 space-y-6">
+    <div className="min-w-0 max-w-full space-y-6 overflow-x-clip">
       <AdminPageHeader
         title="Plans"
         subtitle={`${rows.length} plan${rows.length === 1 ? '' : 's'}`}
@@ -175,17 +177,23 @@ export default function AdminVlbPlansPage() {
         }
       />
       <VlbNav current="/admin/vlb/plans" />
-      {forbidden ? (
-        <AccessDenied title="You don't have access" description="You don't have access to this data." primary={{ label: 'Go back', href: '/admin' }} />
-      ) : failed && !loaded ? (
-        <ErrorState title="We couldn't load plans" description="Try again in a moment." primary={{ label: 'Try again', onClick: () => void load() }} />
+      {featureOff || forbidden || (failed && !loaded) ? (
+        <AdminQueryFail
+          featureOff={featureOff}
+          forbidden={forbidden}
+          failed={failed}
+          loaded={loaded}
+          feature="Laptop Banking"
+          onRetry={() => void load()}
+          errorTitle="We couldn't load plans"
+        />
       ) : (
         <>
-          <section className="rounded-xl bg-white p-6 shadow-sm space-y-5">
+          <section className="min-w-0 overflow-hidden rounded-xl bg-white p-4 shadow-sm space-y-5 sm:p-6">
             <div>
               <h2 className="font-semibold text-[#1A1A1A]">Public documents</h2>
               <p className="mt-1 text-sm text-[#3A3A3A]">
-                PDF files for the public Laptop Banking page. Learn More uses the guide; Read Agreement uses the template.
+                PDF files for the public Laptop Banking page. Learn More uses the guide. Read agreement and Download agreement use the blank agreement.
               </p>
             </div>
             <PublicDocSlot
@@ -203,7 +211,7 @@ export default function AdminVlbPlansPage() {
               onBusy={setBusy}
             />
             <PublicDocSlot
-              label="Agreement template (Read Agreement)"
+              label="Agreement (blank)"
               kind="agreement_template"
               doc={publicDocs.agreement_template}
               file={publicFiles.agreement_template || null}
@@ -279,48 +287,48 @@ export default function AdminVlbPlansPage() {
       )}
       {open && (
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-          <form className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 space-y-3" onSubmit={save}>
+          <form className="max-h-[90vh] w-full max-w-lg overflow-y-auto overflow-x-clip rounded-2xl bg-white p-4 space-y-3 sm:p-6" onSubmit={save}>
             <h2 className="text-lg font-semibold text-[#1A1A1A]">{open === 'new' ? 'New plan' : 'Edit plan'}</h2>
             {open !== 'new' && (
               <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
                 Changing money fields on a plan with investments creates a new version. Existing investments keep the old figures.
               </p>
             )}
-            <div className="grid grid-cols-2 gap-2">
-              <select className="rounded-lg border px-3 py-2 text-sm" value={form.plan_group} onChange={set('plan_group')}>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <select className="min-h-11 min-w-0 w-full rounded-lg border px-3 py-2 text-sm" value={form.plan_group} onChange={set('plan_group')}>
                 <option value="vts">VTS</option>
                 <option value="exclusive">Exclusive</option>
               </select>
-              <input className="rounded-lg border px-3 py-2 text-sm" required placeholder="Tier" value={form.tier} onChange={set('tier')} />
+              <input className="min-h-11 min-w-0 w-full rounded-lg border px-3 py-2 text-sm" required placeholder="Tier" value={form.tier} onChange={set('tier')} />
             </div>
             <input className="w-full rounded-lg border px-3 py-2 text-sm" required placeholder="Name" value={form.name} onChange={set('name')} />
-            <div className="grid grid-cols-2 gap-2">
-              <input className="rounded-lg border px-3 py-2 text-sm" required placeholder="Principal GHS" value={form.principal} onChange={set('principal')} />
-              <input className="rounded-lg border px-3 py-2 text-sm" placeholder="Version" value={form.version} onChange={set('version')} />
-              <input className="rounded-lg border px-3 py-2 text-sm" required placeholder="Terms" value={form.terms_count} onChange={set('terms_count')} />
-              <input className="rounded-lg border px-3 py-2 text-sm" required placeholder="Months per term" value={form.months_per_term} onChange={set('months_per_term')} />
-              <input className="rounded-lg border px-3 py-2 text-sm" required placeholder="Settlement months" value={form.settlement_months} onChange={set('settlement_months')} />
-              <input className="rounded-lg border px-3 py-2 text-sm" required placeholder="Sort order" value={form.sort_order} onChange={set('sort_order')} />
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <input className="min-h-11 min-w-0 w-full rounded-lg border px-3 py-2 text-sm" required placeholder="Principal GHS" value={form.principal} onChange={set('principal')} />
+              <input className="min-h-11 min-w-0 w-full rounded-lg border px-3 py-2 text-sm" placeholder="Version" value={form.version} onChange={set('version')} />
+              <input className="min-h-11 min-w-0 w-full rounded-lg border px-3 py-2 text-sm" required placeholder="Terms" value={form.terms_count} onChange={set('terms_count')} />
+              <input className="min-h-11 min-w-0 w-full rounded-lg border px-3 py-2 text-sm" required placeholder="Months per term" value={form.months_per_term} onChange={set('months_per_term')} />
+              <input className="min-h-11 min-w-0 w-full rounded-lg border px-3 py-2 text-sm" required placeholder="Settlement months" value={form.settlement_months} onChange={set('settlement_months')} />
+              <input className="min-h-11 min-w-0 w-full rounded-lg border px-3 py-2 text-sm" required placeholder="Sort order" value={form.sort_order} onChange={set('sort_order')} />
             </div>
             <label className="block text-sm">Term rates % (comma separated)
               <input className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" required value={form.term_rates} onChange={set('term_rates')} />
             </label>
-            <div className="grid grid-cols-2 gap-2">
-              <select className="rounded-lg border px-3 py-2 text-sm" value={form.rate_basis} onChange={set('rate_basis')}>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <select className="min-h-11 min-w-0 w-full rounded-lg border px-3 py-2 text-sm" value={form.rate_basis} onChange={set('rate_basis')}>
                 <option value="per_month">Per month</option>
                 <option value="per_term">Per term</option>
               </select>
-              <select className="rounded-lg border px-3 py-2 text-sm" value={form.payout_frequency} onChange={set('payout_frequency')}>
+              <select className="min-h-11 min-w-0 w-full rounded-lg border px-3 py-2 text-sm" value={form.payout_frequency} onChange={set('payout_frequency')}>
                 <option value="monthly">Monthly</option>
                 <option value="end_of_term">End of term</option>
               </select>
-              <input className="rounded-lg border px-3 py-2 text-sm" required placeholder="Scholar %" value={form.scholar_fund_percent} onChange={set('scholar_fund_percent')} />
-              <select className="rounded-lg border px-3 py-2 text-sm" value={form.scholar_fund_basis} onChange={set('scholar_fund_basis')}>
+              <input className="min-h-11 min-w-0 w-full rounded-lg border px-3 py-2 text-sm" required placeholder="Scholar %" value={form.scholar_fund_percent} onChange={set('scholar_fund_percent')} />
+              <select className="min-h-11 min-w-0 w-full rounded-lg border px-3 py-2 text-sm" value={form.scholar_fund_basis} onChange={set('scholar_fund_basis')}>
                 <option value="gross_payout">Of gross payout</option>
                 <option value="principal">Of principal</option>
               </select>
-              <input className="rounded-lg border px-3 py-2 text-sm" required placeholder="Premium stars" value={form.premium_stars} onChange={set('premium_stars')} />
-              <input className="rounded-lg border px-3 py-2 text-sm" required placeholder="Referral %" value={form.referral_bonus_percent} onChange={set('referral_bonus_percent')} />
+              <input className="min-h-11 min-w-0 w-full rounded-lg border px-3 py-2 text-sm" required placeholder="Premium stars" value={form.premium_stars} onChange={set('premium_stars')} />
+              <input className="min-h-11 min-w-0 w-full rounded-lg border px-3 py-2 text-sm" required placeholder="Referral %" value={form.referral_bonus_percent} onChange={set('referral_bonus_percent')} />
             </div>
             {open !== 'new' && (
               <label className="flex items-center gap-2 text-sm">
@@ -343,9 +351,9 @@ export default function AdminVlbPlansPage() {
                 Active
               </label>
             )}
-            <div className="flex gap-2">
-              <Button type="submit" disabled={busy}>Save</Button>
-              <Button type="button" variant="outline" onClick={() => setOpen(null)}>Cancel</Button>
+            <div className="flex min-w-0 flex-wrap gap-2">
+              <Button type="submit" disabled={busy} className="w-full sm:w-auto">Save</Button>
+              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => setOpen(null)}>Cancel</Button>
             </div>
           </form>
         </div>
@@ -375,27 +383,65 @@ function PublicDocSlot({
   onSaved: () => Promise<void>;
   onBusy: (value: boolean) => void;
 }) {
+  const [replacing, setReplacing] = useState(false);
+  const showPicker = !doc || replacing;
+
   return (
-    <div className="rounded-lg border border-gray-200 p-4 space-y-3">
-      <h3 className="font-medium text-[#1A1A1A]">{label}</h3>
+    <div className="min-w-0 overflow-hidden rounded-lg border border-gray-200 p-4 space-y-3">
+      <h3 className="break-words font-medium text-[#1A1A1A]">{label}</h3>
       {doc ? (
-        <p className="text-sm text-[#1A1A1A]">
-          Current:{' '}
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-[#1A1A1A]">On file</p>
           <button
             type="button"
-            className="font-medium text-[#FF7A19]"
+            className="mt-1 block max-w-full break-words text-left font-medium text-[#FF7A19]"
             onClick={() => openAdminVlbDocument(doc.id).catch((error) => toast.error(apiMessage(error, 'Could not download this file.')))}
           >
             {doc.title}
           </button>
-          <span className="text-[#3A3A3A]"> · {formatDeviceDate(doc.created_at)}</span>
-        </p>
+          <p className="text-sm text-[#3A3A3A]">{formatDeviceDate(doc.created_at)}</p>
+        </div>
       ) : (
         <p className="text-sm text-[#3A3A3A]">No file uploaded yet.</p>
       )}
-      {editable && (
+      {editable && !showPicker ? (
+        <div className="flex min-w-0 flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy}
+            className="w-full sm:w-auto"
+            onClick={() => setReplacing(true)}
+          >
+            Replace
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy}
+            className="w-full sm:w-auto"
+            onClick={async () => {
+              onBusy(true);
+              try {
+                await removePublicDocument(kind);
+                toast.success('File removed.');
+                setReplacing(false);
+                onFile(null);
+                await onSaved();
+              } catch (error) {
+                toast.error(apiMessage(error, 'Could not remove this file.'));
+              } finally {
+                onBusy(false);
+              }
+            }}
+          >
+            Remove
+          </Button>
+        </div>
+      ) : null}
+      {editable && showPicker ? (
         <form
-          className="flex flex-wrap gap-2"
+          className="grid min-w-0 grid-cols-1 gap-3"
           onSubmit={async (event) => {
             event.preventDefault();
             if (!file) {
@@ -407,6 +453,7 @@ function PublicDocSlot({
               await uploadPublicDocument(kind, file, file.name);
               toast.success(doc ? 'File replaced.' : 'File uploaded.');
               onFile(null);
+              setReplacing(false);
               await onSaved();
             } catch (error) {
               toast.error(apiMessage(error, 'Could not store this file.'));
@@ -415,36 +462,30 @@ function PublicDocSlot({
             }
           }}
         >
-          <input
-            className="rounded-lg border px-3 py-2 text-sm"
-            type="file"
-            accept="application/pdf"
-            onChange={(e) => onFile(e.target.files?.[0] || null)}
-          />
-          <Button type="submit" disabled={busy}>{doc ? 'Replace' : 'Upload'}</Button>
           {doc ? (
-            <Button
-              type="button"
-              variant="outline"
-              disabled={busy}
-              onClick={async () => {
-                onBusy(true);
-                try {
-                  await removePublicDocument(kind);
-                  toast.success('File removed.');
-                  await onSaved();
-                } catch (error) {
-                  toast.error(apiMessage(error, 'Could not remove this file.'));
-                } finally {
-                  onBusy(false);
-                }
-              }}
-            >
-              Remove
-            </Button>
+            <p className="text-sm text-[#3A3A3A]">Choose a new PDF to replace the file on record.</p>
           ) : null}
+          <FilePick accept="application/pdf" file={file} onFile={onFile} />
+          <div className="flex min-w-0 flex-wrap gap-2">
+            <Button type="submit" disabled={busy || !file} className="w-full sm:w-auto">
+              {busy ? 'Working...' : doc ? 'Save replacement' : 'Upload'}
+            </Button>
+            {doc ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full sm:w-auto"
+                onClick={() => {
+                  setReplacing(false);
+                  onFile(null);
+                }}
+              >
+                Cancel
+              </Button>
+            ) : null}
+          </div>
         </form>
-      )}
+      ) : null}
     </div>
   );
 }

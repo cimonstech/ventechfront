@@ -106,11 +106,7 @@ export function payoutMethodLabel(method: string): string {
 }
 
 export function formatCopyGhs(pesewas: number | null | undefined): string {
-  const amount = Number(pesewas);
-  if (!Number.isFinite(amount)) return 'GHS 0';
-  const cedis = amount / 100;
-  if (Number.isInteger(cedis)) return `GHS ${cedis.toLocaleString('en-US')}`;
-  return `GHS ${cedis.toFixed(2)}`;
+  return formatGhs(pesewas);
 }
 
 export function formatCopyDateTime(value: string | Date): string {

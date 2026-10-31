@@ -36,6 +36,15 @@ img, video, canvas, svg, iframe {
   max-width: 100%;
 }
 
+input, select, textarea {
+  max-width: 100%;
+  scroll-margin-top: 5rem;
+}
+
+input[type='file'] {
+  max-width: 100%;
+}
+
 .overflow-x-auto {
   max-width: 100%;
   overscroll-behavior-x: contain;

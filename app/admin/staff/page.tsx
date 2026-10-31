@@ -67,6 +67,7 @@ function displayName(member: StaffMember): string {
 }
 
 function permissionSummary(member: StaffMember): string {
+  if (member.role === 'superadmin') return 'Full access';
   const rows = permissionsOf(member).filter((permission) => permission.can_view || permission.can_edit);
   if (rows.length === 0) return 'No module access';
   return rows

@@ -7,6 +7,7 @@ import {
   AccessModule,
   AccessProfile,
   canEditModule,
+  canMoveVlbMoney as accessCanMoveVlbMoney,
   canViewModule,
   fullAdminAccess,
 } from '@/lib/access';
@@ -16,6 +17,7 @@ interface AccessContextValue {
   loading: boolean;
   canView: (module: AccessModule) => boolean;
   canEdit: (module: AccessModule) => boolean;
+  canMoveVlbMoney: boolean;
 }
 
 const AccessContext = createContext<AccessContextValue>({
@@ -23,6 +25,7 @@ const AccessContext = createContext<AccessContextValue>({
   loading: false,
   canView: () => false,
   canEdit: () => false,
+  canMoveVlbMoney: false,
 });
 
 export function AccessProvider({ children }: { children: React.ReactNode }) {
@@ -75,6 +78,7 @@ export function AccessProvider({ children }: { children: React.ReactNode }) {
     loading,
     canView: (module) => canViewModule(access, module),
     canEdit: (module) => canEditModule(access, module),
+    canMoveVlbMoney: accessCanMoveVlbMoney(access),
   };
 
   return <AccessContext.Provider value={value}>{children}</AccessContext.Provider>;

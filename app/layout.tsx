@@ -6,6 +6,7 @@ import { LayoutWrapper } from "@/components/LayoutWrapper";
 import { RecoverySessionGuard } from "@/components/RecoverySessionGuard";
 import { ReferralCapture } from "@/components/ReferralCapture";
 import { Toaster } from "react-hot-toast";
+import { ToastDedupe } from "@/components/ToastDedupe";
 import { seoConfig } from "@/lib/seo.config";
 
 export const metadata: Metadata = {
@@ -84,6 +85,7 @@ export default function RootLayout({
           <div className="min-h-screen flex flex-col">
             <LayoutWrapper>{children}</LayoutWrapper>
           </div>
+          <ToastDedupe />
           <Toaster
             position="top-right"
             toastOptions={{

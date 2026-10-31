@@ -4,22 +4,26 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Eye,
-  EyeOff,
+import { Badge } from '@/components/ui/Badge';
+import {
+  Plus,
   ArrowUp,
   ArrowDown,
   Save,
-  X
+  X,
 } from 'lucide-react';
 import { deliveryOptionsService } from '@/services/deliveryOptions.service';
 import { formatCurrency } from '@/lib/helpers';
 import { useAppSelector } from '@/store';
 import { hasAdminEntry } from '@/lib/roles';
 import { FeaturesCard } from '@/components/admin/FeaturesCard';
+import {
+  AdminPageHeader,
+  AdminRowCard,
+  ConfirmDialog,
+  ResponsiveTable,
+  RowActions,
+} from '@/components/admin/list';
 import toast from 'react-hot-toast';
 import { AccessDenied, EmptyState, ErrorState, TableSkeleton, UpdatingNotice } from '@/components/ui-states';
 import { useListQuery } from '@/hooks/useListQuery';
@@ -44,6 +48,8 @@ export default function AdminSettingsPage() {
   const [deliveryOptions, setDeliveryOptions] = useState<DeliveryOption[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingOption, setEditingOption] = useState<DeliveryOption | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeliveryOption | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -121,16 +127,18 @@ export default function AdminSettingsPage() {
     setShowForm(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this delivery option?')) return;
-
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await deliveryOptionsService.deleteDeliveryOption(id);
-      toast.success('Delivery option deleted successfully');
+      await deliveryOptionsService.deleteDeliveryOption(deleteTarget.id);
+      toast.success('Delivery option deleted');
+      setDeleteTarget(null);
       fetchDeliveryOptions();
     } catch (error: any) {
-      console.error('Delete error:', error);
-      toast.error(error.message || 'Failed to delete delivery option');
+      toast.error(error.message || 'Could not delete this delivery option');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -209,31 +217,27 @@ export default function AdminSettingsPage() {
   }
 
   return (
-    <div className="p-6">
+    <div className="min-w-0">
       {query.updating ? <UpdatingNotice /> : null}
-      {user?.role === 'superadmin' ? <FeaturesCard /> : null}
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Delivery Options Settings</h1>
-          <p className="text-sm text-gray-600 mt-1">Manage delivery options for checkout</p>
-        </div>
-        <Button
-          variant="primary"
-          onClick={() => {
+      <AdminPageHeader
+        title="Delivery options"
+        subtitle="Checkout delivery methods"
+        primary={{
+          label: 'Add option',
+          icon: <Plus size={16} />,
+          onClick: () => {
             resetForm();
             setShowForm(true);
-          }}
-        >
-          <Plus size={18} className="mr-2" />
-          Add Delivery Option
-        </Button>
-      </div>
+          },
+        }}
+      />
+      {user?.role === 'superadmin' ? <FeaturesCard /> : null}
 
       {showForm && (
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900">
-              {editingOption ? 'Edit Delivery Option' : 'Add New Delivery Option'}
+        <div className="mb-6 min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white p-4">
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <h2 className="min-w-0 text-lg font-bold text-[#1A1A1A]">
+              {editingOption ? 'Edit option' : 'New option'}
             </h2>
             <Button
               variant="outline"
@@ -306,10 +310,11 @@ export default function AdminSettingsPage() {
               </label>
             </div>
 
-            <div className="flex gap-3 pt-4">
+            <div className="flex flex-row gap-2 pt-4">
               <Button
                 type="button"
                 variant="outline"
+                className="min-w-0 flex-1 sm:flex-none"
                 onClick={() => {
                   setShowForm(false);
                   resetForm();
@@ -317,130 +322,121 @@ export default function AdminSettingsPage() {
               >
                 Cancel
               </Button>
-              <Button type="submit" variant="primary">
-                <Save size={18} className="mr-2" />
-                {editingOption ? 'Update' : 'Create'} Delivery Option
+              <Button type="submit" variant="primary" className="min-w-0 flex-1 sm:flex-none">
+                <Save size={16} className="mr-2" />
+                {editingOption ? 'Save' : 'Add option'}
               </Button>
             </div>
           </form>
         </div>
       )}
 
-      {/* Delivery Options List */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Order
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Name
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Description
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Price
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Days
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {deliveryOptions.length === 0 ? (
-                <tr>
-                  <td colSpan={7}>
-                    <EmptyState
-                      title="No delivery options yet"
-                      description="Add a delivery option so shoppers can choose how orders arrive."
-                      primary={{ label: 'Add delivery option', onClick: () => setShowForm(true) }}
-                    />
-                  </td>
-                </tr>
-              ) : (
-                deliveryOptions.map((option) => (
-                  <tr key={option.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => moveOrder(option, 'up')}
-                          className="text-gray-400 hover:text-gray-600"
-                          disabled={deliveryOptions.findIndex(o => o.id === option.id) === 0}
-                        >
-                          <ArrowUp size={16} />
-                        </button>
-                        <span className="text-sm font-medium text-gray-900">
-                          {option.display_order}
-                        </span>
-                        <button
-                          onClick={() => moveOrder(option, 'down')}
-                          className="text-gray-400 hover:text-gray-600"
-                          disabled={deliveryOptions.findIndex(o => o.id === option.id) === deliveryOptions.length - 1}
-                        >
-                          <ArrowDown size={16} />
-                        </button>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{option.name}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-500">{option.description || '-'}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {option.price === 0 ? 'FREE' : formatCurrency(option.price)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500">
-                        {option.estimated_days ? `${option.estimated_days} days` : '-'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <button
-                        onClick={() => toggleActive(option)}
-                        className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          option.is_active
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {option.is_active ? 'Active' : 'Inactive'}
-                      </button>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleEdit(option)}
-                          className="text-blue-600 hover:text-blue-900"
-                        >
-                          <Edit size={18} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(option.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {deliveryOptions.length === 0 ? (
+        <EmptyState
+          title="No delivery options yet"
+          description="Add a delivery option so shoppers can choose how orders arrive."
+          primary={{ label: 'Add option', onClick: () => setShowForm(true) }}
+        />
+      ) : (
+        <ResponsiveTable
+          headers={
+            <tr>
+              <th className="px-4 py-3">Name</th>
+              <th className="px-4 py-3">Price</th>
+              <th className="px-4 py-3">Days</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3 text-right">Actions</th>
+            </tr>
+          }
+          cards={deliveryOptions.map((option) => (
+            <AdminRowCard
+              key={option.id}
+              name={option.name}
+              status={
+                <Badge variant={option.is_active ? 'success' : 'default'} size="sm">
+                  {option.is_active ? 'Active' : 'Inactive'}
+                </Badge>
+              }
+              facts={[
+                { label: 'Price', value: option.price === 0 ? 'Free' : formatCurrency(option.price) },
+                { label: 'Days', value: option.estimated_days ? `${option.estimated_days} days` : '—' },
+              ]}
+              actions={
+                <RowActions
+                  name={option.name}
+                  actions={[
+                    { label: 'Edit', onClick: () => handleEdit(option) },
+                    { label: 'Delete', destructive: true, onClick: () => setDeleteTarget(option) },
+                  ]}
+                />
+              }
+            />
+          ))}
+        >
+          {deliveryOptions.map((option, index) => (
+            <tr key={option.id} className="hover:bg-gray-50">
+              <td className="px-4 py-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => moveOrder(option, 'up')}
+                    className="inline-flex min-h-11 min-w-11 items-center justify-center text-[#3A3A3A] disabled:opacity-30"
+                    disabled={index === 0}
+                    aria-label="Move up"
+                  >
+                    <ArrowUp size={16} />
+                  </button>
+                  <div className="min-w-0">
+                    <p className="font-medium text-[#1A1A1A]">{option.name}</p>
+                    <p className="truncate text-sm text-[#3A3A3A]">{option.description || '—'}</p>
+                  </div>
+                </div>
+              </td>
+              <td className="px-4 py-3">{option.price === 0 ? 'Free' : formatCurrency(option.price)}</td>
+              <td className="px-4 py-3">{option.estimated_days ? `${option.estimated_days} days` : '—'}</td>
+              <td className="px-4 py-3">
+                <button type="button" onClick={() => void toggleActive(option)} className="min-h-11">
+                  <Badge variant={option.is_active ? 'success' : 'default'} size="sm">
+                    {option.is_active ? 'Active' : 'Inactive'}
+                  </Badge>
+                </button>
+              </td>
+              <td className="px-4 py-3 text-right">
+                <div className="flex items-center justify-end gap-1">
+                  <button
+                    type="button"
+                    onClick={() => moveOrder(option, 'down')}
+                    className="inline-flex min-h-11 min-w-11 items-center justify-center text-[#3A3A3A] disabled:opacity-30"
+                    disabled={index === deliveryOptions.length - 1}
+                    aria-label="Move down"
+                  >
+                    <ArrowDown size={16} />
+                  </button>
+                  <RowActions
+                    name={option.name}
+                    actions={[
+                      { label: 'Edit', onClick: () => handleEdit(option) },
+                      { label: 'Delete', destructive: true, onClick: () => setDeleteTarget(option) },
+                    ]}
+                  />
+                </div>
+              </td>
+            </tr>
+          ))}
+        </ResponsiveTable>
+      )}
+
+      {deleteTarget ? (
+        <ConfirmDialog
+          title="Delete this delivery option?"
+          confirmLabel="Delete"
+          busy={deleting}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={() => void handleDelete()}
+        >
+          {deleteTarget.name} will no longer be offered at checkout.
+        </ConfirmDialog>
+      ) : null}
     </div>
   );
 }

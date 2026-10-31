@@ -6,6 +6,7 @@ import { rememberRedirect, safeRedirectPath } from '@/lib/safeRedirect';
 export type ApiKind =
   | 'unauthorized'
   | 'forbidden'
+  | 'feature_off'
   | 'not_found'
   | 'rate_limited'
   | 'server'
@@ -30,6 +31,7 @@ export type ApiFail = {
   kind: ApiKind;
   status: number;
   message: string;
+  code?: string;
   retryAfterSeconds?: number;
   reference?: string;
   fields?: Record<string, string>;
@@ -42,9 +44,23 @@ export type ApiRequestInit = RequestInit & {
   returnPath?: string | null;
 };
 
+const OWN_CODES = new Set([
+  'vlb_error',
+  'affiliate_error',
+  'cannot_withdraw',
+  'ticket_error',
+  'device_error',
+  'validation',
+  'feature_off',
+  'agreement_missing',
+  'expired',
+  'closed',
+]);
+
 const KIND_MESSAGE: Record<ApiKind, string> = {
   unauthorized: 'Your session expired. Sign in again.',
   forbidden: ADMIN_DATA_DENIED,
+  feature_off: "This isn't available right now.",
   not_found: "We couldn't find that.",
   rate_limited: 'Too many requests. Wait a moment and try again.',
   server: 'Something went wrong on our side. Please try again.',
@@ -109,6 +125,45 @@ function pickReference(body: unknown): string | undefined {
   return undefined;
 }
 
+function pickCode(body: unknown): string | undefined {
+  if (!body || typeof body !== 'object') return undefined;
+  const code = (body as { code?: unknown }).code;
+  return typeof code === 'string' && code.trim() ? code.trim() : undefined;
+}
+
+function pickBodyMessage(body: unknown): string | undefined {
+  if (!body || typeof body !== 'object') return undefined;
+  const message = (body as { message?: unknown }).message;
+  return typeof message === 'string' && message.trim() ? message.trim() : undefined;
+}
+
+export function failMessage(status: number, body: unknown, retryAfterSeconds?: number): { kind: ApiKind; message: string; code?: string } {
+  const code = pickCode(body);
+  const backendMessage = pickBodyMessage(body);
+  let kind = kindForStatus(status);
+  if (code === 'feature_off') kind = 'feature_off';
+  else if (status === 403 && (code === 'forbidden' || !code)) kind = 'forbidden';
+
+  const ownCode = Boolean(code && code !== 'forbidden' && (OWN_CODES.has(code) || code.endsWith('_error')));
+  const showBackend =
+    Boolean(backendMessage) &&
+    (ownCode || status === 400 || status === 409 || status === 422);
+
+  if (kind === 'forbidden') {
+    return { kind, message: ADMIN_DATA_DENIED, code: code || 'forbidden' };
+  }
+  if (kind === 'unauthorized') {
+    return { kind, message: messageFor(kind), code };
+  }
+  if (kind === 'feature_off') {
+    return { kind, message: backendMessage || KIND_MESSAGE.feature_off, code: 'feature_off' };
+  }
+  if (showBackend && backendMessage) {
+    return { kind, message: backendMessage, code };
+  }
+  return { kind, message: messageFor(kind, retryAfterSeconds), code };
+}
+
 export function handleUnauthorized(returnPath?: string | null, saveDraft?: () => void) {
   saveDraft?.();
   const fromArg = safeRedirectPath(returnPath);
@@ -126,6 +181,7 @@ export function toApiError(fail: ApiFail): ApiError {
     kind: fail.kind,
     retryAfterSeconds: fail.retryAfterSeconds,
     reference: fail.reference,
+    code: fail.code,
   });
 }
 
@@ -167,19 +223,20 @@ export async function apiRequest<T>(path: string, init: ApiRequestInit = {}): Pr
   }
 
   const status = response.status || 500;
-  const kind = kindForStatus(status);
-  const retryAfterSeconds = kind === 'rate_limited' ? parseRetryAfterSeconds(response.headers.get('Retry-After')) : undefined;
-  const fields = kind === 'validation' ? validationFields(body) : undefined;
+  const retryAfterSeconds = status === 429 ? parseRetryAfterSeconds(response.headers.get('Retry-After')) : undefined;
+  const mapped = failMessage(status, body, retryAfterSeconds);
+  const fields = mapped.kind === 'validation' ? validationFields(body) : undefined;
 
-  if (kind === 'unauthorized') {
+  if (mapped.kind === 'unauthorized') {
     handleUnauthorized(returnPath, saveDraft);
   }
 
   return {
     ok: false,
-    kind,
+    kind: mapped.kind,
     status,
-    message: messageFor(kind, retryAfterSeconds),
+    message: mapped.message,
+    code: mapped.code,
     retryAfterSeconds,
     reference: pickReference(body),
     fields,

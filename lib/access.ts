@@ -120,6 +120,10 @@ export function canEditModule(access: AccessProfile | null, module: AccessModule
   return permissionFor(access, module)?.can_edit === true;
 }
 
+export function canMoveVlbMoney(access: AccessProfile | null): boolean {
+  return canEditModule(access, 'vlb') && canEditModule(access, 'finance');
+}
+
 function matchesPrefix(pathname: string, prefix: string): boolean {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
 }

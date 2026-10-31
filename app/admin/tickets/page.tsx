@@ -86,8 +86,8 @@ function ServiceRequestsList() {
         setSummary(summaryResult.data);
         setAssignees(assigneeResult.data || []);
         setIssues(issueResult.data || []);
-      } catch (error) {
-        if (!cancelled) toast.error(apiMessage(error, 'Could not load service requests'));
+      } catch {
+        /* filters stay empty; the list load reports its own error */
       }
     };
     void loadFilters();

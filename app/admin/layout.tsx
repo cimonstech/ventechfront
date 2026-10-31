@@ -107,16 +107,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           try {
             const result = await deviceRequest<TicketSummary>('/api/admin/tickets/summary');
             setSubmittedTickets(result.data.counts?.submitted || 0);
-          } catch (error) {
-            console.error('service request badge', error);
+          } catch {
+            setSubmittedTickets(0);
           }
         }
 
         if (includeAffiliates) {
           try {
             setAffiliateQueue(await affiliateQueueBadge());
-          } catch (error) {
-            console.error('affiliate queue badge', error);
+          } catch {
+            setAffiliateQueue(0);
           }
         }
 
@@ -124,8 +124,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           try {
             const result = await deviceRequest('/api/admin/devices?limit=1&page=1&status=pending');
             setPendingDevices(result.pending_count || 0);
-          } catch (error) {
-            console.error('pending devices badge', error);
+          } catch {
+            setPendingDevices(0);
           }
         }
 
@@ -163,8 +163,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           // Table doesn't exist or other error - set to 0
           setUnreadNotificationsCount(0);
         }
-      } catch (error) {
-        console.error('Error fetching badge counts:', error);
+      } catch {
+        // Badge counts are optional; leave the last known values.
       }
     };
 
@@ -573,7 +573,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Main Content */}
       <main
-        className={`flex-1 min-w-0 overflow-y-auto ml-0 ${sidebarOpen ? 'lg:ml-64' : 'lg:ml-20'} transition-all duration-300 print:ml-0 print:overflow-visible`}
+        className={`flex-1 min-w-0 overflow-y-auto overflow-x-clip scroll-pt-20 ml-0 ${sidebarOpen ? 'lg:ml-64' : 'lg:ml-20'} transition-all duration-300 print:ml-0 print:overflow-visible`}
       >
         {/* Top Bar */}
         <div className="bg-white border-b border-gray-200 px-4 py-3 lg:px-8 lg:py-4 sticky top-0 z-40 print:hidden">

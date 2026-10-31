@@ -159,11 +159,7 @@ export interface VlbDocument {
 }
 
 export function vlbGhs(pesewas: number | null | undefined): string {
-  const amount = Number(pesewas);
-  if (!Number.isFinite(amount)) return 'GHS 0';
-  const cedis = amount / 100;
-  if (Number.isInteger(cedis)) return `GHS ${cedis.toLocaleString('en-US')}`;
-  return formatGhs(amount);
+  return formatGhs(pesewas);
 }
 
 export const VLB_EARLY_EXIT_ALLOWED = false;
@@ -210,18 +206,30 @@ export async function submitVlbApplication(input: {
   phone: string;
   plan_id: string;
   message?: string;
+  files?: File[];
 }) {
   const headers = await authHeaders();
+  const body = new FormData();
+  body.append('full_name', input.full_name);
+  body.append('email', input.email);
+  body.append('phone', input.phone);
+  body.append('plan_id', input.plan_id);
+  if (input.message) body.append('message', input.message);
+  for (const file of input.files || []) body.append('files', file);
   const response = await fetch(`${API_URL}/api/vlb/applications`, {
     method: 'POST',
-    headers: { ...headers, 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
+    headers,
+    body,
   });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok || body?.success === false) {
-    throw new Error(typeof body?.message === 'string' ? body.message : 'Could not save this application.');
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload?.success === false) {
+    const error = new Error(typeof payload?.message === 'string' ? payload.message : 'Could not save this application.') as Error & {
+      fields?: Record<string, string>;
+    };
+    if (payload?.errors && typeof payload.errors === 'object') error.fields = payload.errors;
+    throw error;
   }
-  return body;
+  return payload;
 }
 
 export function vlbRequest<T>(path: string, init: RequestInit = {}) {
@@ -231,6 +239,7 @@ export function vlbRequest<T>(path: string, init: RequestInit = {}) {
 export interface VlbPublicDocs {
   guide?: { title: string; url: string };
   agreement_template?: { title: string; url: string };
+  agreement?: { title: string; url: string };
 }
 
 export async function fetchPublicVlbDocs(): Promise<VlbPublicDocs> {
@@ -240,9 +249,11 @@ export async function fetchPublicVlbDocs(): Promise<VlbPublicDocs> {
     throw new Error(typeof body?.message === 'string' ? body.message : 'Could not load documents.');
   }
   const data = (body.data || {}) as VlbPublicDocs;
+  const agreement = data.agreement?.url ? data.agreement : data.agreement_template?.url ? data.agreement_template : undefined;
   return {
     guide: data.guide?.url ? data.guide : undefined,
-    agreement_template: data.agreement_template?.url ? data.agreement_template : undefined,
+    agreement_template: agreement,
+    agreement,
   };
 }
 

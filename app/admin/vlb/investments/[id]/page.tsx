@@ -12,6 +12,10 @@ import { useAccess } from '@/context/AccessContext';
 import { formatDeviceDate } from '@/lib/devicesAdmin';
 import { downloadAuthFile, formatGhs, payoutStatusVariant } from '@/lib/vlb';
 import { apiMessage, deviceRequest } from '@/lib/vlbAdmin';
+import { AdminQueryFail } from '@/components/admin/AdminQueryFail';
+import { VlbScheduleView } from '@/components/vlb/VlbScheduleView';
+import { FieldError } from '@/components/ui-states';
+import { applyQueryFail } from '@/lib/queryState';
 
 interface Detail {
   id: string;
@@ -54,37 +58,73 @@ export default function AdminVlbInvestmentDetailPage() {
   const params = useParams();
   const id = typeof params.id === 'string' ? params.id : '';
   useSetAdminHeading('Investment');
-  const { canEdit } = useAccess();
+  const { canEdit, canMoveVlbMoney } = useAccess();
   const editable = canEdit('vlb');
-  const money = canEdit('vlb') && canEdit('finance');
+  const money = canMoveVlbMoney;
   const [row, setRow] = useState<Detail | null>(null);
   const [others, setOthers] = useState<InvestmentListRow[]>([]);
   const [note, setNote] = useState('');
   const [orderId, setOrderId] = useState('');
   const [referred, setReferred] = useState('');
   const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
+  const [featureOff, setFeatureOff] = useState(false);
 
   const load = () =>
-    deviceRequest<Detail>(`/api/admin/vlb/investments/${id}`).then((result) => setRow(result.data));
+    deviceRequest<Detail>(`/api/admin/vlb/investments/${id}`).then((result) => {
+      setRow(result.data);
+      setFailed(false);
+      setForbidden(false);
+      setFeatureOff(false);
+    });
 
   useEffect(() => {
     if (!id) return;
-    load().catch((error) => toast.error(apiMessage(error, 'Could not load this investment.')));
+    let cancelled = false;
+    load().catch((error) => {
+      if (!cancelled) applyQueryFail(error, { setFeatureOff, setForbidden, setFailed });
+    });
     deviceRequest<InvestmentListRow[]>('/api/admin/vlb/investments?limit=100')
-      .then((result) => setOthers((result.data || []).filter((item) => item.id !== id)))
+      .then((result) => {
+        if (!cancelled) setOthers((result.data || []).filter((item) => item.id !== id));
+      })
       .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
+
+  if (featureOff || forbidden || (failed && !row)) {
+    return (
+      <div className="space-y-6">
+        <VlbNav current="/admin/vlb/investments" />
+        <AdminQueryFail
+          featureOff={featureOff}
+          forbidden={forbidden}
+          failed={failed}
+          loaded={Boolean(row)}
+          feature="Laptop Banking"
+          onRetry={() => void load().catch((error) => applyQueryFail(error, { setFeatureOff, setForbidden, setFailed }))}
+          errorTitle="We couldn't load this investment"
+        />
+      </div>
+    );
+  }
 
   if (!row) return <p className="text-sm text-[#3A3A3A]">Loading investment…</p>;
 
   const run = async (path: string, body?: unknown, ok = 'Saved.') => {
+    if (busy) return;
     setBusy(true);
+    setActionError(null);
     try {
       await deviceRequest(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined });
       toast.success(ok);
       await load();
     } catch (error) {
-      toast.error(apiMessage(error, 'Could not save this change.'));
+      setActionError(apiMessage(error, 'Could not save this change.'));
     } finally {
       setBusy(false);
     }
@@ -101,10 +141,10 @@ export default function AdminVlbInvestmentDetailPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 max-w-full space-y-6 overflow-x-clip">
       <VlbNav current="/admin/vlb/investments" />
       <Link href="/admin/vlb/investments" className="text-sm font-medium text-[#FF7A19]">Back to investments</Link>
-      <div className="rounded-xl bg-white p-6 shadow-sm">
+      <div className="min-w-0 overflow-hidden rounded-xl bg-white p-4 shadow-sm sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold text-[#1A1A1A]">{row.plan_name}</h1>
@@ -144,58 +184,40 @@ export default function AdminVlbInvestmentDetailPage() {
         </div>
         {row.status === 'settlement' && money && (
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button disabled={busy} onClick={() => run(`/api/admin/vlb/investments/${id}/settle`, undefined, 'Settled.')}>Settle</Button>
-            <Button variant="outline" disabled={busy} onClick={() => run(`/api/admin/vlb/investments/${id}/renew`, undefined, 'Renewed.')}>Renew</Button>
+            <Button disabled={busy} onClick={() => run(`/api/admin/vlb/investments/${id}/settle`, undefined, 'Settled.')}>{busy ? 'Working...' : 'Settle'}</Button>
+            <Button variant="outline" disabled={busy} onClick={() => run(`/api/admin/vlb/investments/${id}/renew`, undefined, 'Renewed.')}>{busy ? 'Working...' : 'Renew'}</Button>
+            <FieldError message={actionError} />
           </div>
         )}
       </div>
 
-      <section className="overflow-x-auto sticky-first rounded-xl bg-white p-6 shadow-sm">
+      <section className="min-w-0 overflow-hidden rounded-xl bg-white p-4 shadow-sm sm:p-6">
         <h2 className="font-semibold text-[#1A1A1A]">Schedule</h2>
-        <table className="mt-3 min-w-[40rem] w-full text-left text-sm">
-          <thead>
-            <tr className="text-[#3A3A3A]">
-              <th className="pb-2">Period</th>
-              <th className="pb-2">Due</th>
-              <th className="pb-2">Gross</th>
-              <th className="pb-2">Scholar</th>
-              <th className="pb-2">Net</th>
-              <th className="pb-2">Status</th>
-              <th className="pb-2">Ref</th>
-            </tr>
-          </thead>
-          <tbody>
-            {row.schedule.map((payout) => (
-              <tr key={payout.id} className="border-t">
-                <td className="py-2">{payout.period_no}</td>
-                <td className="py-2">{formatDeviceDate(payout.due_date)}</td>
-                <td className="py-2">{formatGhs(payout.gross_pesewas)}</td>
-                <td className="py-2">{formatGhs(payout.scholar_pesewas)}</td>
-                <td className="py-2">{formatGhs(payout.net_pesewas)}</td>
-                <td className="py-2"><Badge size="sm" variant={payoutStatusVariant(payout.status)}>{payout.status}</Badge></td>
-                <td className="py-2">
-                  {payout.reference || '—'}
-                  {payout.status === 'paid' && (
-                    <button
-                      type="button"
-                      className="ml-2 text-[#FF7A19]"
-                      onClick={() => downloadAuthFile(
-                        `/api/admin/vlb/payouts/${payout.id}/receipt.pdf`,
-                        `vlb-receipt-${payout.id}.pdf`
-                      ).catch((error) => toast.error(apiMessage(error, 'Could not download this receipt.')))}
-                    >
-                      Receipt
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <VlbScheduleView
+          rows={row.schedule}
+          extra={(payout) => (
+            <span className="text-sm">
+              <Badge size="sm" variant={payoutStatusVariant((payout as Detail['schedule'][number]).status)}>{(payout as Detail['schedule'][number]).status}</Badge>
+              {(payout as Detail['schedule'][number]).reference ? ` · ${(payout as Detail['schedule'][number]).reference}` : ''}
+              {(payout as Detail['schedule'][number]).status === 'paid' ? (
+                <button
+                  type="button"
+                  className="ml-2 text-[#FF7A19]"
+                  onClick={() => downloadAuthFile(
+                    `/api/admin/vlb/payouts/${payout.id}/receipt.pdf`,
+                    `vlb-receipt-${payout.id}.pdf`
+                  ).catch((error) => toast.error(apiMessage(error, 'Could not download this receipt.')))}
+                >
+                  Receipt
+                </button>
+              ) : null}
+            </span>
+          )}
+        />
       </section>
 
       {editable && (
-        <section className="rounded-xl bg-white p-6 shadow-sm space-y-3">
+        <section className="min-w-0 overflow-hidden rounded-xl bg-white p-4 shadow-sm space-y-3 sm:p-6">
           <h2 className="font-semibold text-[#1A1A1A]">Premium Stars ({row.stars_used}/{row.stars_total})</h2>
           <ul className="text-sm text-[#3A3A3A]">
             {row.star_redemptions.map((item) => (
@@ -211,7 +233,7 @@ export default function AdminVlbInvestmentDetailPage() {
       )}
 
       {money && (
-        <section className="rounded-xl bg-white p-6 shadow-sm space-y-3">
+        <section className="min-w-0 overflow-hidden rounded-xl bg-white p-4 shadow-sm space-y-3 sm:p-6">
           <h2 className="font-semibold text-[#1A1A1A]">Referral bonus</h2>
           <p className="text-sm text-[#3A3A3A]">Applied: {row.referral_bonuses.length}</p>
           <form
@@ -222,13 +244,14 @@ export default function AdminVlbInvestmentDetailPage() {
               void run(`/api/admin/vlb/investments/${id}/referral-bonus`, { referred_investment_id: referred }, 'Bonus applied.');
             }}
           >
-            <select className="min-w-[12rem] flex-1 rounded-lg border px-3 py-2 text-sm" value={referred} onChange={(e) => setReferred(e.target.value)}>
+            <select className="min-h-11 w-full min-w-0 max-w-full flex-1 rounded-lg border px-3 py-2 text-sm" value={referred} onChange={(e) => setReferred(e.target.value)}>
               <option value="">Referred investment</option>
               {others.map((item) => (
                 <option key={item.id} value={item.id}>{item.investor_no || item.id} · {item.plan_name}</option>
               ))}
             </select>
-            <Button type="submit" disabled={busy || !referred}>Apply bonus</Button>
+            <Button type="submit" disabled={busy || !referred}>{busy ? 'Working...' : 'Apply bonus'}</Button>
+            <FieldError message={actionError} />
           </form>
         </section>
       )}

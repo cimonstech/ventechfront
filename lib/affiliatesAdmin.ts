@@ -1,6 +1,7 @@
 import { accessDeniedMessage } from '@/lib/access';
 import { authHeaders } from '@/lib/authHeaders';
 import { apiMessage, deviceRequest, formatDeviceDate } from '@/lib/devicesAdmin';
+import { formatPesewas } from '@/lib/money';
 
 export { apiMessage, deviceRequest, formatDeviceDate };
 
@@ -41,9 +42,7 @@ export function affiliateStatusVariant(status: string): 'default' | 'success' | 
 }
 
 export function formatGhs(pesewas: number | null | undefined): string {
-  const amount = Number(pesewas);
-  if (!Number.isFinite(amount)) return 'GH₵ 0.00';
-  return `GH₵ ${(amount / 100).toFixed(2)}`;
+  return formatPesewas(pesewas);
 }
 
 export function pesewasFromGhs(value: string): number {
@@ -219,16 +218,16 @@ export function commissionNotYetEligible(row: AffiliateCommissionRow): boolean {
 }
 
 export async function affiliateQueueBadge(): Promise<number> {
-  const [pending, ready, metrics] = await Promise.all([
+  const [pending, ready, metrics] = await Promise.allSettled([
     deviceRequest<AffiliateListRow[]>('/api/admin/affiliates?status=pending&page=1&limit=1'),
     deviceRequest<AffiliateCommissionRow[]>('/api/admin/affiliates/commissions?ready=true&page=1&limit=1'),
     deviceRequest<AffiliateMetrics>('/api/admin/affiliates/metrics'),
   ]);
-  return (
-    (pending.pagination?.total || 0) +
-    (ready.pagination?.total || 0) +
-    (metrics.data?.open_withdrawal_requests || 0)
-  );
+  const pendingTotal = pending.status === 'fulfilled' ? pending.value.pagination?.total || 0 : 0;
+  const readyTotal = ready.status === 'fulfilled' ? ready.value.pagination?.total || 0 : 0;
+  const openWithdrawals =
+    metrics.status === 'fulfilled' ? metrics.value.data?.open_withdrawal_requests || 0 : 0;
+  return pendingTotal + readyTotal + openWithdrawals;
 }
 
 export async function downloadAffiliateCsv(

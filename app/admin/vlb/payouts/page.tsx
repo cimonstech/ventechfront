@@ -16,8 +16,9 @@ import {
 import { useAccess } from '@/context/AccessContext';
 import { formatDeviceDate } from '@/lib/devicesAdmin';
 import { formatGhs, payoutStatusVariant } from '@/lib/vlb';
-import { AccessDenied, EmptyState, ErrorState, TableSkeleton } from '@/components/ui-states';
-import { noteQueryFail } from '@/lib/queryState';
+import { EmptyState, FieldError, TableSkeleton } from '@/components/ui-states';
+import { AdminQueryFail } from '@/components/admin/AdminQueryFail';
+import { applyQueryFail } from '@/lib/queryState';
 import { apiMessage, deviceRequest, payoutQueueMeta, type VlbPayoutQueueRow } from '@/lib/vlbAdmin';
 import { downloadAuthFile } from '@/lib/vlb';
 
@@ -29,8 +30,8 @@ const TABS = [
 ];
 
 export default function AdminVlbPayoutsPage() {
-  const { canEdit, canView } = useAccess();
-  const money = canEdit('vlb') && canEdit('finance');
+  const { canView, canMoveVlbMoney } = useAccess();
+  const money = canMoveVlbMoney;
   const financeView = canView('finance');
   const [tab, setTab] = useState('this_week');
   const [rows, setRows] = useState<VlbPayoutQueueRow[]>([]);
@@ -41,6 +42,8 @@ export default function AdminVlbPayoutsPage() {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
   const [forbidden, setForbidden] = useState(false);
+  const [featureOff, setFeatureOff] = useState(false);
+  const [markError, setMarkError] = useState<string | null>(null);
   const [markId, setMarkId] = useState<string | null>(null);
   const [method, setMethod] = useState('momo');
   const [reference, setReference] = useState('');
@@ -58,11 +61,10 @@ export default function AdminVlbPayoutsPage() {
         setLoaded(true);
         setFailed(false);
         setForbidden(false);
+        setFeatureOff(false);
       })
       .catch((error) => {
-        const kind = noteQueryFail(error);
-        if (kind === 'forbidden') setForbidden(true);
-        else if (kind !== 'unauthorized') setFailed(true);
+        applyQueryFail(error, { setFeatureOff, setForbidden, setFailed });
       })
       .finally(() => setLoading(false));
   };
@@ -73,8 +75,9 @@ export default function AdminVlbPayoutsPage() {
 
   const markPaid = async (event: FormEvent) => {
     event.preventDefault();
-    if (!markId) return;
+    if (!markId || busy) return;
     setBusy(true);
+    setMarkError(null);
     try {
       await deviceRequest(`/api/admin/vlb/payouts/${markId}/mark-paid`, {
         method: 'POST',
@@ -89,7 +92,7 @@ export default function AdminVlbPayoutsPage() {
       setReference('');
       await load();
     } catch (error) {
-      toast.error(apiMessage(error, 'Could not mark this payout paid.'));
+      setMarkError(apiMessage(error, 'Could not mark this payout paid.'));
     } finally {
       setBusy(false);
     }
@@ -159,10 +162,16 @@ export default function AdminVlbPayoutsPage() {
           </button>
         ))}
       </div>
-      {forbidden ? (
-        <AccessDenied title="You don't have access" description="You don't have access to this data." primary={{ label: 'Go back', href: '/admin' }} />
-      ) : failed && !loaded ? (
-        <ErrorState title="We couldn't load payouts" description="Try again in a moment." primary={{ label: 'Try again', onClick: () => void load() }} />
+      {featureOff || forbidden || (failed && !loaded) ? (
+        <AdminQueryFail
+          featureOff={featureOff}
+          forbidden={forbidden}
+          failed={failed}
+          loaded={loaded}
+          feature="Laptop Banking"
+          onRetry={() => void load()}
+          errorTitle="We couldn't load payouts"
+        />
       ) : loading && !loaded ? (
         <TableSkeleton rows={6} />
       ) : rows.length === 0 ? (
@@ -227,7 +236,7 @@ export default function AdminVlbPayoutsPage() {
           footer={(
             <div className="flex flex-row justify-end gap-2">
               <Button type="button" variant="outline" className="min-w-0 flex-1 sm:flex-none sm:w-auto" onClick={() => setMarkId(null)}>Cancel</Button>
-              <Button type="submit" form="vlb-mark-paid" className="min-w-0 flex-1 sm:flex-none sm:w-auto" disabled={busy}>Confirm</Button>
+              <Button type="submit" form="vlb-mark-paid" className="min-w-0 flex-1 sm:flex-none sm:w-auto" disabled={busy}>{busy ? 'Working...' : 'Confirm'}</Button>
             </div>
           )}
         >
@@ -244,6 +253,7 @@ export default function AdminVlbPayoutsPage() {
             <label className="block text-sm">Date
               <input className="mt-1 min-h-11 w-full rounded-lg border px-3 py-2" type="date" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} required />
             </label>
+            <FieldError message={markError} />
           </form>
         </Sheet>
       )}

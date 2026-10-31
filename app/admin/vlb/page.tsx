@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/Badge';
-import { AccessDenied, EmptyState, ErrorState, TableSkeleton } from '@/components/ui-states';
-import { noteQueryFail } from '@/lib/queryState';
+import { EmptyState, TableSkeleton } from '@/components/ui-states';
+import { AdminQueryFail } from '@/components/admin/AdminQueryFail';
+import { applyQueryFail } from '@/lib/queryState';
 import { VlbNav } from '@/components/admin/VlbNav';
 import {
   AdminPageHeader,
@@ -27,6 +28,7 @@ const TABS = [
 
 export default function AdminVlbApplicationsPage() {
   const [tab, setTab] = useState('');
+  const [agreement, setAgreement] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
@@ -35,6 +37,7 @@ export default function AdminVlbApplicationsPage() {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
   const [forbidden, setForbidden] = useState(false);
+  const [featureOff, setFeatureOff] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,6 +45,7 @@ export default function AdminVlbApplicationsPage() {
       setLoading(true);
       const params = new URLSearchParams({ page: String(page), limit: '20' });
       if (tab) params.set('status', tab);
+      if (agreement) params.set('agreement', agreement);
       try {
         const result = await deviceRequest<VlbApplicationRow[]>(`/api/admin/vlb/applications?${params}`);
         if (cancelled) return;
@@ -51,11 +55,10 @@ export default function AdminVlbApplicationsPage() {
         setLoaded(true);
         setFailed(false);
         setForbidden(false);
+        setFeatureOff(false);
       } catch (error) {
         if (!cancelled) {
-          const kind = noteQueryFail(error);
-          if (kind === 'forbidden') setForbidden(true);
-          else if (kind !== 'unauthorized') setFailed(true);
+          applyQueryFail(error, { setFeatureOff, setForbidden, setFailed });
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -65,7 +68,7 @@ export default function AdminVlbApplicationsPage() {
     return () => {
       cancelled = true;
     };
-  }, [tab, page]);
+  }, [tab, page, agreement]);
 
   const count = total || rows.length;
 
@@ -93,14 +96,41 @@ export default function AdminVlbApplicationsPage() {
           </button>
         ))}
       </div>
-      {forbidden ? (
-        <AccessDenied title="You don't have access" description="You don't have access to this data." primary={{ label: 'Go back', href: '/admin' }} />
-      ) : failed && !loaded ? (
-        <ErrorState title="We couldn't load applications" description="Try again in a moment." primary={{ label: 'Try again', onClick: () => setPage(1) }} />
+      <div className="flex flex-wrap gap-2">
+        {[
+          { id: '', label: 'All agreements' },
+          { id: 'uploaded', label: 'Agreement uploaded' },
+          { id: 'missing', label: 'Agreement missing' },
+        ].map((item) => (
+          <button
+            key={item.id || 'all-agreements'}
+            type="button"
+            onClick={() => {
+              setAgreement(item.id);
+              setPage(1);
+            }}
+            className={`rounded-full px-3 py-1.5 text-sm font-medium ${
+              agreement === item.id ? 'bg-[#1A1A1A] text-white' : 'bg-white border border-gray-200'
+            }`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+      {featureOff || forbidden || (failed && !loaded) ? (
+        <AdminQueryFail
+          featureOff={featureOff}
+          forbidden={forbidden}
+          failed={failed}
+          loaded={loaded}
+          feature="Laptop Banking"
+          onRetry={() => setPage(1)}
+          errorTitle="We couldn't load applications"
+        />
       ) : loading && !loaded ? (
         <TableSkeleton rows={6} />
-      ) : rows.length === 0 && tab ? (
-        <EmptyState title="No applications in this list yet" description="Try another status, or wait for new applications." />
+      ) : rows.length === 0 && (tab || agreement) ? (
+        <EmptyState title="No applications in this list yet" description="Try another filter, or wait for new applications." />
       ) : rows.length === 0 ? (
         <EmptyState title="No applications yet" description="Laptop Banking applications will show up here." />
       ) : (
@@ -110,7 +140,8 @@ export default function AdminVlbApplicationsPage() {
               <tr>
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Plan</th>
-                <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Agreement</th>
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
@@ -124,6 +155,7 @@ export default function AdminVlbApplicationsPage() {
                 facts={[
                   { label: 'Email', value: row.email },
                   { label: 'Plan', value: nested(row.vlb_plans)?.name || '—' },
+                  { label: 'Agreement', value: row.agreement_uploaded ? 'Uploaded' : 'Missing' },
                   { label: 'Date', value: formatDeviceDate(row.created_at) },
                 ]}
                 actions={
@@ -145,6 +177,11 @@ export default function AdminVlbApplicationsPage() {
                 </td>
                 <td className="px-4 py-3">{nested(row.vlb_plans)?.name || '—'}</td>
                 <td className="px-4 py-3"><Badge variant={payoutStatusVariant(row.status)}>{row.status}</Badge></td>
+                <td className="px-4 py-3">
+                  <Badge variant={row.agreement_uploaded ? 'success' : 'error'}>
+                    {row.agreement_uploaded ? 'Uploaded' : 'Missing'}
+                  </Badge>
+                </td>
                 <td className="px-4 py-3">{formatDeviceDate(row.created_at)}</td>
                 <td className="px-4 py-3 text-right">
                   <RowActions

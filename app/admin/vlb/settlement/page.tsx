@@ -15,8 +15,9 @@ import {
 import { useAccess } from '@/context/AccessContext';
 import { formatDeviceDate } from '@/lib/devicesAdmin';
 import { formatGhs, payoutStatusVariant } from '@/lib/vlb';
-import { AccessDenied, EmptyState, ErrorState, TableSkeleton } from '@/components/ui-states';
-import { noteQueryFail } from '@/lib/queryState';
+import { EmptyState, FieldError, TableSkeleton } from '@/components/ui-states';
+import { AdminQueryFail } from '@/components/admin/AdminQueryFail';
+import { applyQueryFail } from '@/lib/queryState';
 import { apiMessage, deviceRequest } from '@/lib/vlbAdmin';
 
 interface Row {
@@ -29,13 +30,15 @@ interface Row {
 }
 
 export default function AdminVlbSettlementPage() {
-  const { canEdit } = useAccess();
-  const money = canEdit('vlb') && canEdit('finance');
+  const { canMoveVlbMoney } = useAccess();
+  const money = canMoveVlbMoney;
   const [rows, setRows] = useState<Row[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [forbidden, setForbidden] = useState(false);
+  const [featureOff, setFeatureOff] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const load = () =>
     deviceRequest<Row[]>('/api/admin/vlb/settlement')
@@ -44,11 +47,10 @@ export default function AdminVlbSettlementPage() {
         setLoaded(true);
         setFailed(false);
         setForbidden(false);
+        setFeatureOff(false);
       })
       .catch((error) => {
-        const kind = noteQueryFail(error);
-        if (kind === 'forbidden') setForbidden(true);
-        else if (kind !== 'unauthorized') setFailed(true);
+        applyQueryFail(error, { setFeatureOff, setForbidden, setFailed });
       });
 
   useEffect(() => {
@@ -56,13 +58,15 @@ export default function AdminVlbSettlementPage() {
   }, []);
 
   const act = async (id: string, action: 'settle' | 'renew') => {
+    if (busyId) return;
     setBusyId(id);
+    setActionError(null);
     try {
       await deviceRequest(`/api/admin/vlb/investments/${id}/${action}`, { method: 'POST' });
       toast.success(action === 'settle' ? 'Settled.' : 'Renewed.');
       await load();
     } catch (error) {
-      toast.error(apiMessage(error, 'Could not complete this action.'));
+      setActionError(apiMessage(error, 'Could not complete this action.'));
     } finally {
       setBusyId(null);
     }
@@ -72,8 +76,8 @@ export default function AdminVlbSettlementPage() {
   const moneyActions = (row: Row) => (
     money ? (
       <div className="flex flex-wrap justify-end gap-2">
-        <Button size="sm" disabled={busyId === row.id} onClick={() => act(row.id, 'settle')}>Settle</Button>
-        <Button size="sm" variant="outline" disabled={busyId === row.id} onClick={() => act(row.id, 'renew')}>Renew</Button>
+        <Button size="sm" disabled={Boolean(busyId)} onClick={() => act(row.id, 'settle')}>{busyId === row.id ? 'Working...' : 'Settle'}</Button>
+        <Button size="sm" variant="outline" disabled={Boolean(busyId)} onClick={() => act(row.id, 'renew')}>{busyId === row.id ? 'Working...' : 'Renew'}</Button>
       </div>
     ) : null
   );
@@ -85,15 +89,23 @@ export default function AdminVlbSettlementPage() {
         subtitle={`${rows.length} investment${rows.length === 1 ? '' : 's'}`}
       />
       <VlbNav current="/admin/vlb/settlement" />
-      {forbidden ? (
-        <AccessDenied title="You don't have access" description="You don't have access to this data." primary={{ label: 'Go back', href: '/admin' }} />
-      ) : failed && !loaded ? (
-        <ErrorState title="We couldn't load settlement" description="Try again in a moment." primary={{ label: 'Try again', onClick: () => void load() }} />
+      {featureOff || forbidden || (failed && !loaded) ? (
+        <AdminQueryFail
+          featureOff={featureOff}
+          forbidden={forbidden}
+          failed={failed}
+          loaded={loaded}
+          feature="Laptop Banking"
+          onRetry={() => void load()}
+          errorTitle="We couldn't load settlement"
+        />
       ) : !loaded ? (
         <TableSkeleton rows={6} />
       ) : rows.length === 0 ? (
         <EmptyState title="Nothing in settlement this month" description="Investments due for settlement will show up here." />
       ) : (
+        <>
+        {actionError ? <FieldError message={actionError} /> : null}
         <ResponsiveTable
           headers={
             <tr>
@@ -149,6 +161,7 @@ export default function AdminVlbSettlementPage() {
             </tr>
           ))}
         </ResponsiveTable>
+        </>
       )}
     </div>
   );

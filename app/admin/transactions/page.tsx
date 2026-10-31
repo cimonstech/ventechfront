@@ -24,6 +24,7 @@ import { noteQueryFail } from '@/lib/queryState';
 import { useAccess } from '@/context/AccessContext';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
+import { formatCurrency } from '@/lib/helpers';
 
 interface Transaction {
   id: string;
@@ -354,7 +355,7 @@ export default function TransactionsPage() {
               className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-gray-300 px-3 text-sm font-medium text-[#1A1A1A] hover:bg-gray-50 disabled:opacity-50 sm:w-auto"
             >
               <RotateCcw size={16} />
-              Refund selected ({selectedTransactions.size})
+              {isRefunding ? 'Working...' : `Refund selected (${selectedTransactions.size})`}
             </button>
           ) : null
         }
@@ -382,7 +383,7 @@ export default function TransactionsPage() {
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <p className="mb-1 text-sm text-[#3A3A3A]">Total amount</p>
           <p className="text-3xl font-bold text-[#FF7A19]">
-            GHS {totalAmount.toLocaleString()}
+            {formatCurrency(totalAmount)}
           </p>
         </div>
       </div>
@@ -455,7 +456,7 @@ export default function TransactionsPage() {
               status={statusBadge(transaction.status)}
               facts={[
                 { label: 'Customer', value: transaction.customer_name },
-                { label: 'Amount', value: `GHS ${transaction.amount.toFixed(2)}` },
+                { label: 'Amount', value: formatCurrency(transaction.amount) },
                 { label: 'Method', value: transaction.payment_method },
                 { label: 'Date', value: new Date(transaction.created_at).toLocaleDateString() },
               ]}
@@ -496,7 +497,7 @@ export default function TransactionsPage() {
               </td>
               <td className="px-4 py-3">
                 <span className="font-bold text-[#1A1A1A]">
-                  GHS {transaction.amount.toFixed(2)}
+                  {formatCurrency(transaction.amount)}
                 </span>
               </td>
               <td className="px-4 py-3 text-sm text-[#3A3A3A]">
@@ -520,7 +521,7 @@ export default function TransactionsPage() {
       {refundTarget ? (
         <ConfirmDialog
           title={refundTarget === 'bulk' ? 'Refund these transactions?' : 'Refund this transaction?'}
-          confirmLabel="Refund"
+          confirmLabel={isRefunding ? 'Working...' : 'Refund'}
           busy={isRefunding}
           onClose={() => setRefundTarget(null)}
           onConfirm={() =>

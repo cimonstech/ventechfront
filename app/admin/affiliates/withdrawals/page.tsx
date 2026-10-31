@@ -16,7 +16,9 @@ import {
   RowActions,
 } from '@/components/admin/list';
 import { useAccess } from '@/context/AccessContext';
-import { EmptyState, TableSkeleton } from '@/components/ui-states';
+import { EmptyState, FieldError, TableSkeleton } from '@/components/ui-states';
+import { AdminQueryFail } from '@/components/admin/AdminQueryFail';
+import { applyQueryFail } from '@/lib/queryState';
 import {
   AffiliateWithdrawalRow,
   WITHDRAWAL_STATUS_LABEL,
@@ -49,7 +51,12 @@ export default function AdminAffiliateWithdrawalsPage() {
   const [total, setTotal] = useState(0);
   const [rows, setRows] = useState<AffiliateWithdrawalRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
+  const [featureOff, setFeatureOff] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [prompt, setPrompt] = useState<{ id: string; kind: 'reject' | 'paid' } | null>(null);
   const [exporting, setExporting] = useState(false);
 
@@ -61,8 +68,12 @@ export default function AdminAffiliateWithdrawalsPage() {
       setRows(result.data || []);
       setTotalPages(result.pagination?.totalPages || 1);
       setTotal(result.pagination?.total || 0);
+      setLoaded(true);
+      setFailed(false);
+      setForbidden(false);
+      setFeatureOff(false);
     } catch (error) {
-      toast.error(apiMessage(error, 'Could not load withdrawals'));
+      applyQueryFail(error, { setFeatureOff, setForbidden, setFailed });
     } finally {
       setLoading(false);
     }
@@ -73,7 +84,9 @@ export default function AdminAffiliateWithdrawalsPage() {
   }, [tab, page]);
 
   const run = async (id: string, body: Record<string, unknown>, fallback: string) => {
+    if (busy) return;
     setBusy(true);
+    setActionError(null);
     try {
       const result = await deviceRequest(`/api/admin/affiliates/withdrawals/${id}/status`, {
         method: 'POST',
@@ -83,7 +96,7 @@ export default function AdminAffiliateWithdrawalsPage() {
       setPrompt(null);
       await load();
     } catch (error) {
-      toast.error(apiMessage(error, fallback));
+      setActionError(apiMessage(error, fallback));
     } finally {
       setBusy(false);
     }
@@ -104,7 +117,7 @@ export default function AdminAffiliateWithdrawalsPage() {
         <Button size="sm" disabled={busy} onClick={() => run(row.id, { to: 'approved' }, 'Could not update this withdrawal.')}>Approve</Button>
       )}
       {finance && (row.status === 'processing' || row.status === 'approved') && (
-        <Button size="sm" disabled={busy} onClick={() => setPrompt({ id: row.id, kind: 'paid' })}>Mark paid</Button>
+          <Button size="sm" disabled={busy} onClick={() => setPrompt({ id: row.id, kind: 'paid' })}>{busy ? 'Working...' : 'Mark paid'}</Button>
       )}
       {editable && (row.status === 'requested' || row.status === 'processing' || row.status === 'approved') && (
         <Button size="sm" variant="outline" disabled={busy} onClick={() => setPrompt({ id: row.id, kind: 'reject' })}>Reject</Button>
@@ -161,12 +174,23 @@ export default function AdminAffiliateWithdrawalsPage() {
         ))}
       </div>
 
-      {loading ? (
+      {featureOff || forbidden || (failed && !loaded) ? (
+        <AdminQueryFail
+          featureOff={featureOff}
+          forbidden={forbidden}
+          failed={failed}
+          loaded={loaded}
+          feature="Affiliates"
+          onRetry={() => void load()}
+          errorTitle="We couldn't load withdrawals"
+        />
+      ) : loading && !loaded ? (
         <TableSkeleton rows={6} />
       ) : rows.length === 0 ? (
         <EmptyState title="No withdrawals in this list" description="Withdrawals for this status will show up here." />
       ) : (
         <>
+          {actionError ? <FieldError message={actionError} /> : null}
           <ResponsiveTable
             headers={
               <tr>

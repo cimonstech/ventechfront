@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { AccessDenied } from './AccessDenied';
 import { EmptyState } from './EmptyState';
 import { ErrorState } from './ErrorState';
+import { FeatureOffNote } from './FeatureOffNote';
 import { NoResults } from './NoResults';
 import { UpdatingNotice } from './UpdatingNotice';
 import type { StateAction } from './StateActions';
@@ -14,6 +15,8 @@ export function LoadGate({
   updating = false,
   error,
   forbidden = false,
+  featureOff = false,
+  featureName,
   isEmpty,
   filtered = false,
   onRetry,
@@ -30,6 +33,8 @@ export function LoadGate({
   updating?: boolean;
   error: boolean;
   forbidden?: boolean;
+  featureOff?: boolean;
+  featureName?: string;
   isEmpty: boolean;
   filtered?: boolean;
   onRetry: () => void;
@@ -41,6 +46,10 @@ export function LoadGate({
   denyHome?: string;
   children: ReactNode;
 }) {
+  if (featureOff) {
+    return <FeatureOffNote feature={featureName || 'This'} customer={denyHome !== '/admin'} />;
+  }
+
   if (forbidden) {
     return (
       <AccessDenied

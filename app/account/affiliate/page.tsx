@@ -78,6 +78,7 @@ export default function AffiliateDashboardPage() {
   const [amount, setAmount] = useState('0.00');
   const [modeBusy, setModeBusy] = useState(false);
   const [withdrawBusy, setWithdrawBusy] = useState(false);
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
   const [payoutMethod, setPayoutMethod] = useState<PayoutMethod>('momo');
   const [momoNetwork, setMomoNetwork] = useState('MTN');
   const [momoNumber, setMomoNumber] = useState('');
@@ -214,8 +215,9 @@ export default function AffiliateDashboardPage() {
   };
 
   const requestWithdraw = async () => {
-    if (withdrawBlocked) return;
+    if (withdrawBlocked || withdrawBusy) return;
     setWithdrawBusy(true);
+    setWithdrawError(null);
     try {
       const result = await affiliateRequest('/api/affiliates/me/withdrawals', {
         method: 'POST',
@@ -224,7 +226,7 @@ export default function AffiliateDashboardPage() {
       toast.success(result.message);
       await load();
     } catch (error) {
-      toast.error(apiMessage(error, 'Could not request this withdrawal.'));
+      setWithdrawError(apiMessage(error, 'Could not request this withdrawal.'));
     } finally {
       setWithdrawBusy(false);
     }
@@ -578,8 +580,9 @@ export default function AffiliateDashboardPage() {
               onClick={() => void requestWithdraw()}
               className="mt-3 w-full rounded-lg bg-[#FF7A19] px-4 py-3 font-semibold text-white hover:bg-[#e66a0f] disabled:opacity-50"
             >
-              {withdrawBusy ? 'Requesting…' : 'Withdraw'}
+              {withdrawBusy ? 'Working...' : 'Withdraw'}
             </button>
+            {withdrawError ? <p className="mt-2 text-sm text-red-600">{withdrawError}</p> : null}
             <InfoNote className="mt-2">
               You can withdraw once your available balance reaches {formatCopyGhs(minPesewas)}. Payments go to your registered {payoutKind} account, usually within {payoutDays} working days.
             </InfoNote>

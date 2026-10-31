@@ -495,13 +495,13 @@ function DocumentsSection({
 
       <h3 className="mt-4 text-sm font-medium text-[#1A1A1A]">Your agreement</h3>
       {agreements.length === 0 ? (
-        <p className="mt-2 text-sm text-[#3A3A3A]">Your signed agreement will appear here once VENTECH has uploaded it.</p>
+        <p className="mt-2 text-sm text-[#3A3A3A]">Your signed agreement will appear here after your investment is activated.</p>
       ) : (
         <ul className="mt-1 divide-y divide-gray-100">
           {agreements.map((doc) => (
             <DocRow
               key={doc.id}
-              name={doc.title}
+              name={doc.title || 'Signed agreement'}
               date={doc.created_at}
               onDownload={() => openDocumentWithRefresh(doc.id, reload)}
             />

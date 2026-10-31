@@ -20,6 +20,18 @@ export interface VlbAdminPlan extends VlbPublicPlan {
   updated_at?: string;
 }
 
+export interface VlbApplicationFile {
+  id: string;
+  file_name: string;
+  mime_type: string;
+  size_bytes: number;
+  uploaded_via: string;
+  uploaded_by: string | null;
+  uploader_name?: string | null;
+  created_at: string;
+  url: string | null;
+}
+
 export interface VlbApplicationRow {
   id: string;
   user_id: string | null;
@@ -31,6 +43,9 @@ export interface VlbApplicationRow {
   status: string;
   notes: string | null;
   created_at: string;
+  agreement_uploaded?: boolean;
+  agreement_status?: string;
+  agreement_files?: VlbApplicationFile[];
   vlb_plans?:
     | { name?: string; plan_group?: string; tier?: string; version?: string; principal_pesewas?: number }
     | Array<{ name?: string; plan_group?: string; tier?: string; version?: string; principal_pesewas?: number }>
@@ -156,6 +171,42 @@ export async function openAdminVlbDocument(documentId: string) {
   if (!result.data?.url) {
     throw new Error('Could not download this file.');
   }
+  window.open(result.data.url, '_blank', 'noopener,noreferrer');
+}
+
+export async function uploadApplicationAgreement(applicationId: string, files: File[]) {
+  const headers = await authHeaders();
+  const body = new FormData();
+  for (const file of files) body.append('files', file);
+  const response = await fetch(`${API_URL}/api/admin/vlb/applications/${applicationId}/files`, {
+    method: 'POST',
+    headers,
+    body,
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload?.success === false) {
+    throw new Error(accessDeniedMessage(response.status, typeof payload?.message === 'string' ? payload.message : 'Could not store this file.'));
+  }
+  return payload.data;
+}
+
+export async function removeApplicationAgreement(applicationId: string, fileId: string, reason: string) {
+  return deviceRequest(`/api/admin/vlb/applications/${applicationId}/files/${fileId}`, {
+    method: 'DELETE',
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function sendApplicationUploadLink(applicationId: string, message?: string) {
+  return deviceRequest(`/api/admin/vlb/applications/${applicationId}/send-upload-link`, {
+    method: 'POST',
+    body: JSON.stringify({ message: message || undefined }),
+  });
+}
+
+export async function openApplicationAgreementFile(applicationId: string, fileId: string) {
+  const result = await deviceRequest<{ url: string | null }>(`/api/admin/vlb/applications/${applicationId}/files/${fileId}`);
+  if (!result.data?.url) throw new Error('Could not download this file.');
   window.open(result.data.url, '_blank', 'noopener,noreferrer');
 }
 

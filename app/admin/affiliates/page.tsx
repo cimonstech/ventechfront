@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { Badge } from '@/components/ui/Badge';
-import { AccessDenied, EmptyState, ErrorState, NoResults, TableSkeleton } from '@/components/ui-states';
-import { noteQueryFail } from '@/lib/queryState';
+import { EmptyState, NoResults, TableSkeleton } from '@/components/ui-states';
+import { AdminQueryFail } from '@/components/admin/AdminQueryFail';
+import { applyQueryFail } from '@/lib/queryState';
 import {
   AdminPageHeader,
   AdminPagination,
@@ -50,6 +51,7 @@ export default function AdminAffiliatesPage() {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
   const [forbidden, setForbidden] = useState(false);
+  const [featureOff, setFeatureOff] = useState(false);
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
@@ -58,9 +60,7 @@ export default function AdminAffiliatesPage() {
       .then((result) => {
         if (!cancelled) setMetrics(result.data);
       })
-      .catch((error) => {
-        if (!cancelled) toast.error(apiMessage(error, 'Could not load metrics'));
-      });
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
@@ -80,11 +80,10 @@ export default function AdminAffiliatesPage() {
         setLoaded(true);
         setFailed(false);
         setForbidden(false);
+        setFeatureOff(false);
       } catch (error) {
         if (!cancelled) {
-          const kind = noteQueryFail(error);
-          if (kind === 'forbidden') setForbidden(true);
-          else if (kind !== 'unauthorized') setFailed(true);
+          applyQueryFail(error, { setFeatureOff, setForbidden, setFailed });
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -172,10 +171,16 @@ export default function AdminAffiliatesPage() {
         searchPlaceholder="Search affiliates"
       />
 
-      {forbidden ? (
-        <AccessDenied title="You don't have access" description="You don't have access to this data." primary={{ label: 'Go back', href: '/admin' }} />
-      ) : failed && !loaded ? (
-        <ErrorState title="We couldn't load affiliates" description="Try again in a moment." primary={{ label: 'Try again', onClick: () => setPage(1) }} />
+      {featureOff || forbidden || (failed && !loaded) ? (
+        <AdminQueryFail
+          featureOff={featureOff}
+          forbidden={forbidden}
+          failed={failed}
+          loaded={loaded}
+          feature="Affiliates"
+          onRetry={() => setPage(1)}
+          errorTitle="We couldn't load affiliates"
+        />
       ) : loading && !loaded ? (
         <TableSkeleton rows={6} />
       ) : rows.length === 0 && query ? (

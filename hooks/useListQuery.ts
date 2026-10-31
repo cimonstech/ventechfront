@@ -9,6 +9,7 @@ export function useListQuery() {
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState(false);
   const [forbidden, setForbidden] = useState(false);
+  const [featureOff, setFeatureOff] = useState(false);
   const loadedRef = useRef(false);
 
   const run = useCallback(async <T,>(fn: () => Promise<T>): Promise<T | undefined> => {
@@ -20,10 +21,12 @@ export function useListQuery() {
       setLoaded(true);
       setError(false);
       setForbidden(false);
+      setFeatureOff(false);
       return value;
     } catch (err) {
       const kind = noteQueryFail(err);
-      if (kind === 'forbidden') setForbidden(true);
+      if (kind === 'feature_off') setFeatureOff(true);
+      else if (kind === 'forbidden') setForbidden(true);
       else if (kind !== 'unauthorized') setError(true);
       return undefined;
     } finally {
@@ -32,5 +35,5 @@ export function useListQuery() {
     }
   }, []);
 
-  return { loaded, loading, updating, error, forbidden, run };
+  return { loaded, loading, updating, error, forbidden, featureOff, run };
 }

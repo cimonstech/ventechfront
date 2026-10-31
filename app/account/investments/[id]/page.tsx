@@ -23,6 +23,8 @@ import {
   vlbRequest,
   type VlbInvestmentDetail,
 } from '@/lib/vlb';
+import { scheduleRowLabel } from '@/components/vlb/VlbScheduleView';
+import { FeatureOffNote } from '@/components/ui-states';
 
 export default function AccountInvestmentDetailPage() {
   const params = useParams();
@@ -69,7 +71,7 @@ export default function AccountInvestmentDetailPage() {
     return (
       <div className="rounded-xl bg-white p-5 shadow-sm">
         <h1 className="text-xl font-bold text-[#1A1A1A]">Investments</h1>
-        <p className="mt-2 text-sm text-[#3A3A3A]">This feature is not available yet.</p>
+        <FeatureOffNote feature="Laptop Banking" customer />
       </div>
     );
   }
@@ -189,7 +191,7 @@ export default function AccountInvestmentDetailPage() {
               <div key={payout.id} className="rounded-lg border border-gray-100 p-3">
                 <StackRows
                   rows={[
-                    { label: 'Period', value: payout.period_no },
+                    { label: 'Label', value: scheduleRowLabel(payout, row.schedule.filter((item) => item.type !== 'principal').length) },
                     { label: 'Due', value: formatDeviceDate(payout.due_date) },
                     { label: 'Gross', value: formatGhs(payout.gross_pesewas) },
                     { label: 'Scholar', value: formatGhs(payout.scholar_pesewas) },
@@ -207,7 +209,7 @@ export default function AccountInvestmentDetailPage() {
         <table className="min-w-[40rem] w-full text-left text-sm">
           <thead>
             <tr className="text-[#3A3A3A]">
-              <th className="pb-2 font-medium">Period</th>
+              <th className="pb-2 font-medium">Label</th>
               <th className="pb-2 font-medium">Due</th>
               <th className="pb-2 font-medium">Gross</th>
               <th className="pb-2 font-medium">Scholar</th>
@@ -223,7 +225,7 @@ export default function AccountInvestmentDetailPage() {
               const statusBadge = <Badge variant={payoutStatusVariant(payout.status)} size="sm">{payout.status}</Badge>;
               return (
               <tr key={payout.id} className="border-t border-gray-100">
-                <td className="py-2">{payout.period_no}</td>
+                <td className="py-2">{scheduleRowLabel(payout, row.schedule.filter((item) => item.type !== 'principal').length)}</td>
                 <td className="py-2">{formatDeviceDate(payout.due_date)}</td>
                 <td className="py-2">{formatGhs(payout.gross_pesewas)}</td>
                 <td className="py-2">{formatGhs(payout.scholar_pesewas)}</td>

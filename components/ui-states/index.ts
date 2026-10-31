@@ -7,6 +7,7 @@ export { OfflineBanner } from './OfflineBanner';
 export { ProgressBar } from './ProgressBar';
 export { NoResults } from './NoResults';
 export { AccessDenied } from './AccessDenied';
+export { FeatureOffNote } from './FeatureOffNote';
 export { SessionExpiredHost } from './SessionExpired';
 export { FieldError, FieldHint } from './FieldError';
 export { SuccessPanel } from './SuccessPanel';

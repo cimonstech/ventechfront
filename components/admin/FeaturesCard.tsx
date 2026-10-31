@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import { ErrorState } from '@/components/ui-states';
 import { deviceRequest } from '@/lib/devicesAdmin';
 import {
   clearPublicFeaturesCache,
@@ -28,16 +29,20 @@ const FLAGS: Array<{
 
 export function FeaturesCard() {
   const [flags, setFlags] = useState<PublicFeatures | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [busy, setBusy] = useState<keyof PublicFeatures | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     fetchPublicFeatures()
       .then((data) => {
-        if (!cancelled) setFlags(data);
+        if (!cancelled) {
+          setFlags(data);
+          setLoadFailed(false);
+        }
       })
       .catch(() => {
-        if (!cancelled) toast.error('Could not load feature switches.');
+        if (!cancelled) setLoadFailed(true);
       });
     return () => {
       cancelled = true;
@@ -62,20 +67,29 @@ export function FeaturesCard() {
   };
 
   return (
-    <div className="mb-6 rounded-xl bg-white p-6 shadow-sm">
-      <h2 className="text-xl font-bold text-gray-900">Features</h2>
-      <p className="mt-1 text-sm text-gray-600">
+    <div className="mb-6 min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white p-4">
+      <h2 className="text-lg font-bold text-[#1A1A1A]">Features</h2>
+      <p className="mt-1 text-sm text-[#3A3A3A]">
         Finished features stay off in production until you switch them on.
       </p>
-      <div className="mt-4 space-y-4">
+      {loadFailed && !flags ? (
+        <div className="mt-4">
+          <ErrorState
+            title="We couldn't load feature switches"
+            description="Refresh the page and try again."
+            primary={{ label: 'Refresh', onClick: () => window.location.reload() }}
+          />
+        </div>
+      ) : null}
+      <div className="mt-4 space-y-3">
         {FLAGS.map((item) => {
           const on = flags?.[item.key] === true;
           const disabled = !flags || busy === item.key;
           return (
-            <div key={item.key} className="rounded-lg border border-gray-200 p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="font-semibold text-gray-900">{item.label}</p>
+            <div key={item.key} className="min-w-0 rounded-lg border border-gray-200 p-3">
+              <div className="flex items-start gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-[#1A1A1A]">{item.label}</p>
                   <p className="mt-1 text-sm text-amber-800">{item.warning}</p>
                 </div>
                 <button
@@ -85,7 +99,7 @@ export function FeaturesCard() {
                   aria-label={item.label}
                   disabled={disabled}
                   onClick={() => void toggle(item.key, !on)}
-                  className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
+                  className={`relative inline-flex h-11 w-12 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
                     on ? 'bg-[#FF7A19]' : 'bg-gray-300'
                   }`}
                 >

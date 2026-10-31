@@ -44,10 +44,10 @@ export function VlbPayoutFields({
 }) {
   const set = (patch: Partial<VlbPayoutForm>) => onChange({ ...value, ...patch });
   return (
-    <div className="space-y-3">
-      <label className="block text-sm">Payout method
+    <div className="min-w-0 space-y-3">
+      <label className="block min-w-0 text-sm">Payout method
         <select
-          className="mt-1 w-full rounded-lg border px-3 py-2"
+          className="mt-1 min-h-11 w-full min-w-0 max-w-full rounded-lg border px-3 py-2"
           value={value.payout_method}
           onChange={(e) => set({ payout_method: e.target.value as 'momo' | 'bank' })}
         >
@@ -57,9 +57,9 @@ export function VlbPayoutFields({
       </label>
       {value.payout_method === 'momo' ? (
         <>
-          <label className="block text-sm">MoMo network
+          <label className="block min-w-0 text-sm">MoMo network
             <select
-              className="mt-1 w-full rounded-lg border px-3 py-2"
+              className="mt-1 min-h-11 w-full min-w-0 max-w-full rounded-lg border px-3 py-2"
               value={value.momo_network}
               onChange={(e) => set({ momo_network: e.target.value })}
             >
@@ -68,9 +68,9 @@ export function VlbPayoutFields({
               ))}
             </select>
           </label>
-          <label className="block text-sm">MoMo number
+          <label className="block min-w-0 text-sm">MoMo number
             <input
-              className="mt-1 w-full rounded-lg border px-3 py-2"
+              className="mt-1 min-h-11 w-full min-w-0 max-w-full rounded-lg border px-3 py-2"
               required
               value={value.momo_number}
               onChange={(e) => set({ momo_number: e.target.value })}
@@ -79,14 +79,14 @@ export function VlbPayoutFields({
         </>
       ) : (
         <>
-          <label className="block text-sm">Bank name
-            <input className="mt-1 w-full rounded-lg border px-3 py-2" required value={value.bank_name} onChange={(e) => set({ bank_name: e.target.value })} />
+          <label className="block min-w-0 text-sm">Bank name
+            <input className="mt-1 min-h-11 w-full min-w-0 max-w-full rounded-lg border px-3 py-2" required value={value.bank_name} onChange={(e) => set({ bank_name: e.target.value })} />
           </label>
-          <label className="block text-sm">Account name
-            <input className="mt-1 w-full rounded-lg border px-3 py-2" required value={value.bank_account_name} onChange={(e) => set({ bank_account_name: e.target.value })} />
+          <label className="block min-w-0 text-sm">Account name
+            <input className="mt-1 min-h-11 w-full min-w-0 max-w-full rounded-lg border px-3 py-2" required value={value.bank_account_name} onChange={(e) => set({ bank_account_name: e.target.value })} />
           </label>
-          <label className="block text-sm">Account number
-            <input className="mt-1 w-full rounded-lg border px-3 py-2" required value={value.bank_account_number} onChange={(e) => set({ bank_account_number: e.target.value })} />
+          <label className="block min-w-0 text-sm">Account number
+            <input className="mt-1 min-h-11 w-full min-w-0 max-w-full rounded-lg border px-3 py-2" required value={value.bank_account_number} onChange={(e) => set({ bank_account_number: e.target.value })} />
           </label>
         </>
       )}

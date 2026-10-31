@@ -3,7 +3,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/Button';
-import { LoadGate, ProductGridSkeleton } from '@/components/ui-states';
+import { LoadGate, ProductGridSkeleton, SuccessPanel } from '@/components/ui-states';
+import { AgreementFilePicker } from '@/components/vlb/AgreementFilePicker';
 import { useListQuery } from '@/hooks/useListQuery';
 import { apiRequest, toApiError } from '@/lib/api';
 import {
@@ -31,6 +32,9 @@ export default function LaptopBankingPage() {
   const [selectedPlanId, setSelectedPlanId] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [agreementFiles, setAgreementFiles] = useState<File[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -115,6 +119,7 @@ export default function LaptopBankingPage() {
       return;
     }
     setIsSubmitting(true);
+    setFileError(null);
     try {
       await submitVlbApplication({
         full_name: formData.name,
@@ -122,13 +127,17 @@ export default function LaptopBankingPage() {
         phone: formData.phone,
         plan_id: selectedPlanId,
         message: formData.message || undefined,
+        files: agreementFiles,
       });
-      toast.success('Thank you! We will contact you within 24 hours. Check your email for confirmation.');
       setFormData({ name: '', email: '', phone: '', message: '' });
       setSelectedPlanId('');
+      setAgreementFiles([]);
       setShowModal(false);
+      setSubmitted(true);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to submit investment request. Please try again.');
+      const fields = (error as { fields?: Record<string, string> }).fields;
+      if (fields?.files) setFileError(fields.files);
+      toast.error(error instanceof Error ? error.message : 'Could not save this application.');
     } finally {
       setIsSubmitting(false);
     }
@@ -210,6 +219,24 @@ export default function LaptopBankingPage() {
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19] text-sm resize-none"
         />
       </div>
+      <div className="rounded-lg border border-gray-200 p-4 space-y-3">
+        <h3 className="font-semibold text-[#1A1A1A]">Signed agreement</h3>
+        <p className="text-sm text-[#3A3A3A]">
+          Download the agreement, print it, fill it in and sign it. Then upload a clear scan or photos of every page.
+        </p>
+        <button type="button" className="text-sm font-medium text-[#FF7A19]" onClick={() => void handleReadAgreement()}>
+          Download agreement
+        </button>
+        <AgreementFilePicker
+          files={agreementFiles}
+          onFiles={setAgreementFiles}
+          error={fileError}
+          disabled={isSubmitting}
+        />
+        <p className="text-sm text-[#3A3A3A]">
+          No printer? You can submit now and upload it later, or bring the signed copy to our shop.
+        </p>
+      </div>
       <Button
         type="submit"
         variant="primary"
@@ -218,7 +245,7 @@ export default function LaptopBankingPage() {
         icon={<ArrowRight className="w-5 h-5" />}
         disabled={isSubmitting}
       >
-        {isSubmitting ? 'Submitting...' : 'Submit Application'}
+        {isSubmitting ? 'Working...' : 'Submit Application'}
       </Button>
     </>
   );
@@ -332,6 +359,14 @@ export default function LaptopBankingPage() {
               className="w-full px-3 py-2 sm:px-4 sm:py-2 text-sm border-2 border-[#FF7A19] text-[#FF7A19] hover:!bg-[#FF7A19] hover:!text-white transition-colors"
             >
               Read Agreement
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void handleReadAgreement()}
+              className="w-full px-3 py-2 sm:px-4 sm:py-2 text-sm border-2 border-[#FF7A19] text-[#FF7A19] hover:!bg-[#FF7A19] hover:!text-white transition-colors"
+            >
+              Download agreement
             </Button>
           </div>
         </div>
@@ -469,6 +504,9 @@ export default function LaptopBankingPage() {
             loading={plansQuery.loading}
             updating={plansQuery.updating}
             error={plansQuery.error}
+            forbidden={plansQuery.forbidden}
+            featureOff={plansQuery.featureOff}
+            featureName="Laptop Banking"
             isEmpty={plans.length === 0}
             onRetry={() => void loadPlans()}
             skeleton={<ProductGridSkeleton count={3} />}
@@ -518,7 +556,15 @@ export default function LaptopBankingPage() {
               <p className="text-sm md:text-base text-[#3A3A3A]">Fill out the form below and we'll contact you within 24 hours</p>
             </div>
             <div className="bg-white rounded-xl p-6 md:p-8 shadow-lg border border-gray-200">
-              <form onSubmit={handleSubmit} className="space-y-4">{applicationFields}</form>
+              {submitted ? (
+                <SuccessPanel
+                  title="Application received"
+                  description="Check your email. If you have not uploaded a signed agreement yet, the email includes a link to upload it."
+                  primary={{ label: 'Back to Laptop Banking', onClick: () => setSubmitted(false) }}
+                />
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-4">{applicationFields}</form>
+              )}
             </div>
           </div>
         </div>
