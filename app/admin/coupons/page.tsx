@@ -5,14 +5,23 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Coupon, CreateCouponData } from '@/types/coupon';
 import { couponService } from '@/services/coupon.service';
-import { useAppSelector } from '@/store';
-import { Plus, Edit, Trash2, Copy, Check, X, Tag, Percent, DollarSign, Truck } from 'lucide-react';
+import { Plus, Copy, Tag, Percent, DollarSign, Truck } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { LoadGate, TableSkeleton } from '@/components/ui-states';
+import {
+  AdminPageHeader,
+  AdminRowCard,
+  ConfirmDialog,
+  ResponsiveTable,
+  RowActions,
+} from '@/components/admin/list';
+import { useListQuery } from '@/hooks/useListQuery';
 
 export default function AdminCouponsPage() {
-  const { user } = useAppSelector((state) => state.auth);
+  const query = useListQuery();
   const [coupons, setCoupons] = useState<Coupon[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState<Coupon | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
   const [newCoupon, setNewCoupon] = useState<CreateCouponData>({
@@ -36,16 +45,9 @@ export default function AdminCouponsPage() {
   }, []);
 
   const fetchCoupons = async () => {
-    try {
-      setIsLoading(true);
-      const data = await couponService.getAllCoupons();
-      setCoupons(data);
-    } catch (error) {
-      console.error('Error fetching coupons:', error);
-      toast.error('Failed to fetch coupons');
-    } finally {
-      setIsLoading(false);
-    }
+    await query.run(async () => {
+      setCoupons(await couponService.getAllCoupons());
+    });
   };
 
   const generateCouponCode = () => {
@@ -117,16 +119,19 @@ export default function AdminCouponsPage() {
     }
   };
 
-  const handleDeleteCoupon = async (couponId: string) => {
-    if (!confirm('Are you sure you want to delete this coupon?')) return;
-
+  const handleDeleteCoupon = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await couponService.deleteCoupon(couponId);
+      await couponService.deleteCoupon(deleteTarget.id);
       toast.success('Coupon deleted successfully!');
+      setDeleteTarget(null);
       fetchCoupons();
     } catch (error: any) {
       console.error('Error deleting coupon:', error);
       toast.error(error.message || 'Failed to delete coupon');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -199,21 +204,30 @@ export default function AdminCouponsPage() {
     return new Date(validUntil) < new Date();
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF7A19]"></div>
-      </div>
-    );
-  }
+  const couponValue = (coupon: Coupon) =>
+    coupon.discount_type === 'percentage'
+      ? `${coupon.discount_value}%`
+      : coupon.discount_type === 'fixed_amount'
+        ? `GHS ${coupon.discount_value}`
+        : 'Free shipping';
+
+  const couponStatus = (coupon: Coupon) =>
+    isActive(coupon) ? 'Active' : isExpired(coupon.valid_until) ? 'Expired' : 'Inactive';
+
+  const couponActions = (coupon: Coupon) => [
+    { label: 'Edit', onClick: () => handleEditCoupon(coupon) },
+    { label: 'Delete', destructive: true, onClick: () => setDeleteTarget(coupon) },
+  ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-[#1A1A1A]">Coupons</h1>
-        <Button
-          variant="primary"
-          onClick={() => {
+    <div className="min-w-0 space-y-6">
+      <AdminPageHeader
+        title="Coupons"
+        subtitle={`${coupons.length} coupon${coupons.length === 1 ? '' : 's'}`}
+        primary={{
+          label: 'Add coupon',
+          icon: <Plus size={16} />,
+          onClick: () => {
             setEditingCoupon(null);
             setNewCoupon({
               code: '',
@@ -231,120 +245,107 @@ export default function AdminCouponsPage() {
               valid_until: '',
             });
             setShowCreateModal(true);
-          }}
-          icon={<Plus size={18} />}
-        >
-          Create Coupon
-        </Button>
-      </div>
+          },
+        }}
+      />
 
-      {/* Coupons Table */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Code</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usage</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valid Until</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {coupons.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
-                    No coupons found. Create your first coupon above.
-                  </td>
-                </tr>
-              ) : (
-                coupons.map((coupon) => (
-                  <tr key={coupon.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-900 font-mono">{coupon.code}</span>
-                        <button
-                          onClick={() => copyToClipboard(coupon.code)}
-                          className="text-gray-400 hover:text-[#FF7A19] transition-colors"
-                          title="Copy code"
-                        >
-                          <Copy size={14} />
-                        </button>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900">{coupon.name}</div>
-                      {coupon.description && (
-                        <div className="text-xs text-gray-500 mt-1 max-w-xs truncate">
-                          {coupon.description}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge className={`${getTypeColor(coupon.discount_type)} flex items-center gap-1 w-fit`}>
-                        {getTypeIcon(coupon.discount_type)}
-                        {coupon.discount_type.replace('_', ' ')}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {coupon.discount_type === 'percentage' ? `${coupon.discount_value}%` : 
-                         coupon.discount_type === 'fixed_amount' ? `GHS ${coupon.discount_value}` : 
-                         'Free Shipping'}
-                      </div>
-                      {coupon.minimum_amount > 0 && (
-                        <div className="text-xs text-gray-500">Min: GHS {coupon.minimum_amount}</div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {coupon.used_count}
-                        {coupon.usage_limit && ` / ${coupon.usage_limit}`}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge
-                        variant={isActive(coupon) ? 'success' : 'error'}
-                        size="sm"
-                      >
-                        {isActive(coupon) ? 'Active' : 
-                         isExpired(coupon.valid_until) ? 'Expired' : 'Inactive'}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {coupon.valid_until ? 
-                        new Date(coupon.valid_until).toLocaleDateString() : 
-                        'No expiry'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleEditCoupon(coupon)}
-                          className="text-[#FF7A19] hover:text-[#e66a0f] transition-colors"
-                          title="Edit"
-                        >
-                          <Edit size={18} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteCoupon(coupon.id)}
-                          className="text-red-600 hover:text-red-700 transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <LoadGate
+        loaded={query.loaded}
+        loading={query.loading}
+        updating={query.updating}
+        error={query.error}
+        forbidden={query.forbidden}
+        isEmpty={coupons.length === 0}
+        onRetry={() => void fetchCoupons()}
+        skeleton={<TableSkeleton />}
+        emptyTitle="No coupons yet"
+        emptyDescription="Create a coupon to offer a discount at checkout."
+        emptyPrimary={{ label: 'Add coupon', onClick: () => setShowCreateModal(true) }}
+        denyHome="/admin"
+      >
+        <ResponsiveTable
+          headers={
+            <tr>
+              <th className="px-4 py-3">Code</th>
+              <th className="px-4 py-3">Name</th>
+              <th className="px-4 py-3">Type</th>
+              <th className="px-4 py-3">Value</th>
+              <th className="px-4 py-3">Usage</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Valid until</th>
+              <th className="px-4 py-3 text-right">Actions</th>
+            </tr>
+          }
+          cards={coupons.map((coupon) => (
+            <AdminRowCard
+              key={coupon.id}
+              name={coupon.code}
+              status={
+                <Badge variant={isActive(coupon) ? 'success' : 'error'} size="sm">
+                  {couponStatus(coupon)}
+                </Badge>
+              }
+              facts={[
+                { label: 'Name', value: coupon.name },
+                { label: 'Value', value: couponValue(coupon) },
+                { label: 'Usage', value: `${coupon.used_count}${coupon.usage_limit ? ` / ${coupon.usage_limit}` : ''}` },
+              ]}
+              actions={<RowActions name={coupon.code} actions={couponActions(coupon)} />}
+            />
+          ))}
+        >
+          {coupons.map((coupon) => (
+            <tr key={coupon.id} className="hover:bg-gray-50">
+              <td className="px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-sm font-medium text-[#1A1A1A]">{coupon.code}</span>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(coupon.code)}
+                    className="text-gray-400 hover:text-[#FF7A19]"
+                    title="Copy code"
+                  >
+                    <Copy size={14} />
+                  </button>
+                </div>
+              </td>
+              <td className="px-4 py-3">
+                <p className="text-sm font-medium text-[#1A1A1A]">{coupon.name}</p>
+                {coupon.description ? (
+                  <p className="mt-1 max-w-xs truncate text-xs text-[#3A3A3A]">{coupon.description}</p>
+                ) : null}
+              </td>
+              <td className="px-4 py-3">
+                <Badge className={`${getTypeColor(coupon.discount_type)} flex w-fit items-center gap-1`}>
+                  {getTypeIcon(coupon.discount_type)}
+                  {coupon.discount_type.replace('_', ' ')}
+                </Badge>
+              </td>
+              <td className="px-4 py-3">
+                <p className="text-sm text-[#1A1A1A]">{couponValue(coupon)}</p>
+                {coupon.minimum_amount > 0 ? (
+                  <p className="text-xs text-[#3A3A3A]">Min: GHS {coupon.minimum_amount}</p>
+                ) : null}
+              </td>
+              <td className="px-4 py-3 text-sm text-[#1A1A1A]">
+                {coupon.used_count}
+                {coupon.usage_limit && ` / ${coupon.usage_limit}`}
+              </td>
+              <td className="px-4 py-3">
+                <Badge variant={isActive(coupon) ? 'success' : 'error'} size="sm">
+                  {couponStatus(coupon)}
+                </Badge>
+              </td>
+              <td className="px-4 py-3 text-sm text-[#3A3A3A]">
+                {coupon.valid_until ? new Date(coupon.valid_until).toLocaleDateString() : 'No expiry'}
+              </td>
+              <td className="px-4 py-3 text-right">
+                <RowActions name={coupon.code} actions={couponActions(coupon)} />
+              </td>
+            </tr>
+          ))}
+        </ResponsiveTable>
+      </LoadGate>
 
       {/* Create/Edit Modal */}
       {(showCreateModal || editingCoupon) && (
@@ -591,6 +592,18 @@ export default function AdminCouponsPage() {
           </div>
         </div>
       )}
+
+      {deleteTarget ? (
+        <ConfirmDialog
+          title="Delete this coupon?"
+          confirmLabel="Delete"
+          busy={deleting}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={() => void handleDeleteCoupon()}
+        >
+          {deleteTarget.code} will be removed.
+        </ConfirmDialog>
+      ) : null}
     </div>
   );
 }

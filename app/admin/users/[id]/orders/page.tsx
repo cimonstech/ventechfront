@@ -1,6 +1,5 @@
 'use client';
 
-import { authHeaders } from '@/lib/authHeaders';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -18,8 +17,10 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency, formatDate, getOrderStatusColor } from '@/lib/helpers';
+import { apiRequest, toApiError } from '@/lib/api';
+import { AccessDenied, EmptyState, ErrorState, NoResults, TableSkeleton, UpdatingNotice } from '@/components/ui-states';
+import { useListQuery } from '@/hooks/useListQuery';
 import toast from 'react-hot-toast';
-import { Spinner } from '@/components/loaders/Spinner';
 
 interface Order {
   id: string;
@@ -45,7 +46,7 @@ export default function UserOrdersPage() {
   const router = useRouter();
   const userId = params.id as string;
   
-  const [loading, setLoading] = useState(true);
+  const query = useListQuery();
   const [user, setUser] = useState<UserData | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -75,62 +76,10 @@ export default function UserOrdersPage() {
   };
 
   const fetchUserOrders = async () => {
-    try {
-      setLoading(true);
-      
-      // Try backend API first (bypasses RLS)
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      try {
-        const response = await fetch(`${API_URL}/api/orders?user_id=${userId}`, {
-          method: 'GET',
-          headers: {
-            ...(await authHeaders()),
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success && result.data) {
-            const formattedOrders = result.data.map((order: any) => ({
-              id: order.id,
-              order_number: order.order_number,
-              status: order.status,
-              payment_status: order.payment_status,
-              payment_method: order.payment_method,
-              total: parseFloat(order.total) || 0,
-              created_at: order.created_at,
-              updated_at: order.updated_at,
-              items_count: order.order_items?.length || 0,
-            }));
-            setOrders(formattedOrders);
-            return;
-          }
-        }
-      } catch (apiError) {
-        console.warn('Backend API failed, trying Supabase:', apiError);
-      }
-
-      // Fallback to Supabase
-      const { data, error } = await supabase
-        .from('orders')
-        .select(`
-          id,
-          order_number,
-          status,
-          payment_status,
-          payment_method,
-          total,
-          created_at,
-          updated_at,
-          order_items(id)
-        `)
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      const formattedOrders = (data || []).map((order: any) => ({
+    await query.run(async () => {
+      const result = await apiRequest<any[]>(`/api/orders?user_id=${userId}`);
+      if (!result.ok) throw toApiError(result);
+      const formattedOrders = (result.data || []).map((order: any) => ({
         id: order.id,
         order_number: order.order_number,
         status: order.status,
@@ -141,15 +90,8 @@ export default function UserOrdersPage() {
         updated_at: order.updated_at,
         items_count: order.order_items?.length || 0,
       }));
-
       setOrders(formattedOrders);
-    } catch (error: any) {
-      console.error('Error fetching orders:', error);
-      toast.error('Failed to load orders');
-      setOrders([]);
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   const filteredOrders = orders.filter(order =>
@@ -181,16 +123,33 @@ export default function UserOrdersPage() {
     );
   };
 
-  if (loading && !user) {
+  if (query.forbidden) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Spinner />
-      </div>
+      <AccessDenied
+        title="You don't have access"
+        description="You don't have access to this data."
+        primary={{ label: 'Go back', href: '/admin/users' }}
+      />
     );
+  }
+
+  if (query.error && !query.loaded) {
+    return (
+      <ErrorState
+        title="We couldn't load these orders"
+        description="Try again in a moment."
+        primary={{ label: 'Try again', onClick: () => void fetchUserOrders() }}
+      />
+    );
+  }
+
+  if (query.loading && !query.loaded) {
+    return <TableSkeleton />;
   }
 
   return (
     <div className="space-y-6">
+      {query.updating ? <UpdatingNotice /> : null}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -226,15 +185,12 @@ export default function UserOrdersPage() {
 
       {/* Orders Table */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Spinner />
-          </div>
-        ) : filteredOrders.length === 0 ? (
-          <div className="text-center py-12">
-            <Package className="mx-auto text-gray-400 mb-4" size={48} />
-            <p className="text-gray-600">No orders found</p>
-          </div>
+        {filteredOrders.length === 0 ? (
+          searchQuery ? (
+            <NoResults primary={{ label: 'Clear filters', onClick: () => setSearchQuery('') }} />
+          ) : (
+            <EmptyState title="No orders yet" description="Orders for this customer will show up here." />
+          )
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">

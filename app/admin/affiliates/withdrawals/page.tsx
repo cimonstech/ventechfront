@@ -8,8 +8,15 @@ import { Button } from '@/components/ui/Button';
 import { InfoNote } from '@/components/ui/InfoNote';
 import { AffiliatePrompt } from '@/components/admin/AffiliatePrompt';
 import { AffiliatesNav } from '@/components/admin/AffiliatesNav';
-import { useSetAdminHeading } from '@/components/admin/AdminHeading';
+import {
+  AdminPageHeader,
+  AdminPagination,
+  AdminRowCard,
+  ResponsiveTable,
+  RowActions,
+} from '@/components/admin/list';
 import { useAccess } from '@/context/AccessContext';
+import { EmptyState, TableSkeleton } from '@/components/ui-states';
 import {
   AffiliateWithdrawalRow,
   WITHDRAWAL_STATUS_LABEL,
@@ -33,13 +40,13 @@ const TABS: Array<{ id: Tab; label: string }> = [
 ];
 
 export default function AdminAffiliateWithdrawalsPage() {
-  useSetAdminHeading('Withdrawals');
   const { canEdit } = useAccess();
   const editable = canEdit('affiliates');
   const finance = canEdit('finance');
   const [tab, setTab] = useState<Tab>('requested');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const [rows, setRows] = useState<AffiliateWithdrawalRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -53,6 +60,7 @@ export default function AdminAffiliateWithdrawalsPage() {
       const result = await deviceRequest<AffiliateWithdrawalRow[]>(`/api/admin/affiliates/withdrawals?${params.toString()}`);
       setRows(result.data || []);
       setTotalPages(result.pagination?.totalPages || 1);
+      setTotal(result.pagination?.total || 0);
     } catch (error) {
       toast.error(apiMessage(error, 'Could not load withdrawals'));
     } finally {
@@ -81,29 +89,53 @@ export default function AdminAffiliateWithdrawalsPage() {
     }
   };
 
+  const affiliateName = (row: AffiliateWithdrawalRow) => nested(row.affiliate)?.affiliate_no || 'Affiliate';
+  const count = total || rows.length;
+
+  const rowButtons = (row: AffiliateWithdrawalRow) => (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      {editable && row.status === 'requested' && (
+        <>
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => run(row.id, { to: 'processing' }, 'Could not update this withdrawal.')}>Processing</Button>
+          <Button size="sm" disabled={busy} onClick={() => run(row.id, { to: 'approved' }, 'Could not update this withdrawal.')}>Approve</Button>
+        </>
+      )}
+      {editable && row.status === 'processing' && (
+        <Button size="sm" disabled={busy} onClick={() => run(row.id, { to: 'approved' }, 'Could not update this withdrawal.')}>Approve</Button>
+      )}
+      {finance && (row.status === 'processing' || row.status === 'approved') && (
+        <Button size="sm" disabled={busy} onClick={() => setPrompt({ id: row.id, kind: 'paid' })}>Mark paid</Button>
+      )}
+      {editable && (row.status === 'requested' || row.status === 'processing' || row.status === 'approved') && (
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => setPrompt({ id: row.id, kind: 'reject' })}>Reject</Button>
+      )}
+    </div>
+  );
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <AffiliatesNav current="/admin/affiliates/withdrawals" />
-        <Button
-          size="sm"
-          variant="outline"
-          isLoading={exporting}
-          onClick={async () => {
-            setExporting(true);
-            try {
-              await downloadAffiliateCsv('withdrawals', new URLSearchParams({ status: tab }));
-              toast.success('Export downloaded.');
-            } catch (error) {
-              toast.error(apiMessage(error, 'Could not export this file.'));
-            } finally {
-              setExporting(false);
-            }
-          }}
-        >
-          Export CSV
-        </Button>
-      </div>
+    <div className="min-w-0 space-y-6">
+      <AdminPageHeader
+        title="Withdrawals"
+        subtitle={`${count} withdrawal${count === 1 ? '' : 's'}`}
+        secondary={[
+          {
+            label: exporting ? 'Exporting' : 'Export all',
+            disabled: exporting,
+            onClick: async () => {
+              setExporting(true);
+              try {
+                await downloadAffiliateCsv('withdrawals', new URLSearchParams({ status: tab }));
+                toast.success('Export downloaded.');
+              } catch (error) {
+                toast.error(apiMessage(error, 'Could not export this file.'));
+              } finally {
+                setExporting(false);
+              }
+            },
+          },
+        ]}
+      />
+      <AffiliatesNav current="/admin/affiliates/withdrawals" />
 
       {finance ? (
         <InfoNote>
@@ -129,71 +161,86 @@ export default function AdminAffiliateWithdrawalsPage() {
         ))}
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto sticky-first">
-        <table className="min-w-[860px] w-full text-sm">
-          <thead className="bg-gray-50 text-left text-[#3A3A3A]">
-            <tr>
-              <th className="px-4 py-3">Affiliate</th>
-              <th className="px-4 py-3">Amount</th>
-              <th className="px-4 py-3">Mode</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Requested</th>
-              <th className="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {loading ? (
-              <tr><td colSpan={6} className="px-4 py-10 text-center text-[#3A3A3A]">Loading withdrawals…</td></tr>
-            ) : rows.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-10 text-center text-[#3A3A3A]">No withdrawals in this list.</td></tr>
-            ) : rows.map((row) => {
-              const affiliate = nested(row.affiliate);
-              return (
-                <tr key={row.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">
+      {loading ? (
+        <TableSkeleton rows={6} />
+      ) : rows.length === 0 ? (
+        <EmptyState title="No withdrawals in this list" description="Withdrawals for this status will show up here." />
+      ) : (
+        <>
+          <ResponsiveTable
+            headers={
+              <tr>
+                <th className="px-4 py-3">Affiliate</th>
+                <th className="px-4 py-3">Amount</th>
+                <th className="px-4 py-3">Mode</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Requested</th>
+                <th className="px-4 py-3 text-right">Actions</th>
+              </tr>
+            }
+            cards={rows.map((row) => (
+              <AdminRowCard
+                key={row.id}
+                name={affiliateName(row)}
+                href={row.affiliate_id ? `/admin/affiliates/${row.affiliate_id}` : undefined}
+                status={
+                  <Badge size="sm" variant={affiliateStatusVariant(row.status)}>
+                    {WITHDRAWAL_STATUS_LABEL[row.status] || row.status}
+                  </Badge>
+                }
+                facts={[
+                  { label: 'Amount', value: formatGhs(row.amount_pesewas) },
+                  { label: 'Mode', value: row.mode?.replace('_', ' ') || '—' },
+                  { label: 'Requested', value: formatWhen(row.created_at) },
+                ]}
+                actions={
+                  <div className="flex flex-col items-end gap-1">
                     {row.affiliate_id ? (
-                      <Link href={`/admin/affiliates/${row.affiliate_id}`} className="font-semibold text-[#FF7A19]">
-                        {affiliate?.affiliate_no || 'Affiliate'}
-                      </Link>
-                    ) : (affiliate?.affiliate_no || '—')}
-                  </td>
-                  <td className="px-4 py-3">{formatGhs(row.amount_pesewas)}</td>
-                  <td className="px-4 py-3 capitalize">{row.mode?.replace('_', ' ')}</td>
-                  <td className="px-4 py-3">
-                    <Badge size="sm" variant={affiliateStatusVariant(row.status)}>
-                      {WITHDRAWAL_STATUS_LABEL[row.status] || row.status}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">{formatWhen(row.created_at)}</td>
-                  <td className="px-4 py-3 text-right space-x-2 whitespace-nowrap">
-                    {editable && row.status === 'requested' && (
-                      <>
-                        <Button size="sm" variant="outline" disabled={busy} onClick={() => run(row.id, { to: 'processing' }, 'Could not update this withdrawal.')}>Processing</Button>
-                        <Button size="sm" disabled={busy} onClick={() => run(row.id, { to: 'approved' }, 'Could not update this withdrawal.')}>Approve</Button>
-                      </>
-                    )}
-                    {editable && row.status === 'processing' && (
-                      <Button size="sm" disabled={busy} onClick={() => run(row.id, { to: 'approved' }, 'Could not update this withdrawal.')}>Approve</Button>
-                    )}
-                    {finance && (row.status === 'processing' || row.status === 'approved') && (
-                      <Button size="sm" disabled={busy} onClick={() => setPrompt({ id: row.id, kind: 'paid' })}>Mark paid</Button>
-                    )}
-                    {editable && (row.status === 'requested' || row.status === 'processing' || row.status === 'approved') && (
-                      <Button size="sm" variant="outline" disabled={busy} onClick={() => setPrompt({ id: row.id, kind: 'reject' })}>Reject</Button>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="flex items-center justify-between text-sm">
-        <button type="button" className="text-[#FF7A19] font-semibold disabled:text-gray-400" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</button>
-        <span className="text-[#3A3A3A]">Page {page} of {totalPages}</span>
-        <button type="button" className="text-[#FF7A19] font-semibold disabled:text-gray-400" disabled={page >= totalPages} onClick={() => setPage((value) => value + 1)}>Next</button>
-      </div>
+                      <RowActions
+                        name={affiliateName(row)}
+                        actions={[{ label: 'View', href: `/admin/affiliates/${row.affiliate_id}` }]}
+                      />
+                    ) : null}
+                    {rowButtons(row)}
+                  </div>
+                }
+              />
+            ))}
+          >
+            {rows.map((row) => (
+              <tr key={row.id} className="hover:bg-gray-50">
+                <td className="px-4 py-3">
+                  {row.affiliate_id ? (
+                    <Link href={`/admin/affiliates/${row.affiliate_id}`} className="font-semibold text-[#FF7A19]">
+                      {affiliateName(row)}
+                    </Link>
+                  ) : (nested(row.affiliate)?.affiliate_no || '—')}
+                </td>
+                <td className="px-4 py-3">{formatGhs(row.amount_pesewas)}</td>
+                <td className="px-4 py-3 capitalize">{row.mode?.replace('_', ' ')}</td>
+                <td className="px-4 py-3">
+                  <Badge size="sm" variant={affiliateStatusVariant(row.status)}>
+                    {WITHDRAWAL_STATUS_LABEL[row.status] || row.status}
+                  </Badge>
+                </td>
+                <td className="px-4 py-3 whitespace-nowrap">{formatWhen(row.created_at)}</td>
+                <td className="px-4 py-3 text-right">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    {row.affiliate_id ? (
+                      <RowActions
+                        name={affiliateName(row)}
+                        actions={[{ label: 'View', href: `/admin/affiliates/${row.affiliate_id}` }]}
+                      />
+                    ) : null}
+                    {rowButtons(row)}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </ResponsiveTable>
+          <AdminPagination page={page} totalPages={totalPages} onPage={setPage} />
+        </>
+      )}
 
       {prompt?.kind === 'reject' && (
         <AffiliatePrompt

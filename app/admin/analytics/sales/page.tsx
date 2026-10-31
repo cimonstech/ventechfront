@@ -4,9 +4,15 @@ import { ADMIN_DATA_DENIED, isAccessDeniedStatus } from '@/lib/access';
 import { authHeaders } from '@/lib/authHeaders';
 import { useState, useEffect } from 'react';
 import { TrendingUp, Package, ShoppingBag, Star, Download } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import {
+  AdminPageHeader,
+  AdminRowCard,
+  filterSelectClassName,
+  ResponsiveTable,
+} from '@/components/admin/list';
+import { LoadGate, StatCardSkeleton } from '@/components/ui-states';
+import { noteQueryFail } from '@/lib/queryState';
 import { supabase } from '@/lib/supabase';
-import toast from 'react-hot-toast';
 
 interface SalesData {
   totalOrders: number;
@@ -18,13 +24,9 @@ interface SalesData {
 export default function SalesAnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [denied, setDenied] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [timeFilter, setTimeFilter] = useState<'7days' | '30days' | '90days'>('30days');
-  const [salesData, setSalesData] = useState<SalesData>({
-    totalOrders: 0,
-    totalUnits: 0,
-    conversionRate: 0,
-    topProducts: [],
-  });
+  const [salesData, setSalesData] = useState<SalesData | null>(null);
 
   useEffect(() => {
     fetchSalesData();
@@ -210,61 +212,53 @@ export default function SalesAnalyticsPage() {
         conversionRate: parseFloat(conversionRate.toFixed(1)),
         topProducts,
       });
+      setFailed(false);
     } catch (error) {
       console.error('Error fetching sales data:', error);
-      if (error instanceof Error && error.message === ADMIN_DATA_DENIED) {
+      const kind = noteQueryFail(error);
+      if (kind === 'forbidden' || (error instanceof Error && error.message === ADMIN_DATA_DENIED)) {
         setDenied(true);
-        toast.error(ADMIN_DATA_DENIED);
-      } else {
-        toast.error('Failed to load sales analytics');
+      } else if (kind !== 'unauthorized') {
+        setFailed(true);
       }
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF7A19] mx-auto mb-4"></div>
-          <p className="text-[#3A3A3A]">Loading sales analytics...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (denied) {
-    return (
-      <p className="rounded-xl bg-white p-6 text-sm text-[#3A3A3A] shadow-sm">{ADMIN_DATA_DENIED}</p>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-[#1A1A1A]">Sales Analytics</h1>
-          <p className="text-sm text-[#3A3A3A] mt-1">
-            Monitor sales performance and trends
-          </p>
-        </div>
-        <div className="flex gap-3">
+    <div className="min-w-0 space-y-6">
+      <AdminPageHeader
+        title="Sales"
+        subtitle="Monitor sales performance and trends"
+        secondary={[{ label: 'Export report', icon: <Download size={16} /> }]}
+        extra={
           <select
             value={timeFilter}
             onChange={(e) => setTimeFilter(e.target.value as any)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
+            className={filterSelectClassName()}
           >
-            <option value="7days">Last 7 Days</option>
-            <option value="30days">Last 30 Days</option>
-            <option value="90days">Last 90 Days</option>
+            <option value="7days">Last 7 days</option>
+            <option value="30days">Last 30 days</option>
+            <option value="90days">Last 90 days</option>
           </select>
-          <Button variant="outline" icon={<Download size={18} />}>
-            Export Report
-          </Button>
-        </div>
-      </div>
+        }
+      />
+
+      <LoadGate
+        loaded={Boolean(salesData)}
+        loading={loading || !salesData}
+        error={failed}
+        forbidden={denied}
+        isEmpty={false}
+        onRetry={() => void fetchSalesData()}
+        skeleton={<StatCardSkeleton count={4} />}
+        emptyTitle="No sales yet"
+        emptyDescription="Paid orders will show up here."
+        denyHome="/admin"
+      >
+        {salesData ? (
+          <>
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -272,7 +266,7 @@ export default function SalesAnalyticsPage() {
           <div className="flex items-center gap-3 mb-4">
             <ShoppingBag className="text-blue-600" size={32} />
           </div>
-          <p className="text-sm text-blue-700 mb-1">Total Orders</p>
+          <p className="text-sm text-blue-700 mb-1">Total orders</p>
           <p className="text-3xl font-bold text-blue-900">{salesData.totalOrders}</p>
           <p className="text-sm text-blue-700 mt-2">Completed transactions</p>
         </div>
@@ -281,7 +275,7 @@ export default function SalesAnalyticsPage() {
           <div className="flex items-center gap-3 mb-4">
             <Package className="text-purple-600" size={32} />
           </div>
-          <p className="text-sm text-purple-700 mb-1">Units Sold</p>
+          <p className="text-sm text-purple-700 mb-1">Units sold</p>
           <p className="text-3xl font-bold text-purple-900">{salesData.totalUnits}</p>
           <p className="text-sm text-purple-700 mt-2">Individual products</p>
         </div>
@@ -290,73 +284,74 @@ export default function SalesAnalyticsPage() {
           <div className="flex items-center gap-3 mb-4">
             <TrendingUp className="text-orange-600" size={32} />
           </div>
-          <p className="text-sm text-orange-700 mb-1">Conversion Rate</p>
+          <p className="text-sm text-orange-700 mb-1">Conversion rate</p>
           <p className="text-3xl font-bold text-orange-900">{salesData.conversionRate}%</p>
           <p className="text-sm text-orange-700 mt-2">Visitors to buyers</p>
         </div>
       </div>
 
-      {/* Top Selling Products */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-lg font-bold text-[#1A1A1A]">Top Selling Products</h2>
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <div className="border-b border-gray-200 p-6">
+          <h2 className="text-lg font-bold text-[#1A1A1A]">Top selling products</h2>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-[#1A1A1A] uppercase">
-                  Rank
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-[#1A1A1A] uppercase">
-                  Product
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-[#1A1A1A] uppercase">
-                  Units Sold
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-[#1A1A1A] uppercase">
-                  Revenue
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-[#1A1A1A] uppercase">
-                  Performance
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {salesData.topProducts.length === 0 ? (
+        {salesData.topProducts.length === 0 ? (
+          <p className="px-6 py-12 text-center text-[#3A3A3A]">No products sold yet</p>
+        ) : (
+          <div className="p-4 md:p-0">
+            <ResponsiveTable
+              headers={
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-[#3A3A3A]">
-                    No products sold yet
-                  </td>
+                  <th className="px-4 py-3">Rank</th>
+                  <th className="px-4 py-3">Product</th>
+                  <th className="px-4 py-3">Units sold</th>
+                  <th className="px-4 py-3">Revenue</th>
+                  <th className="px-4 py-3">Performance</th>
                 </tr>
-              ) : (
-                salesData.topProducts.map((product, index) => {
-                  const maxUnits = Math.max(...salesData.topProducts.map((p) => p.units), 1);
-                  const performance = maxUnits > 0 ? (product.units / maxUnits) * 100 : 0;
-                  return (
-                  <tr key={index} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4">
+              }
+              cards={salesData.topProducts.map((product, index) => {
+                const maxUnits = Math.max(...salesData.topProducts.map((p) => p.units), 1);
+                const performance = maxUnits > 0 ? (product.units / maxUnits) * 100 : 0;
+                return (
+                  <AdminRowCard
+                    key={product.name}
+                    name={product.name}
+                    status={index === 0 ? <Star size={16} className="text-yellow-500 fill-yellow-500" /> : <span className="text-sm text-[#3A3A3A]">#{index + 1}</span>}
+                    facts={[
+                      { label: 'Units', value: `${product.units} units` },
+                      { label: 'Revenue', value: `GHS ${product.revenue.toLocaleString()}` },
+                      { label: 'Performance', value: `${Math.round(performance)}%` },
+                    ]}
+                  />
+                );
+              })}
+            >
+              {salesData.topProducts.map((product, index) => {
+                const maxUnits = Math.max(...salesData.topProducts.map((p) => p.units), 1);
+                const performance = maxUnits > 0 ? (product.units / maxUnits) * 100 : 0;
+                return (
+                  <tr key={product.name} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         {index === 0 && <Star size={16} className="text-yellow-500 fill-yellow-500" />}
                         <span className="font-bold text-[#1A1A1A]">#{index + 1}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <span className="font-semibold text-[#1A1A1A]">{product.name}</span>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <span className="font-bold text-[#3A3A3A]">{product.units} units</span>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <span className="font-bold text-[#FF7A19]">
                         GHS {product.revenue.toLocaleString()}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-gray-200 rounded-full h-2 overflow-hidden max-w-[120px]">
+                        <div className="h-2 max-w-[120px] flex-1 overflow-hidden rounded-full bg-gray-200">
                           <div
-                            className="bg-[#FF7A19] h-full rounded-full"
+                            className="h-full rounded-full bg-[#FF7A19]"
                             style={{ width: `${performance}%` }}
                           ></div>
                         </div>
@@ -364,18 +359,16 @@ export default function SalesAnalyticsPage() {
                       </div>
                     </td>
                   </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                );
+              })}
+            </ResponsiveTable>
+          </div>
+        )}
       </div>
 
-      {/* Sales Insights - Dynamic based on actual data */}
       {salesData.topProducts.length > 0 && (
-        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl border-2 border-green-200 p-6">
-          <h3 className="font-bold text-green-900 mb-3">💡 Sales Insights</h3>
+        <div className="rounded-xl border-2 border-green-200 bg-gradient-to-br from-green-50 to-green-100 p-6">
+          <h3 className="mb-3 font-bold text-green-900">Sales insights</h3>
           <ul className="space-y-2 text-sm text-green-700">
             {salesData.topProducts[0] && (
               <li>✓ {salesData.topProducts[0].name} is your best seller with {salesData.topProducts[0].units} units sold</li>
@@ -392,6 +385,9 @@ export default function SalesAnalyticsPage() {
           </ul>
         </div>
       )}
+          </>
+        ) : null}
+      </LoadGate>
     </div>
   );
 }

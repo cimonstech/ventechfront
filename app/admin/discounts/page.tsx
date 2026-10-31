@@ -1,9 +1,18 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Percent, DollarSign, Truck, Calendar } from 'lucide-react';
+import { Plus, Percent, DollarSign, Truck, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import {
+  AdminPageHeader,
+  AdminRowCard,
+  ConfirmDialog,
+  ResponsiveTable,
+  RowActions,
+} from '@/components/admin/list';
+import { LoadGate, TableSkeleton } from '@/components/ui-states';
+import { noteQueryFail } from '@/lib/queryState';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 
@@ -28,6 +37,9 @@ interface Discount {
 export default function AdminDiscountsPage() {
   const [discounts, setDiscounts] = useState<Discount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingDiscount, setEditingDiscount] = useState<Discount | null>(null);
   const [newDiscount, setNewDiscount] = useState<Partial<Discount>>({
@@ -43,6 +55,8 @@ export default function AdminDiscountsPage() {
     usage_limit: 0,
     applies_to: 'all',
   });
+  const [deleteTarget, setDeleteTarget] = useState<Discount | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchDiscounts();
@@ -56,55 +70,16 @@ export default function AdminDiscountsPage() {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        // Check if table doesn't exist - handle silently
-        const errorStr = String(JSON.stringify(error)).toLowerCase();
-        const errorMessage = String(error.message || '').toLowerCase();
-        const errorCode = String(error.code || '');
-        
-        // PGRST205 = table not found in schema cache
-        if (errorCode === '42P01' || errorCode === 'PGRST116' || errorCode === 'PGRST205' ||
-            errorMessage.includes('does not exist') || 
-            errorMessage.includes('could not find the table') ||
-            errorMessage.includes('relation') || 
-            errorMessage.includes('not found') ||
-            errorStr.includes('does not exist') ||
-            errorStr.includes('could not find the table') ||
-            errorStr.includes('relation') ||
-            errorStr.includes('not found') ||
-            Object.keys(error).length === 0) {
-          // Table doesn't exist or empty error - set empty array silently
-          setDiscounts([]);
-          return;
-        }
-        throw error;
-      }
+      if (error) throw error;
       setDiscounts(data || []);
+      setLoaded(true);
+      setFailed(false);
+      setForbidden(false);
     } catch (error: any) {
-      // Check if it's a "table doesn't exist" error
-      const errorStr = String(JSON.stringify(error || {})).toLowerCase();
-      const errorMessage = String(error?.message || '').toLowerCase();
-      const errorCode = String(error?.code || '');
-      
-      // PGRST205 = table not found in schema cache
-      if (errorCode === '42P01' || errorCode === 'PGRST116' || errorCode === 'PGRST205' ||
-          errorMessage.includes('does not exist') || 
-          errorMessage.includes('could not find the table') ||
-          errorMessage.includes('relation') || 
-          errorMessage.includes('not found') ||
-          errorStr.includes('does not exist') ||
-          errorStr.includes('could not find the table') ||
-          errorStr.includes('relation') ||
-          errorStr.includes('not found') ||
-          Object.keys(error || {}).length === 0) {
-        // Table doesn't exist or empty error - set empty array silently
-        setDiscounts([]);
-      } else {
-        // Real error - log it
-        console.error('Error fetching discounts:', error);
-        toast.error('Failed to fetch discounts');
-        setDiscounts([]);
-      }
+      console.error('Error fetching discounts:', error);
+      const kind = noteQueryFail(error);
+      if (kind === 'forbidden') setForbidden(true);
+      else if (kind !== 'unauthorized') setFailed(true);
     } finally {
       setIsLoading(false);
     }
@@ -137,7 +112,7 @@ export default function AdminDiscountsPage() {
             errorStr.includes('relation') ||
             errorStr.includes('not found') ||
             Object.keys(error || {}).length === 0) {
-          toast.error('Discounts table does not exist. Please run the create_taxes_discounts_system.sql migration in Supabase.');
+          toast.error('Could not save this discount.');
           return;
         }
         throw error;
@@ -162,7 +137,7 @@ export default function AdminDiscountsPage() {
           errorStr.includes('relation') ||
           errorStr.includes('not found') ||
           Object.keys(error || {}).length === 0) {
-        toast.error('Discounts table does not exist. Please run the create_taxes_discounts_system.sql migration in Supabase.');
+        toast.error('Could not save this discount.');
       } else {
         console.error('Error creating discount:', error);
         toast.error('Failed to create discount');
@@ -200,7 +175,7 @@ export default function AdminDiscountsPage() {
             errorStr.includes('relation') ||
             errorStr.includes('not found') ||
             Object.keys(error || {}).length === 0) {
-          toast.error('Discounts table does not exist. Please run the create_taxes_discounts_system.sql migration in Supabase.');
+          toast.error('Could not save this discount.');
           return;
         }
         throw error;
@@ -225,7 +200,7 @@ export default function AdminDiscountsPage() {
           errorStr.includes('relation') ||
           errorStr.includes('not found') ||
           Object.keys(error || {}).length === 0) {
-        toast.error('Discounts table does not exist. Please run the create_taxes_discounts_system.sql migration in Supabase.');
+        toast.error('Could not save this discount.');
       } else {
         console.error('Error updating discount:', error);
         toast.error('Failed to update discount');
@@ -233,14 +208,15 @@ export default function AdminDiscountsPage() {
     }
   };
 
-  const handleDeleteDiscount = async (discountId: string) => {
-    if (!confirm('Are you sure you want to delete this discount?')) return;
+  const handleDeleteDiscount = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
 
     try {
       const { error } = await supabase
         .from('discounts')
         .delete()
-        .eq('id', discountId);
+        .eq('id', deleteTarget.id);
 
       if (error) {
         // Check if table doesn't exist - handle silently
@@ -264,6 +240,7 @@ export default function AdminDiscountsPage() {
         throw error;
       }
       toast.success('Discount deleted successfully!');
+      setDeleteTarget(null);
       fetchDiscounts();
     } catch (error: any) {
       // Only log if it's not a "table doesn't exist" error
@@ -284,6 +261,8 @@ export default function AdminDiscountsPage() {
         console.error('Error deleting discount:', error);
         toast.error('Failed to delete discount');
       }
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -360,127 +339,104 @@ export default function AdminDiscountsPage() {
            (!discount.usage_limit || discount.used_count < discount.usage_limit);
   };
 
-  if (isLoading) {
-    return (
-      <div className="p-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-          <div className="space-y-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-16 bg-gray-200 rounded"></div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const discountStatus = (discount: Discount) =>
+    isActive(discount) ? 'Active' : isExpired(discount.valid_until) ? 'Expired' : 'Inactive';
+
+  const discountActions = (discount: Discount) => [
+    { label: 'Edit', onClick: () => handleEditDiscount(discount) },
+    { label: 'Delete', destructive: true, onClick: () => setDeleteTarget(discount) },
+  ];
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-[#1A1A1A]">Discount Management</h1>
-        <Button
-          variant="primary"
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Add Discount
-        </Button>
-      </div>
+    <div className="min-w-0">
+      <AdminPageHeader
+        title="Discounts"
+        subtitle={`${discounts.length} discount${discounts.length === 1 ? '' : 's'}`}
+        primary={{ label: 'Add discount', icon: <Plus size={16} />, onClick: () => setShowCreateModal(true) }}
+      />
 
-      {/* Discounts Table */}
-      <div className="bg-white rounded-lg shadow-sm border">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Name
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Type
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Value
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Usage
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Valid Until
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {discounts.map((discount) => (
-                <tr key={discount.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{discount.name}</div>
-                      {discount.description && (
-                        <div className="text-sm text-gray-500">{discount.description}</div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <Badge className={`${getTypeColor(discount.type)} flex items-center gap-1 w-fit`}>
-                      {getTypeIcon(discount.type)}
-                      {discount.type.replace('_', ' ')}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {formatValue(discount.value, discount.type)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {discount.used_count}
-                    {discount.usage_limit && ` / ${discount.usage_limit}`}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <Badge 
-                      variant={isActive(discount) ? 'success' : 'error'}
-                    >
-                      {isActive(discount) ? 'Active' : 
-                       isExpired(discount.valid_until) ? 'Expired' : 'Inactive'}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <div className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4" />
-                      {discount.valid_until ? 
-                        new Date(discount.valid_until).toLocaleDateString() : 
-                        'No expiry'
-                      }
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleEditDiscount(discount)}
-                        className="text-[#FF7A19] hover:text-[#FF7A19]/80"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteDiscount(discount.id)}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <LoadGate
+        loaded={loaded}
+        loading={isLoading}
+        updating={isLoading && loaded}
+        error={failed}
+        forbidden={forbidden}
+        isEmpty={discounts.length === 0}
+        onRetry={() => void fetchDiscounts()}
+        skeleton={<TableSkeleton rows={4} />}
+        emptyTitle="No discounts yet"
+        emptyDescription="Add a discount to offer at checkout."
+        emptyPrimary={{ label: 'Add discount', onClick: () => setShowCreateModal(true) }}
+        denyHome="/admin"
+      >
+        <ResponsiveTable
+          headers={
+            <tr>
+              <th className="px-4 py-3">Name</th>
+              <th className="px-4 py-3">Type</th>
+              <th className="px-4 py-3">Value</th>
+              <th className="px-4 py-3">Usage</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Valid until</th>
+              <th className="px-4 py-3 text-right">Actions</th>
+            </tr>
+          }
+          cards={discounts.map((discount) => (
+            <AdminRowCard
+              key={discount.id}
+              name={discount.name}
+              status={
+                <Badge variant={isActive(discount) ? 'success' : 'error'}>
+                  {discountStatus(discount)}
+                </Badge>
+              }
+              facts={[
+                { label: 'Value', value: formatValue(discount.value, discount.type) },
+                { label: 'Usage', value: `${discount.used_count}${discount.usage_limit ? ` / ${discount.usage_limit}` : ''}` },
+                {
+                  label: 'Valid until',
+                  value: discount.valid_until ? new Date(discount.valid_until).toLocaleDateString() : 'No expiry',
+                },
+              ]}
+              actions={<RowActions name={discount.name} actions={discountActions(discount)} />}
+            />
+          ))}
+        >
+          {discounts.map((discount) => (
+            <tr key={discount.id} className="hover:bg-gray-50">
+              <td className="px-4 py-3">
+                <p className="font-medium text-[#1A1A1A]">{discount.name}</p>
+                {discount.description ? <p className="text-sm text-[#3A3A3A]">{discount.description}</p> : null}
+              </td>
+              <td className="px-4 py-3">
+                <Badge className={`${getTypeColor(discount.type)} flex w-fit items-center gap-1`}>
+                  {getTypeIcon(discount.type)}
+                  {discount.type.replace('_', ' ')}
+                </Badge>
+              </td>
+              <td className="px-4 py-3 text-sm text-[#1A1A1A]">{formatValue(discount.value, discount.type)}</td>
+              <td className="px-4 py-3 text-sm text-[#1A1A1A]">
+                {discount.used_count}
+                {discount.usage_limit && ` / ${discount.usage_limit}`}
+              </td>
+              <td className="px-4 py-3">
+                <Badge variant={isActive(discount) ? 'success' : 'error'}>
+                  {discountStatus(discount)}
+                </Badge>
+              </td>
+              <td className="px-4 py-3 text-sm text-[#3A3A3A]">
+                <div className="flex items-center gap-1">
+                  <Calendar className="h-4 w-4" />
+                  {discount.valid_until ? new Date(discount.valid_until).toLocaleDateString() : 'No expiry'}
+                </div>
+              </td>
+              <td className="px-4 py-3 text-right">
+                <RowActions name={discount.name} actions={discountActions(discount)} />
+              </td>
+            </tr>
+          ))}
+        </ResponsiveTable>
+      </LoadGate>
 
       {/* Create/Edit Modal */}
       {(showCreateModal || editingDiscount) && (
@@ -670,6 +626,18 @@ export default function AdminDiscountsPage() {
           </div>
         </div>
       )}
+
+      {deleteTarget ? (
+        <ConfirmDialog
+          title="Delete this discount?"
+          confirmLabel="Delete"
+          busy={deleting}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={() => void handleDeleteDiscount()}
+        >
+          {deleteTarget.name} will be removed.
+        </ConfirmDialog>
+      ) : null}
     </div>
   );
 }

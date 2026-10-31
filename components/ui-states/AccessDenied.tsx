@@ -6,7 +6,7 @@ import { StateAction, StateActions } from './StateActions';
 
 export function AccessDenied({
   title = "You don't have access",
-  description = "This page is limited to a different role. If you think that's a mistake, ask an admin.",
+  description = "You don't have access to this data. If you think that's a mistake, contact support.",
   primary,
   secondary,
 }: {

@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { ProductCard } from '@/components/cards/ProductCard';
 import { Button } from '@/components/ui/Button';
 import { ProductListSkeleton } from '@/components/loaders/ProductCardSkeleton';
+import { LoadGate } from '@/components/ui-states';
+import { useListQuery } from '@/hooks/useListQuery';
 import { QuickView } from '@/components/shop/QuickView';
 import { ArrowLeft, Filter, Grid, List, ChevronDown } from 'lucide-react';
 import { Category } from '@/types/product';
@@ -19,7 +21,7 @@ interface CategoryContentProps {
 
 export function CategoryContent({ category }: CategoryContentProps) {
   const [products, setProducts] = useState<Product[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const catalog = useListQuery();
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showFilters, setShowFilters] = useState(false);
@@ -50,26 +52,17 @@ export function CategoryContent({ category }: CategoryContentProps) {
   }, []);
 
   useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        setIsLoading(true);
-        const productsData = await productService.getProducts({
-          category: category.id,
-          ...(selectedBrand && { brand: selectedBrand }),
-          ...(inStockOnly && { inStock: true }),
-          sortBy: sortBy === 'price_low' ? 'price_asc' : sortBy === 'price_high' ? 'price_desc' : sortBy === 'newest' ? 'newest' : 'rating',
-          limit: 100,
-        });
-        setProducts(productsData);
-      } catch (error) {
-        console.error('Error fetching products:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchProducts();
-  }, [category.id, selectedBrand, inStockOnly, sortBy]);
+    void catalog.run(async () => {
+      const productsData = await productService.getProducts({
+        category: category.id,
+        ...(selectedBrand && { brand: selectedBrand }),
+        ...(inStockOnly && { inStock: true }),
+        sortBy: sortBy === 'price_low' ? 'price_asc' : sortBy === 'price_high' ? 'price_desc' : sortBy === 'newest' ? 'newest' : 'rating',
+        limit: 100,
+      });
+      setProducts(productsData);
+    });
+  }, [category.id, selectedBrand, inStockOnly, sortBy, catalog.run]);
 
   // Filter products by price range
   const filteredProducts = products.filter((product) => {
@@ -97,7 +90,9 @@ export function CategoryContent({ category }: CategoryContentProps) {
         {/* Toolbar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <p className="text-sm text-[#3A3A3A]">
-            {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'} found
+            {catalog.loaded && !catalog.error
+              ? `${filteredProducts.length} ${filteredProducts.length === 1 ? 'product' : 'products'}`
+              : ' '}
           </p>
 
           <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -342,16 +337,34 @@ export function CategoryContent({ category }: CategoryContentProps) {
 
           {/* Products Grid/List */}
           <div className="lg:col-span-3">
-            {isLoading ? (
-              <ProductListSkeleton count={12} />
-            ) : filteredProducts.length === 0 ? (
-              <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-                <p className="text-[#3A3A3A] text-sm mb-4">No products found in this category</p>
-                <Link href="/shop">
-                  <Button variant="outline">Browse All Products</Button>
-                </Link>
-              </div>
-            ) : (
+            <LoadGate
+              loaded={catalog.loaded}
+              loading={catalog.loading}
+              updating={catalog.updating}
+              error={catalog.error}
+              isEmpty={filteredProducts.length === 0}
+              filtered={Boolean(selectedBrand || inStockOnly || priceRange[0] > 0 || priceRange[1] < 100000)}
+              onRetry={() => {
+                void catalog.run(async () => {
+                  setProducts(await productService.getProducts({
+                    category: category.id,
+                    ...(selectedBrand && { brand: selectedBrand }),
+                    ...(inStockOnly && { inStock: true }),
+                    sortBy: sortBy === 'price_low' ? 'price_asc' : sortBy === 'price_high' ? 'price_desc' : sortBy === 'newest' ? 'newest' : 'rating',
+                    limit: 100,
+                  }));
+                });
+              }}
+              onClearFilters={() => {
+                setSelectedBrand(null);
+                setInStockOnly(false);
+                setPriceRange([0, 100000]);
+              }}
+              skeleton={<ProductListSkeleton count={12} />}
+              emptyTitle="No products in this category yet"
+              emptyDescription="Browse the rest of the shop while we add more here."
+              emptyPrimary={{ label: 'Browse all products', href: '/shop' }}
+            >
               <div className={viewMode === 'grid' 
                 ? 'grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6'
                 : 'space-y-4'
@@ -364,7 +377,7 @@ export function CategoryContent({ category }: CategoryContentProps) {
                   />
                 ))}
               </div>
-            )}
+            </LoadGate>
           </div>
         </div>
       </div>

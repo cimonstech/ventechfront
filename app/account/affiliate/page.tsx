@@ -1,10 +1,12 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Copy, Facebook } from 'lucide-react';
+import { AccessDenied, EmptyState, ErrorState, OverviewSkeleton } from '@/components/ui-states';
+import { useListQuery } from '@/hooks/useListQuery';
 import { Badge } from '@/components/ui/Badge';
 import { InfoNote, InfoTip } from '@/components/ui/InfoNote';
 import { StackRows } from '@/components/ui/ScrollTable';
@@ -63,6 +65,7 @@ export default function AffiliateDashboardPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAppSelector((state) => state.auth);
   const [ready, setReady] = useState(false);
+  const accountQuery = useListQuery();
   const [me, setMe] = useState<AffiliateMe | null>(null);
   const [summary, setSummary] = useState<AffiliateSummary | null>(null);
   const [sales, setSales] = useState<AffiliateSale[]>([]);
@@ -83,30 +86,33 @@ export default function AffiliateDashboardPage() {
   const [bankAccountNumber, setBankAccountNumber] = useState('');
   const [payoutBusy, setPayoutBusy] = useState(false);
 
-  const load = async () => {
-    const [account, publicInfo] = await Promise.all([loadAffiliateMe(), fetchPublicAffiliateInfo()]);
-    setMe(account);
-    setInfo(publicInfo);
-    if (!account || account.status !== 'active') {
-      setSummary(null);
-      setSales([]);
-      setWithdrawals([]);
-      return;
-    }
-    const [summaryResult, salesResult, withdrawalResult] = await Promise.all([
-      affiliateRequest<AffiliateSummary>('/api/affiliates/me/summary'),
-      affiliateRequest<AffiliateSale[]>('/api/affiliates/me/sales?page=1&limit=20'),
-      affiliateRequest<AffiliateWithdrawal[]>('/api/affiliates/me/withdrawals?page=1&limit=20'),
-    ]);
-    setSummary(summaryResult.data);
-    setSales(salesResult.data || []);
-    setWithdrawals(withdrawalResult.data || []);
-    setAmount(ghsInput(summaryResult.data.available_pesewas));
-    setPayoutMethod((account.payout.payout_method as PayoutMethod) || 'momo');
-    setMomoNetwork(account.payout.momo_network || 'MTN');
-    setBankName(account.payout.bank_name || '');
-    setBankAccountName(account.payout.bank_account_name || '');
-  };
+  const load = useCallback(async () => {
+    await accountQuery.run(async () => {
+      const [account, publicInfo] = await Promise.all([loadAffiliateMe(), fetchPublicAffiliateInfo()]);
+      setInfo(publicInfo);
+      if (!account || account.status !== 'active') {
+        setMe(account);
+        setSummary(null);
+        setSales([]);
+        setWithdrawals([]);
+        return;
+      }
+      const [summaryResult, salesResult, withdrawalResult] = await Promise.all([
+        affiliateRequest<AffiliateSummary>('/api/affiliates/me/summary'),
+        affiliateRequest<AffiliateSale[]>('/api/affiliates/me/sales?page=1&limit=20'),
+        affiliateRequest<AffiliateWithdrawal[]>('/api/affiliates/me/withdrawals?page=1&limit=20'),
+      ]);
+      setMe(account);
+      setSummary(summaryResult.data);
+      setSales(salesResult.data || []);
+      setWithdrawals(withdrawalResult.data || []);
+      setAmount(ghsInput(summaryResult.data.available_pesewas));
+      setPayoutMethod((account.payout.payout_method as PayoutMethod) || 'momo');
+      setMomoNetwork(account.payout.momo_network || 'MTN');
+      setBankName(account.payout.bank_name || '');
+      setBankAccountName(account.payout.bank_account_name || '');
+    });
+  }, [accountQuery.run]);
 
   useEffect(() => {
     let cancelled = false;
@@ -123,13 +129,8 @@ export default function AffiliateDashboardPage() {
         router.replace(next ? `/login?redirect=${encodeURIComponent(next)}` : '/login');
         return;
       }
-      try {
-        await load();
-      } catch (error) {
-        if (!cancelled) toast.error(apiMessage(error, 'Could not load your affiliate account.'));
-      } finally {
-        if (!cancelled) setReady(true);
-      }
+      await load();
+      if (!cancelled) setReady(true);
     };
     void run();
     return () => {
@@ -257,26 +258,37 @@ export default function AffiliateDashboardPage() {
     }
   };
 
-  if (!ready) {
-    return <div className="min-h-screen bg-gray-50 px-4 py-16 text-center text-[#3A3A3A]">Loading…</div>;
+  if (!ready || accountQuery.loading) {
+    return <OverviewSkeleton />;
+  }
+
+  if (accountQuery.forbidden) {
+    return (
+      <AccessDenied
+        title="You don't have access"
+        description="You don't have access to this data."
+        primary={{ label: 'Go to your account', href: '/account' }}
+      />
+    );
+  }
+
+  if (accountQuery.error && !me) {
+    return (
+      <ErrorState
+        title="We couldn't load your affiliate account"
+        description="Try again in a moment. If it keeps failing, contact support."
+        primary={{ label: 'Try again', onClick: () => void load() }}
+      />
+    );
   }
 
   if (!me) {
     return (
-      <div className="min-h-screen bg-gray-50 py-12">
-        <div className="mx-auto max-w-lg px-4">
-          <div className="rounded-xl bg-white p-6 shadow-lg">
-            <h1 className="mb-3 text-2xl font-bold text-[#1A1A1A]">Affiliate dashboard</h1>
-            <p className="mb-6 text-[#3A3A3A]">You do not have an affiliate application yet.</p>
-            <Link
-              href="/affiliate/join"
-              className="inline-flex rounded-lg bg-[#FF7A19] px-4 py-2 font-medium text-white hover:bg-[#e66a0f]"
-            >
-              Join now
-            </Link>
-          </div>
-        </div>
-      </div>
+      <EmptyState
+        title="No affiliate application yet"
+        description="Join the programme to share products and earn commission on successful sales."
+        primary={{ label: 'Join now', href: '/affiliate/join' }}
+      />
     );
   }
 

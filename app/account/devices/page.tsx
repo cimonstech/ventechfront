@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import { Laptop, QrCode, X } from 'lucide-react';
 import { DeviceWarrantyBadge } from '@/components/admin/DeviceWarrantyBadge';
 import { OwnerQrCard } from '@/components/devices/OwnerQrCard';
-import { AccountListSkeleton, EmptyState, ErrorState } from '@/components/ui-states';
+import { AccessDenied, AccountListSkeleton, EmptyState, ErrorState } from '@/components/ui-states';
+import { noteQueryFail } from '@/lib/queryState';
 import { useOnlineRefetch } from '@/hooks/useOnlineRefetch';
 import { useAppSelector } from '@/store';
 import { settingsService } from '@/lib/settings.service';
@@ -33,6 +34,7 @@ export default function MyDevicesPage() {
   const [devices, setDevices] = useState<MineDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
   const [qrDevice, setQrDevice] = useState<MineDevice | null>(null);
   const [phone, setPhone] = useState(FALLBACK_PHONE);
 
@@ -52,11 +54,14 @@ export default function MyDevicesPage() {
     if (!isAuthenticated) return;
     setLoading(true);
     setFailed(false);
+    setForbidden(false);
     try {
       const result = await deviceRequest<MineDevice[]>('/api/devices/mine');
       setDevices(result.data || []);
-    } catch {
-      setFailed(true);
+    } catch (error) {
+      const kind = noteQueryFail(error);
+      if (kind === 'forbidden') setForbidden(true);
+      else if (kind !== 'unauthorized') setFailed(true);
     } finally {
       setLoading(false);
     }
@@ -80,7 +85,13 @@ export default function MyDevicesPage() {
   return (
     <div>
         <h1 className="mb-6 hidden text-2xl font-bold text-[#1A1A1A] md:block">My devices</h1>
-        {failed && devices.length === 0 ? (
+        {forbidden ? (
+          <AccessDenied
+            title="You don't have access"
+            description="You don't have access to this data."
+            primary={{ label: 'Go to your account', href: '/account' }}
+          />
+        ) : failed && devices.length === 0 ? (
           <ErrorState
             title="We couldn't load your laptops"
             description="Try again in a moment. If it keeps failing, contact support."

@@ -50,6 +50,10 @@ img, video, canvas, svg, iframe {
   background-color: #fff;
 }
 
+.sticky-first thead th:first-child {
+  background-color: #f9fafb;
+}
+
 .sticky-first tbody tr:hover td:first-child {
   background-color: #f9fafb;
 }

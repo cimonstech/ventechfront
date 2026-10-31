@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { InfoNote, InfoTip } from '@/components/ui/InfoNote';
 import { StackRows } from '@/components/ui/ScrollTable';
+import { AccessDenied, ErrorState, LoadingMessage } from '@/components/ui-states';
+import { noteQueryFail } from '@/lib/queryState';
 import { fetchPublicFeatures } from '@/lib/features';
 import {
   VLB_EARLY_EXIT_ALLOWED,
@@ -29,9 +31,16 @@ export default function AccountInvestmentDetailPage() {
   const [busy, setBusy] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [dashboardOn, setDashboardOn] = useState<boolean | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
 
   const load = () =>
-    vlbRequest<VlbInvestmentDetail>(`/api/vlb/me/investments/${id}`).then((result) => setRow(result.data));
+    vlbRequest<VlbInvestmentDetail>(`/api/vlb/me/investments/${id}`).then((result) => {
+      setRow(result.data);
+      setFailed(false);
+      setForbidden(false);
+      return result.data;
+    });
 
   useEffect(() => {
     let cancelled = false;
@@ -49,7 +58,11 @@ export default function AccountInvestmentDetailPage() {
 
   useEffect(() => {
     if (!id || dashboardOn !== true) return;
-    load().catch((error) => toast.error(apiMessage(error, 'Could not load this investment.')));
+    load().catch((error) => {
+      const kind = noteQueryFail(error);
+      if (kind === 'forbidden') setForbidden(true);
+      else if (kind !== 'unauthorized') setFailed(true);
+    });
   }, [id, dashboardOn]);
 
   if (dashboardOn === false) {
@@ -61,8 +74,28 @@ export default function AccountInvestmentDetailPage() {
     );
   }
 
+  if (forbidden) {
+    return (
+      <AccessDenied
+        title="You don't have access"
+        description="You don't have access to this data."
+        primary={{ label: 'Back to investments', href: '/account/investments' }}
+      />
+    );
+  }
+
+  if (failed && !row) {
+    return (
+      <ErrorState
+        title="We couldn't load this investment"
+        description="Try again in a moment. Your agreements and payouts are still saved."
+        primary={{ label: 'Try again', onClick: () => void load() }}
+      />
+    );
+  }
+
   if (!row) {
-    return <p className="text-sm text-[#3A3A3A]">Loading investment…</p>;
+    return <LoadingMessage label="Loading investment" />;
   }
 
   const choose = async (choice: 'settle' | 'renew') => {

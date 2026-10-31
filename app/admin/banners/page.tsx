@@ -1,13 +1,23 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Upload, Plus, Trash2, Eye, EyeOff, MoveUp, MoveDown, ImageIcon, Edit } from 'lucide-react';
+import { Upload, Plus, Trash2, ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { AccessDenied, EmptyState, ErrorState, TableSkeleton } from '@/components/ui-states';
+import { noteQueryFail } from '@/lib/queryState';
 import toast from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 import { MediaPicker } from '@/components/admin/MediaPicker';
 import { accessDeniedMessage } from '@/lib/access';
 import { useAccess } from '@/context/AccessContext';
+import {
+  AdminPageHeader,
+  AdminRowCard,
+  ConfirmDialog,
+  ResponsiveTable,
+  RowActions,
+} from '@/components/admin/list';
 
 interface Banner {
   id: string;
@@ -26,10 +36,15 @@ export default function BannersPage() {
   const canEditContent = canEdit('content');
   const [banners, setBanners] = useState<Banner[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
   const [uploading, setUploading] = useState(false);
   const [showMediaPicker, setShowMediaPicker] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Banner | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -86,16 +101,14 @@ export default function BannersPage() {
         .sort((a: any, b: any) => a.display_order - b.display_order);
 
       setBanners(heroBanners);
+      setLoaded(true);
+      setFailed(false);
+      setForbidden(false);
     } catch (error: any) {
       console.error('Error fetching banners:', error);
-      const errorMessage = error.message || 'Failed to load banners';
-      toast.error(errorMessage);
-      setBanners([]);
-      
-      // If it's an auth error, log more details
-      if (errorMessage.includes('Unauthorized') || errorMessage.includes('401')) {
-        console.error('Authentication failed. Please check your session.');
-      }
+      const kind = noteQueryFail(error);
+      if (kind === 'forbidden') setForbidden(true);
+      else if (kind !== 'unauthorized') setFailed(true);
     } finally {
       setLoading(false);
     }
@@ -221,9 +234,10 @@ export default function BannersPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this banner?')) return;
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
 
+    setDeleting(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -233,7 +247,7 @@ export default function BannersPage() {
       }
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${apiUrl}/api/banners/${id}`, {
+      const response = await fetch(`${apiUrl}/api/banners/${deleteTarget.id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -246,14 +260,29 @@ export default function BannersPage() {
       }
 
       toast.success('Banner deleted successfully!');
+      setDeleteTarget(null);
       
       // Refresh banners list
       fetchBanners();
     } catch (error: any) {
       console.error('Delete error:', error);
       toast.error(error.message || 'Failed to delete banner');
+    } finally {
+      setDeleting(false);
     }
   };
+
+  const bannerActions = (banner: Banner) =>
+    canEditContent
+      ? [
+          { label: 'Edit', onClick: () => handleEdit(banner) },
+          {
+            label: banner.active ? 'Deactivate' : 'Activate',
+            onClick: () => void toggleActive(banner.id),
+          },
+          { label: 'Delete', destructive: true, onClick: () => setDeleteTarget(banner) },
+        ]
+      : [];
 
   const toggleActive = async (id: string) => {
     try {
@@ -295,31 +324,27 @@ export default function BannersPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-[#1A1A1A]">Homepage Hero Sliders</h1>
-            <p className="text-[#3A3A3A] mt-2">Manage banner images for the homepage carousel</p>
-          </div>
-          {canEditContent && (
-          <Button
-            variant="primary"
-            icon={<Plus size={20} />}
-            onClick={() => {
-              if (showForm) {
-                handleCancel();
-              } else {
-                setShowForm(true);
-                setEditingBanner(null);
+    <div className="min-w-0">
+      <AdminPageHeader
+        title="Banners"
+        subtitle={`${banners.length} banner${banners.length === 1 ? '' : 's'}`}
+        primary={
+          canEditContent
+            ? {
+                label: showForm ? 'Cancel' : 'Add banner',
+                icon: showForm ? undefined : <Plus size={16} />,
+                onClick: () => {
+                  if (showForm) {
+                    handleCancel();
+                  } else {
+                    setShowForm(true);
+                    setEditingBanner(null);
+                  }
+                },
               }
-            }}
-          >
-            {showForm ? 'Cancel' : 'Add New Banner'}
-          </Button>
-          )}
-        </div>
+            : undefined
+        }
+      />
 
         {/* Add/Edit Banner Form */}
         {canEditContent && showForm && (
@@ -513,77 +538,87 @@ export default function BannersPage() {
           </div>
         )}
 
-        {/* Banners List */}
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-lg font-bold text-[#1A1A1A]">Current Hero Sliders</h2>
-          </div>
-
-          {loading ? (
-            <div className="p-8 text-center text-[#3A3A3A]">Loading banners...</div>
-          ) : banners.length === 0 ? (
-            <div className="p-8 text-center text-[#3A3A3A]">
-              No banners yet. Click "Add New Banner" to create your first hero slider!
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-200">
-              {banners.map((banner) => (
-                <div key={banner.id} className="p-6 hover:bg-gray-50 transition-colors">
-                  <div className="flex gap-6">
-                    {/* Image Preview */}
-                    <img
-                      src={banner.image_url}
-                      alt={banner.title}
-                      className="w-48 h-32 object-cover rounded-lg"
-                    />
-
-                    {/* Details */}
-                    <div className="flex-1">
-                      <h3 className="text-lg font-bold text-[#1A1A1A] mb-1">{banner.title}</h3>
-                      <p className="text-[#3A3A3A] mb-3">{banner.subtitle}</p>
-                      <div className="flex items-center gap-4 text-sm text-[#3A3A3A]">
-                        <span>Order: {banner.display_order}</span>
-                        <span className={banner.active ? 'text-green-600' : 'text-red-600'}>
-                          {banner.active ? '● Active' : '○ Inactive'}
-                        </span>
+        {forbidden ? (
+          <AccessDenied title="You don't have access" description="You don't have access to this data." primary={{ label: 'Go back', href: '/admin' }} />
+        ) : failed && !loaded ? (
+          <ErrorState title="We couldn't load banners" description="Try again in a moment." primary={{ label: 'Try again', onClick: () => void fetchBanners() }} />
+        ) : loading && !loaded ? (
+          <TableSkeleton rows={4} />
+        ) : banners.length === 0 ? (
+          <EmptyState title="No banners yet" description="Add a hero slider to show on the home page." />
+        ) : (
+          <ResponsiveTable
+            headers={
+              <tr>
+                <th className="px-4 py-3">Banner</th>
+                <th className="px-4 py-3">Order</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3 text-right">Actions</th>
+              </tr>
+            }
+            cards={banners.map((banner) => (
+              <AdminRowCard
+                key={banner.id}
+                name={banner.title || 'Untitled banner'}
+                thumbnail={banner.image_url || undefined}
+                status={
+                  <Badge variant={banner.active ? 'success' : 'default'} size="sm">
+                    {banner.active ? 'Active' : 'Inactive'}
+                  </Badge>
+                }
+                facts={[
+                  { label: 'Subtitle', value: banner.subtitle || '—' },
+                  { label: 'Order', value: banner.display_order },
+                ]}
+                actions={<RowActions name={banner.title || 'Untitled banner'} actions={bannerActions(banner)} />}
+              />
+            ))}
+          >
+            {banners.map((banner) => (
+              <tr key={banner.id} className="hover:bg-gray-50">
+                <td className="px-4 py-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    {banner.image_url ? (
+                      <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                        <img
+                          src={banner.image_url}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
                       </div>
+                    ) : null}
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-[#1A1A1A]">{banner.title || 'Untitled banner'}</p>
+                      <p className="truncate text-sm text-[#3A3A3A]">{banner.subtitle}</p>
                     </div>
-
-                    {/* Actions */}
-                    {canEditContent && (
-                    <div className="flex flex-col gap-2">
-                      <button
-                        onClick={() => handleEdit(banner)}
-                        className="p-2 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors"
-                        title="Edit Banner"
-                      >
-                        <Edit size={20} />
-                      </button>
-                      <button
-                        onClick={() => toggleActive(banner.id)}
-                        className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
-                        title={banner.active ? 'Deactivate' : 'Activate'}
-                      >
-                        {banner.active ? <EyeOff size={20} /> : <Eye size={20} />}
-                      </button>
-                      <button
-                        onClick={() => handleDelete(banner.id)}
-                        className="p-2 hover:bg-red-100 text-red-600 rounded-lg transition-colors"
-                        title="Delete"
-                      >
-                        <Trash2 size={20} />
-                      </button>
-                    </div>
-                    )}
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+                </td>
+                <td className="px-4 py-3 text-[#1A1A1A]">{banner.display_order}</td>
+                <td className="px-4 py-3">
+                  <Badge variant={banner.active ? 'success' : 'default'} size="sm">
+                    {banner.active ? 'Active' : 'Inactive'}
+                  </Badge>
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <RowActions name={banner.title || 'Untitled banner'} actions={bannerActions(banner)} />
+                </td>
+              </tr>
+            ))}
+          </ResponsiveTable>
+        )}
 
-      {/* Media Picker */}
+      {deleteTarget ? (
+        <ConfirmDialog
+          title="Delete this banner?"
+          confirmLabel="Delete"
+          busy={deleting}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={() => void handleDelete()}
+        >
+          {deleteTarget.title || 'This banner'} will be removed.
+        </ConfirmDialog>
+      ) : null}
+
       <MediaPicker
         isOpen={showMediaPicker}
         onClose={() => setShowMediaPicker(false)}

@@ -2,25 +2,29 @@
 
 import { authHeaders } from '@/lib/authHeaders';
 import { useState, useEffect } from 'react';
+import { apiRequest, toApiError } from '@/lib/api';
+import { LoadGate, TableSkeleton } from '@/components/ui-states';
+import { noteQueryFail } from '@/lib/queryState';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { 
   Package, 
-  Search, 
-  Eye, 
-  ChevronLeft,
-  Filter,
   Download,
   Clock,
   CheckCircle,
   XCircle,
   Truck,
-  FileText
 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import {
+  AdminPageHeader,
+  AdminRowCard,
+  FilterBar,
+  filterSelectClassName,
+  ResponsiveTable,
+  RowActions,
+} from '@/components/admin/list';
 import { useAppSelector } from '@/store';
-import { ADMIN_DATA_DENIED, isAccessDeniedStatus } from '@/lib/access';
+import { ADMIN_DATA_DENIED } from '@/lib/access';
 import { hasAdminEntry } from '@/lib/roles';
 import { useAccess } from '@/context/AccessContext';
 import { supabase } from '@/lib/supabase';
@@ -50,6 +54,8 @@ export default function AdminOrdersPage() {
   const canEditOrders = canEdit('orders');
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [denied, setDenied] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -99,24 +105,10 @@ export default function AdminOrdersPage() {
       setIsLoading(true);
       setDenied(false);
       
-      // Try backend API first (better access to all fields including is_pre_order)
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
       try {
-        const response = await fetch(`${API_URL}/api/orders`, {
-          method: 'GET',
-          headers: {
-            ...(await authHeaders()),
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (isAccessDeniedStatus(response.status)) {
-          throw new Error(ADMIN_DATA_DENIED);
-        }
-
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success && result.data) {
+        const result = await apiRequest<any[]>('/api/orders');
+        if (!result.ok) throw toApiError(result);
+        if (result.data) {
             let formattedOrders = result.data.map((order: any) => {
               // Backend already extracts is_pre_order, but we'll use it directly
               const isPreOrder = order.is_pre_order || false;
@@ -151,11 +143,14 @@ export default function AdminOrdersPage() {
             }
 
             setOrders(formattedOrders);
+            setLoaded(true);
+            setFailed(false);
             return;
-          }
         }
       } catch (apiError) {
-        if (apiError instanceof Error && apiError.message === ADMIN_DATA_DENIED) throw apiError;
+        const kind = noteQueryFail(apiError);
+        if (kind === 'forbidden') throw apiError;
+        if (kind === 'unauthorized') return;
         console.warn('Backend API failed, trying Supabase:', apiError);
       }
 
@@ -218,13 +213,15 @@ export default function AdminOrdersPage() {
       }
 
       setOrders(formattedOrders);
+      setLoaded(true);
+      setFailed(false);
     } catch (error) {
       console.error('Error fetching orders:', error);
-      if (error instanceof Error && error.message === ADMIN_DATA_DENIED) {
+      const kind = noteQueryFail(error);
+      if (kind === 'forbidden' || (error instanceof Error && error.message === ADMIN_DATA_DENIED)) {
         setDenied(true);
-        toast.error(ADMIN_DATA_DENIED);
-      } else {
-        toast.error('Failed to fetch orders');
+      } else if (kind !== 'unauthorized') {
+        setFailed(true);
       }
     } finally {
       setIsLoading(false);
@@ -472,277 +469,210 @@ export default function AdminOrdersPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link href="/admin">
-                <Button variant="ghost" size="sm">
-                  <ChevronLeft size={20} />
-                  Back
-                </Button>
-              </Link>
-              <div>
-                <h1 className="text-3xl font-bold text-[#1A1A1A]">Orders</h1>
-                <p className="text-sm text-[#3A3A3A] mt-1">Manage and track customer orders</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {canEditOrders && isSelectMode && selectedOrders.size > 0 && (
-                <div className="flex items-center gap-2">
-                  <select
-                    onChange={(e) => bulkUpdateStatus(e.target.value)}
-                    className="text-sm px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
-                    defaultValue=""
-                  >
-                    <option value="" disabled>Bulk Update Status</option>
-                    <option value="pending">Pending</option>
-                    <option value="processing">Processing</option>
-                    <option value="shipped">Shipped</option>
-                    <option value="delivered">Delivered</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                  <select
-                    onChange={(e) => bulkUpdatePaymentStatus(e.target.value)}
-                    className="text-sm px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
-                    defaultValue=""
-                  >
-                    <option value="" disabled>Bulk Update Payment</option>
-                    <option value="pending">Pending</option>
-                    <option value="paid">Paid</option>
-                    <option value="failed">Failed</option>
-                    <option value="refunded">Refunded</option>
-                  </select>
-                  <span className="text-sm text-[#3A3A3A]">
-                    {selectedOrders.size} selected
-                  </span>
-                </div>
-              )}
-              {canEditOrders && (
-              <Button
-                variant="outline"
-                onClick={() => {
+    <div className="min-w-0">
+      <AdminPageHeader
+        title="Orders"
+        subtitle={`${orders.length} order${orders.length === 1 ? '' : 's'}`}
+        secondary={[
+          ...(canEditOrders
+            ? [{
+                label: isSelectMode ? 'Cancel select' : 'Select',
+                onClick: () => {
                   setIsSelectMode(!isSelectMode);
                   if (isSelectMode) setSelectedOrders(new Set());
-                }}
-              >
-                {isSelectMode ? 'Cancel' : 'Select'}
-              </Button>
-              )}
-              <Button 
-                variant="outline" 
-                icon={<Download size={18} />}
-                onClick={handleExportOrders}
-              >
-                Export
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="container mx-auto px-4 py-8">
-        {/* Filters */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-          <div className="grid md:grid-cols-4 gap-4">
-            {/* Search */}
-            <div className="md:col-span-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#3A3A3A]" size={20} />
-                <input
-                  type="text"
-                  placeholder="Search by order number, order ID, customer name or email..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
-                />
-              </div>
-            </div>
-
-            {/* Status Filter */}
-            <div>
+                },
+              }]
+            : []),
+          { label: 'Export all', icon: <Download size={16} />, onClick: handleExportOrders },
+        ]}
+        extra={
+          canEditOrders && isSelectMode && selectedOrders.size > 0 ? (
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
               <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
+                onChange={(e) => bulkUpdateStatus(e.target.value)}
+                className={`${filterSelectClassName()} min-h-11`}
+                defaultValue=""
               >
-                <option value="all">All Status</option>
+                <option value="" disabled>Bulk update status</option>
                 <option value="pending">Pending</option>
                 <option value="processing">Processing</option>
                 <option value="shipped">Shipped</option>
                 <option value="delivered">Delivered</option>
                 <option value="cancelled">Cancelled</option>
               </select>
-            </div>
-
-            {/* Date Filter */}
-            <div>
-              <select className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]">
-                <option>Last 30 days</option>
-                <option>Last 7 days</option>
-                <option>Today</option>
-                <option>This month</option>
-                <option>All time</option>
+              <select
+                onChange={(e) => bulkUpdatePaymentStatus(e.target.value)}
+                className={`${filterSelectClassName()} min-h-11`}
+                defaultValue=""
+              >
+                <option value="" disabled>Bulk update payment</option>
+                <option value="pending">Pending</option>
+                <option value="paid">Paid</option>
+                <option value="failed">Failed</option>
+                <option value="refunded">Refunded</option>
               </select>
+              <span className="text-sm text-[#3A3A3A]">{selectedOrders.size} selected</span>
             </div>
-          </div>
-        </div>
+          ) : null
+        }
+      />
 
-        {/* Orders List */}
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF7A19]"></div>
-            </div>
-          ) : denied ? (
-            <p className="px-6 py-20 text-center text-sm text-[#3A3A3A]">{ADMIN_DATA_DENIED}</p>
-          ) : orders.length === 0 ? (
-            /* Empty State */
-            <div className="text-center py-20">
-              <div className="bg-orange-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Package className="w-10 h-10 text-[#FF7A19]" />
-              </div>
-              <h3 className="text-xl font-bold text-[#1A1A1A] mb-2">No Orders Yet</h3>
-              <p className="text-[#3A3A3A] mb-6">
-                Orders will appear here once customers start purchasing
-              </p>
-            </div>
-          ) : (
-            /* Orders Table */
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    {isSelectMode && (
-                      <th className="text-left px-6 py-4 text-sm font-semibold text-[#1A1A1A]">
-                        <input
-                          type="checkbox"
-                          checked={selectedOrders.size === orders.length && orders.length > 0}
-                          onChange={toggleSelectAll}
-                          className="w-4 h-4 rounded border-gray-300 text-[#FF7A19] focus:ring-[#FF7A19]"
-                        />
-                      </th>
+      <FilterBar
+        search={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Search orders"
+        activeCount={statusFilter !== 'all' ? 1 : 0}
+        onClear={() => setStatusFilter('all')}
+      >
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className={filterSelectClassName()}
+        >
+          <option value="all">All statuses</option>
+          <option value="pending">Pending</option>
+          <option value="processing">Processing</option>
+          <option value="shipped">Shipped</option>
+          <option value="delivered">Delivered</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </FilterBar>
+
+        <div className="overflow-hidden rounded-xl">
+          <LoadGate
+            loaded={loaded}
+            loading={isLoading}
+            updating={isLoading && loaded}
+            error={failed}
+            forbidden={denied}
+            isEmpty={orders.length === 0}
+            filtered={Boolean(searchQuery || statusFilter !== 'all')}
+            onRetry={() => void fetchOrders()}
+            onClearFilters={() => {
+              setSearchQuery('');
+              setStatusFilter('all');
+            }}
+            skeleton={<TableSkeleton rows={8} />}
+            emptyTitle="No orders yet"
+            emptyDescription="Orders will appear here once customers start purchasing."
+            denyHome="/admin"
+          >
+            <ResponsiveTable
+              headers={
+                <tr>
+                  {isSelectMode ? (
+                    <th className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedOrders.size === orders.length && orders.length > 0}
+                        onChange={toggleSelectAll}
+                        className="h-4 w-4 rounded border-gray-300 text-[#FF7A19] focus:ring-[#FF7A19]"
+                        aria-label="Select all orders"
+                      />
+                    </th>
+                  ) : null}
+                  <th className="px-4 py-3">Order</th>
+                  <th className="px-4 py-3">Customer</th>
+                  <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3">Items</th>
+                  <th className="px-4 py-3">Total</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Payment</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
+                </tr>
+              }
+              cards={orders.map((order) => (
+                <AdminRowCard
+                  key={order.id}
+                  name={order.order_number}
+                  status={getStatusBadge(order.status)}
+                  facts={[
+                    { label: 'Customer', value: order.user_name },
+                    { label: 'Total', value: `GHS ${order.total_amount.toLocaleString()}` },
+                    { label: 'Items', value: order.items_count },
+                    { label: 'Date', value: new Date(order.created_at).toLocaleDateString() },
+                  ]}
+                  actions={
+                    <RowActions
+                      name={order.order_number}
+                      actions={[
+                        {
+                          label: 'View',
+                          onClick: () => {
+                            setSelectedOrderId(order.id);
+                            setIsModalOpen(true);
+                          },
+                        },
+                        { label: 'Download PDF', onClick: () => downloadOrderPDF(order.id, order.order_number) },
+                      ]}
+                    />
+                  }
+                />
+              ))}
+            >
+              {orders.map((order) => (
+                <tr key={order.id} className={`hover:bg-gray-50 ${selectedOrders.has(order.id) ? 'bg-blue-50' : ''}`}>
+                  {isSelectMode ? (
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedOrders.has(order.id)}
+                        onChange={() => toggleOrderSelection(order.id)}
+                        className="h-4 w-4 rounded border-gray-300 text-[#FF7A19] focus:ring-[#FF7A19]"
+                        aria-label={`Select ${order.order_number}`}
+                      />
+                    </td>
+                  ) : null}
+                  <td className="px-4 py-3">
+                    <p className="font-mono text-sm font-semibold text-[#FF7A19]">{order.order_number}</p>
+                    {order.is_pre_order ? (
+                      <span className="mt-1 inline-block rounded bg-black px-2 py-0.5 text-xs font-semibold text-white">Pre-order</span>
+                    ) : null}
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="text-sm font-medium text-[#1A1A1A]">{order.user_name}</p>
+                    <p className="text-xs text-[#3A3A3A]">{order.user_email}</p>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-[#3A3A3A]">{new Date(order.created_at).toLocaleDateString()}</td>
+                  <td className="px-4 py-3 text-sm text-[#3A3A3A]">{order.items_count}</td>
+                  <td className="px-4 py-3 font-semibold text-[#1A1A1A]">GHS {order.total_amount.toLocaleString()}</td>
+                  <td className="px-4 py-3">{getStatusBadge(order.status)}</td>
+                  <td className="px-4 py-3">
+                    {canEditOrders ? (
+                      <select
+                        value={order.payment_status}
+                        onChange={(e) => updatePaymentStatus(order.id, e.target.value)}
+                        className="min-h-11 rounded-lg border border-gray-300 bg-white px-2 text-sm"
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="paid">Paid</option>
+                        <option value="failed">Failed</option>
+                        <option value="refunded">Refunded</option>
+                      </select>
+                    ) : (
+                      <span className="text-sm capitalize text-[#3A3A3A]">{order.payment_status}</span>
                     )}
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-[#1A1A1A]">Order #</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-[#1A1A1A]">Customer</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-[#1A1A1A]">Date</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-[#1A1A1A]">Items</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-[#1A1A1A]">Total</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-[#1A1A1A]">Status</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-[#1A1A1A]">Payment</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-[#1A1A1A]">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {orders.map((order) => (
-                    <tr key={order.id} className={`hover:bg-gray-50 ${selectedOrders.has(order.id) ? 'bg-blue-50' : ''}`}>
-                      {isSelectMode && (
-                        <td className="px-6 py-4">
-                          <input
-                            type="checkbox"
-                            checked={selectedOrders.has(order.id)}
-                            onChange={() => toggleOrderSelection(order.id)}
-                            className="w-4 h-4 rounded border-gray-300 text-[#FF7A19] focus:ring-[#FF7A19]"
-                          />
-                        </td>
-                      )}
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col gap-1">
-                          <span className="font-mono text-sm text-[#FF7A19] font-semibold">
-                            {order.order_number}
-                          </span>
-                          {order.is_pre_order && (
-                            <span className="px-2 py-0.5 bg-black text-white text-xs font-semibold rounded w-fit">
-                              PRE-ORDER
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div>
-                          <p className="font-medium text-sm text-[#1A1A1A]">{order.user_name}</p>
-                          <p className="text-xs text-[#3A3A3A]">{order.user_email}</p>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-[#3A3A3A]">
-                        {new Date(order.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-[#3A3A3A]">
-                        {order.items_count} items
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="font-semibold text-[#1A1A1A]">
-                          GHS {order.total_amount.toLocaleString()}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        {getStatusBadge(order.status)}
-                      </td>
-                      <td className="px-6 py-4">
-                        {canEditOrders ? (
-                        <select
-                          value={order.payment_status}
-                          onChange={(e) => updatePaymentStatus(order.id, e.target.value)}
-                          className="text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#FF7A19] bg-white"
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="paid">Paid</option>
-                          <option value="failed">Failed</option>
-                          <option value="refunded">Refunded</option>
-                        </select>
-                        ) : (
-                          <span className="text-xs text-[#3A3A3A] capitalize">{order.payment_status}</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => {
-                              setSelectedOrderId(order.id);
-                              setIsModalOpen(true);
-                            }}
-                          >
-                            <Eye size={16} />
-                            View
-                          </Button>
-                          
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => downloadOrderPDF(order.id, order.order_number)}
-                            title="Download PDF"
-                          >
-                            <FileText size={16} />
-                          </Button>
-                          
-                          {canEditOrders && (
-                          <select
-                            value={order.status}
-                            onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                            className="text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#FF7A19]"
-                            disabled={order.status === 'delivered' || order.status === 'cancelled'}
-                          >
-                            <option value="pending">Pending</option>
-                            <option value="processing">Processing</option>
-                            <option value="shipped">Shipped</option>
-                            <option value="delivered">Delivered</option>
-                            <option value="cancelled">Cancelled</option>
-                          </select>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <RowActions
+                      name={order.order_number}
+                      actions={[
+                        {
+                          label: 'View',
+                          onClick: () => {
+                            setSelectedOrderId(order.id);
+                            setIsModalOpen(true);
+                          },
+                        },
+                        { label: 'Download PDF', onClick: () => downloadOrderPDF(order.id, order.order_number) },
+                      ]}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </ResponsiveTable>
+          </LoadGate>
         </div>
-      </div>
 
       {/* Order Detail Modal */}
       {selectedOrderId && (

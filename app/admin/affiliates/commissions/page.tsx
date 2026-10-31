@@ -8,8 +8,15 @@ import { Button } from '@/components/ui/Button';
 import { InfoNote } from '@/components/ui/InfoNote';
 import { AffiliatePrompt } from '@/components/admin/AffiliatePrompt';
 import { AffiliatesNav } from '@/components/admin/AffiliatesNav';
-import { useSetAdminHeading } from '@/components/admin/AdminHeading';
+import {
+  AdminPageHeader,
+  AdminPagination,
+  AdminRowCard,
+  ResponsiveTable,
+  RowActions,
+} from '@/components/admin/list';
 import { useAccess } from '@/context/AccessContext';
+import { EmptyState, TableSkeleton } from '@/components/ui-states';
 import {
   AffiliateCommissionRow,
   COMMISSION_STATUS_LABEL,
@@ -34,12 +41,12 @@ const TABS: Array<{ id: Tab; label: string }> = [
 ];
 
 export default function AdminAffiliateCommissionsPage() {
-  useSetAdminHeading('Commissions');
   const { canEdit } = useAccess();
   const editable = canEdit('affiliates');
   const [tab, setTab] = useState<Tab>('ready');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const [rows, setRows] = useState<AffiliateCommissionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -57,6 +64,7 @@ export default function AdminAffiliateCommissionsPage() {
       const list = result.data || [];
       setRows(tab === 'pending' ? list.filter(commissionNotYetEligible) : list);
       setTotalPages(result.pagination?.totalPages || 1);
+      setTotal(result.pagination?.total || 0);
     } catch (error) {
       toast.error(apiMessage(error, 'Could not load commissions'));
     } finally {
@@ -93,32 +101,52 @@ export default function AdminAffiliateCommissionsPage() {
     }
   };
 
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <AffiliatesNav current="/admin/affiliates/commissions" />
-        <Button
-          size="sm"
-          variant="outline"
-          isLoading={exporting}
-          onClick={async () => {
-            setExporting(true);
-            const params = new URLSearchParams();
-            if (tab === 'ready') params.set('ready', 'true');
-            else params.set('status', tab === 'pending' ? 'pending' : tab);
-            try {
-              await downloadAffiliateCsv('commissions', params);
-              toast.success('Export downloaded.');
-            } catch (error) {
-              toast.error(apiMessage(error, 'Could not export this file.'));
-            } finally {
-              setExporting(false);
-            }
-          }}
-        >
-          Export CSV
+  const affiliateName = (row: AffiliateCommissionRow) => nested(row.affiliate)?.affiliate_no || 'Affiliate';
+  const orderNumber = (row: AffiliateCommissionRow) => nested(row.order)?.order_number || '—';
+  const count = total || rows.length;
+
+  const rowButtons = (row: AffiliateCommissionRow) => (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      {editable && tab === 'ready' && (
+        <Button size="sm" disabled={busy} onClick={() => run(`/api/admin/affiliates/commissions/${row.id}/approve`, undefined, 'Could not approve this commission.')}>
+          Approve
         </Button>
-      </div>
+      )}
+      {editable && (tab === 'ready' || tab === 'approved') && (
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => setReverseId(row.id)}>
+          Reverse
+        </Button>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="min-w-0 space-y-6">
+      <AdminPageHeader
+        title="Commissions"
+        subtitle={`${count} commission${count === 1 ? '' : 's'}`}
+        secondary={[
+          {
+            label: exporting ? 'Exporting' : 'Export all',
+            disabled: exporting,
+            onClick: async () => {
+              setExporting(true);
+              const params = new URLSearchParams();
+              if (tab === 'ready') params.set('ready', 'true');
+              else params.set('status', tab === 'pending' ? 'pending' : tab);
+              try {
+                await downloadAffiliateCsv('commissions', params);
+                toast.success('Export downloaded.');
+              } catch (error) {
+                toast.error(apiMessage(error, 'Could not export this file.'));
+              } finally {
+                setExporting(false);
+              }
+            },
+          },
+        ]}
+      />
+      <AffiliatesNav current="/admin/affiliates/commissions" />
 
       <InfoNote>
         Approve a commission only after the order is delivered, fully paid and the {returnWindowDays}-day return period has passed. Reverse it if the order was cancelled, refunded, returned, failed payment, was never completed, looks fraudulent, or duplicates another referral.
@@ -142,68 +170,87 @@ export default function AdminAffiliateCommissionsPage() {
         ))}
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto sticky-first">
-        <table className="min-w-[800px] w-full text-sm">
-          <thead className="bg-gray-50 text-left text-[#3A3A3A]">
-            <tr>
-              <th className="px-4 py-3">Affiliate</th>
-              <th className="px-4 py-3">Order</th>
-              <th className="px-4 py-3">Amount</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Eligible from</th>
-              <th className="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {loading ? (
-              <tr><td colSpan={6} className="px-4 py-10 text-center text-[#3A3A3A]">Loading commissions…</td></tr>
-            ) : rows.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-10 text-center text-[#3A3A3A]">No commissions in this list.</td></tr>
-            ) : rows.map((row) => {
-              const affiliate = nested(row.affiliate);
-              const order = nested(row.order);
-              return (
-                <tr key={row.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">
+      {loading ? (
+        <TableSkeleton rows={6} />
+      ) : rows.length === 0 ? (
+        <EmptyState title="No commissions in this list" description="Commissions for this status will show up here." />
+      ) : (
+        <>
+          <ResponsiveTable
+            headers={
+              <tr>
+                <th className="px-4 py-3">Affiliate</th>
+                <th className="px-4 py-3">Order</th>
+                <th className="px-4 py-3">Amount</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Eligible from</th>
+                <th className="px-4 py-3 text-right">Actions</th>
+              </tr>
+            }
+            cards={rows.map((row) => (
+              <AdminRowCard
+                key={row.id}
+                name={affiliateName(row)}
+                href={row.affiliate_id ? `/admin/affiliates/${row.affiliate_id}` : undefined}
+                status={
+                  <Badge size="sm" variant={affiliateStatusVariant(row.status)}>
+                    {COMMISSION_STATUS_LABEL[row.status] || row.status}
+                  </Badge>
+                }
+                facts={[
+                  { label: 'Order', value: orderNumber(row) },
+                  { label: 'Amount', value: formatGhs(row.amount_pesewas) },
+                  { label: 'Eligible from', value: formatWhen(row.eligible_from) },
+                ]}
+                actions={
+                  <div className="flex flex-col items-end gap-1">
                     {row.affiliate_id ? (
-                      <Link href={`/admin/affiliates/${row.affiliate_id}`} className="font-semibold text-[#FF7A19]">
-                        {affiliate?.affiliate_no || 'Affiliate'}
-                      </Link>
-                    ) : (affiliate?.affiliate_no || '—')}
-                  </td>
-                  <td className="px-4 py-3">{order?.order_number || '—'}</td>
-                  <td className="px-4 py-3">{formatGhs(row.amount_pesewas)}</td>
-                  <td className="px-4 py-3">
-                    <Badge size="sm" variant={affiliateStatusVariant(row.status)}>
-                      {COMMISSION_STATUS_LABEL[row.status] || row.status}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">{formatWhen(row.eligible_from)}</td>
-                  <td className="px-4 py-3 text-right space-x-2 whitespace-nowrap">
-                    {editable && tab === 'ready' && (
-                      <Button size="sm" disabled={busy} onClick={() => run(`/api/admin/affiliates/commissions/${row.id}/approve`, undefined, 'Could not approve this commission.')}>
-                        Approve
-                      </Button>
-                    )}
-                    {editable && (tab === 'ready' || tab === 'approved') && (
-                      <Button size="sm" variant="outline" disabled={busy} onClick={() => setReverseId(row.id)}>
-                        Reverse
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {tab !== 'pending' && (
-        <div className="flex items-center justify-between text-sm">
-          <button type="button" className="text-[#FF7A19] font-semibold disabled:text-gray-400" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</button>
-          <span className="text-[#3A3A3A]">Page {page} of {totalPages}</span>
-          <button type="button" className="text-[#FF7A19] font-semibold disabled:text-gray-400" disabled={page >= totalPages} onClick={() => setPage((value) => value + 1)}>Next</button>
-        </div>
+                      <RowActions
+                        name={affiliateName(row)}
+                        actions={[{ label: 'View', href: `/admin/affiliates/${row.affiliate_id}` }]}
+                      />
+                    ) : null}
+                    {rowButtons(row)}
+                  </div>
+                }
+              />
+            ))}
+          >
+            {rows.map((row) => (
+              <tr key={row.id} className="hover:bg-gray-50">
+                <td className="px-4 py-3">
+                  {row.affiliate_id ? (
+                    <Link href={`/admin/affiliates/${row.affiliate_id}`} className="font-semibold text-[#FF7A19]">
+                      {affiliateName(row)}
+                    </Link>
+                  ) : (nested(row.affiliate)?.affiliate_no || '—')}
+                </td>
+                <td className="px-4 py-3">{orderNumber(row)}</td>
+                <td className="px-4 py-3">{formatGhs(row.amount_pesewas)}</td>
+                <td className="px-4 py-3">
+                  <Badge size="sm" variant={affiliateStatusVariant(row.status)}>
+                    {COMMISSION_STATUS_LABEL[row.status] || row.status}
+                  </Badge>
+                </td>
+                <td className="px-4 py-3 whitespace-nowrap">{formatWhen(row.eligible_from)}</td>
+                <td className="px-4 py-3 text-right">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    {row.affiliate_id ? (
+                      <RowActions
+                        name={affiliateName(row)}
+                        actions={[{ label: 'View', href: `/admin/affiliates/${row.affiliate_id}` }]}
+                      />
+                    ) : null}
+                    {rowButtons(row)}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </ResponsiveTable>
+          {tab !== 'pending' ? (
+            <AdminPagination page={page} totalPages={totalPages} onPage={setPage} />
+          ) : null}
+        </>
       )}
 
       {reverseId && (

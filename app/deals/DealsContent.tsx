@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ProductCard } from '@/components/cards/ProductCard';
 import { Button } from '@/components/ui/Button';
-import { Zap, TrendingDown, Clock, ArrowRight } from 'lucide-react';
+import { LoadGate, ProductGridSkeleton } from '@/components/ui-states';
+import { useListQuery } from '@/hooks/useListQuery';
+import { Zap, Clock, ArrowRight } from 'lucide-react';
 import { getCategories } from '@/services/category.service';
 import { Category } from '@/types/product';
 import { FlashDeals } from '@/components/shop/FlashDeals';
@@ -14,25 +16,22 @@ import { Product } from '@/types/product';
 export function DealsContent() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [deals, setDeals] = useState<Product[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const catalog = useListQuery();
+
+  const loadDeals = useCallback(() => {
+    return catalog.run(async () => {
+      const [categoriesData, dealsData] = await Promise.all([
+        getCategories(),
+        productService.getProducts({ limit: 20 }),
+      ]);
+      setCategories(categoriesData.slice(0, 8));
+      setDeals(dealsData);
+    });
+  }, [catalog.run]);
 
   useEffect(() => {
-    (async () => {
-      try {
-        setIsLoading(true);
-        const [categoriesData, dealsData] = await Promise.all([
-          getCategories(),
-          productService.getProducts({ limit: 20 }),
-        ]);
-        setCategories(categoriesData.slice(0, 8));
-        setDeals(dealsData);
-      } catch (error) {
-        console.error('Error fetching deals page data:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    })();
-  }, []);
+    void loadDeals();
+  }, [loadDeals]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -71,31 +70,24 @@ export function DealsContent() {
           </Link>
         </div>
 
-        {isLoading ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="bg-white rounded-xl p-4 animate-pulse">
-                <div className="w-full h-48 bg-gray-200 rounded-lg mb-3" />
-                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
-                <div className="h-3 bg-gray-200 rounded w-1/2" />
-              </div>
-            ))}
-          </div>
-        ) : deals.length > 0 ? (
+        <LoadGate
+          loaded={catalog.loaded}
+          loading={catalog.loading}
+          updating={catalog.updating}
+          error={catalog.error}
+          isEmpty={deals.length === 0}
+          onRetry={() => void loadDeals()}
+          skeleton={<ProductGridSkeleton count={8} />}
+          emptyTitle="No deals yet"
+          emptyDescription="Check the shop for current prices while we add more offers."
+          emptyPrimary={{ label: 'Browse all products', href: '/shop' }}
+        >
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {deals.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
           </div>
-        ) : (
-          <div className="text-center py-12 bg-white rounded-xl">
-            <TrendingDown className="mx-auto mb-4 text-gray-400" size={48} />
-            <p className="text-[#3A3A3A] mb-4">No deals available at the moment</p>
-            <Link href="/shop">
-              <Button variant="outline">Browse All Products</Button>
-            </Link>
-          </div>
-        )}
+        </LoadGate>
       </section>
 
       {/* Shop Deals by Category */}
@@ -113,7 +105,18 @@ export function DealsContent() {
             </Link>
           </div>
 
-          {categories.length > 0 ? (
+          <LoadGate
+            loaded={catalog.loaded}
+            loading={catalog.loading}
+            updating={catalog.updating}
+            error={catalog.error}
+            isEmpty={categories.length === 0}
+            onRetry={() => void loadDeals()}
+            skeleton={<ProductGridSkeleton count={5} />}
+            emptyTitle="No categories yet"
+            emptyDescription="Browse the shop while we add more product groups."
+            emptyPrimary={{ label: 'Browse the shop', href: '/shop' }}
+          >
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {categories.map((category) => (
                 <Link
@@ -131,11 +134,7 @@ export function DealsContent() {
                 </Link>
               ))}
             </div>
-          ) : (
-            <div className="text-center py-8">
-              <p className="text-[#3A3A3A] text-sm">No categories available</p>
-            </div>
-          )}
+          </LoadGate>
         </div>
       </section>
 

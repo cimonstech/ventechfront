@@ -2,12 +2,20 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import { Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { VlbNav } from '@/components/admin/VlbNav';
-import { useSetAdminHeading } from '@/components/admin/AdminHeading';
+import {
+  AdminPageHeader,
+  AdminRowCard,
+  ResponsiveTable,
+  RowActions,
+} from '@/components/admin/list';
 import { useAccess } from '@/context/AccessContext';
 import { formatGhs } from '@/lib/vlb';
+import { AccessDenied, EmptyState, ErrorState } from '@/components/ui-states';
+import { noteQueryFail } from '@/lib/queryState';
 import {
   apiMessage,
   deviceRequest,
@@ -50,7 +58,6 @@ function parseRates(value: string): number[] {
 }
 
 export default function AdminVlbPlansPage() {
-  useSetAdminHeading('Plans');
   const { canEdit } = useAccess();
   const editable = canEdit('vlb');
   const [rows, setRows] = useState<VlbAdminPlan[]>([]);
@@ -60,10 +67,23 @@ export default function AdminVlbPlansPage() {
   const [publicDocs, setPublicDocs] = useState<VlbPublicDocsAdmin>({ guide: null, agreement_template: null });
   const [publicFiles, setPublicFiles] = useState<Partial<Record<VlbPublicDocKind, File | null>>>({});
 
+  const [failed, setFailed] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
   const load = () =>
     deviceRequest<VlbAdminPlan[]>('/api/admin/vlb/plans')
-      .then((result) => setRows(result.data || []))
-      .catch((error) => toast.error(apiMessage(error, 'Could not load plans')));
+      .then((result) => {
+        setRows(result.data || []);
+        setLoaded(true);
+        setFailed(false);
+        setForbidden(false);
+      })
+      .catch((error) => {
+        const kind = noteQueryFail(error);
+        if (kind === 'forbidden') setForbidden(true);
+        else if (kind !== 'unauthorized') setFailed(true);
+      });
 
   const loadPublicDocs = () =>
     fetchAdminPublicDocs()
@@ -144,78 +164,119 @@ export default function AdminVlbPlansPage() {
     setForm((current) => ({ ...current, [key]: event.target.value }));
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
+      <AdminPageHeader
+        title="Plans"
+        subtitle={`${rows.length} plan${rows.length === 1 ? '' : 's'}`}
+        primary={
+          editable
+            ? { label: 'Add plan', icon: <Plus size={16} />, onClick: () => { setOpen('new'); setForm(EMPTY); } }
+            : undefined
+        }
+      />
       <VlbNav current="/admin/vlb/plans" />
-      <section className="rounded-xl bg-white p-6 shadow-sm space-y-5">
-        <div>
-          <h2 className="font-semibold text-[#1A1A1A]">Public documents</h2>
-          <p className="mt-1 text-sm text-[#3A3A3A]">
-            PDF files for the public Laptop Banking page. Learn More uses the guide; Read Agreement uses the template.
-          </p>
-        </div>
-        <PublicDocSlot
-          label="Laptop Banking guide (Learn More)"
-          kind="guide"
-          doc={publicDocs.guide}
-          file={publicFiles.guide || null}
-          editable={editable}
-          busy={busy}
-          onFile={(file) => setPublicFiles((current) => ({ ...current, guide: file }))}
-          onSaved={async () => {
-            setPublicFiles((current) => ({ ...current, guide: null }));
-            await loadPublicDocs();
-          }}
-          onBusy={setBusy}
-        />
-        <PublicDocSlot
-          label="Agreement template (Read Agreement)"
-          kind="agreement_template"
-          doc={publicDocs.agreement_template}
-          file={publicFiles.agreement_template || null}
-          editable={editable}
-          busy={busy}
-          onFile={(file) => setPublicFiles((current) => ({ ...current, agreement_template: file }))}
-          onSaved={async () => {
-            setPublicFiles((current) => ({ ...current, agreement_template: null }));
-            await loadPublicDocs();
-          }}
-          onBusy={setBusy}
-        />
-      </section>
-      {editable && (
-        <Button onClick={() => { setOpen('new'); setForm(EMPTY); }}>New plan</Button>
+      {forbidden ? (
+        <AccessDenied title="You don't have access" description="You don't have access to this data." primary={{ label: 'Go back', href: '/admin' }} />
+      ) : failed && !loaded ? (
+        <ErrorState title="We couldn't load plans" description="Try again in a moment." primary={{ label: 'Try again', onClick: () => void load() }} />
+      ) : (
+        <>
+          <section className="rounded-xl bg-white p-6 shadow-sm space-y-5">
+            <div>
+              <h2 className="font-semibold text-[#1A1A1A]">Public documents</h2>
+              <p className="mt-1 text-sm text-[#3A3A3A]">
+                PDF files for the public Laptop Banking page. Learn More uses the guide; Read Agreement uses the template.
+              </p>
+            </div>
+            <PublicDocSlot
+              label="Laptop Banking guide (Learn More)"
+              kind="guide"
+              doc={publicDocs.guide}
+              file={publicFiles.guide || null}
+              editable={editable}
+              busy={busy}
+              onFile={(file) => setPublicFiles((current) => ({ ...current, guide: file }))}
+              onSaved={async () => {
+                setPublicFiles((current) => ({ ...current, guide: null }));
+                await loadPublicDocs();
+              }}
+              onBusy={setBusy}
+            />
+            <PublicDocSlot
+              label="Agreement template (Read Agreement)"
+              kind="agreement_template"
+              doc={publicDocs.agreement_template}
+              file={publicFiles.agreement_template || null}
+              editable={editable}
+              busy={busy}
+              onFile={(file) => setPublicFiles((current) => ({ ...current, agreement_template: file }))}
+              onSaved={async () => {
+                setPublicFiles((current) => ({ ...current, agreement_template: null }));
+                await loadPublicDocs();
+              }}
+              onBusy={setBusy}
+            />
+          </section>
+          {loaded && rows.length === 0 ? (
+            <EmptyState title="No plans yet" description="Add a plan to offer Laptop Banking investments." />
+          ) : rows.length === 0 ? null : (
+            <ResponsiveTable
+              headers={
+                <tr>
+                  <th className="px-4 py-3">Plan</th>
+                  <th className="px-4 py-3">Principal</th>
+                  <th className="px-4 py-3">Rates</th>
+                  <th className="px-4 py-3">Stars</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
+                </tr>
+              }
+              cards={rows.map((row) => (
+                <AdminRowCard
+                  key={row.id}
+                  name={row.name}
+                  status={<Badge variant={row.is_active ? 'success' : 'default'}>{row.is_active ? 'Active' : 'Inactive'}</Badge>}
+                  facts={[
+                    { label: 'Group', value: `${row.plan_group} · ${row.version}` },
+                    { label: 'Principal', value: formatGhs(row.principal_pesewas) },
+                    { label: 'Rates', value: `${(row.term_rates_percent || []).join('% / ')}%` },
+                    { label: 'Stars', value: row.premium_stars },
+                  ]}
+                  actions={
+                    editable ? (
+                      <RowActions
+                        name={row.name}
+                        actions={[{ label: 'Edit', onClick: () => startEdit(row) }]}
+                      />
+                    ) : undefined
+                  }
+                />
+              ))}
+            >
+              {rows.map((row) => (
+                <tr key={row.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    {row.name}
+                    <p className="text-xs text-[#3A3A3A]">{row.plan_group} · {row.version}</p>
+                  </td>
+                  <td className="px-4 py-3">{formatGhs(row.principal_pesewas)}</td>
+                  <td className="px-4 py-3">{(row.term_rates_percent || []).join('% / ')}%</td>
+                  <td className="px-4 py-3">{row.premium_stars}</td>
+                  <td className="px-4 py-3"><Badge variant={row.is_active ? 'success' : 'default'}>{row.is_active ? 'Active' : 'Inactive'}</Badge></td>
+                  <td className="px-4 py-3 text-right">
+                    {editable ? (
+                      <RowActions
+                        name={row.name}
+                        actions={[{ label: 'Edit', onClick: () => startEdit(row) }]}
+                      />
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </ResponsiveTable>
+          )}
+        </>
       )}
-      <div className="overflow-x-auto sticky-first rounded-xl bg-white shadow-sm">
-        <table className="min-w-full text-left text-sm">
-          <thead>
-            <tr className="border-b text-[#3A3A3A]">
-              <th className="px-4 py-3 font-medium">Plan</th>
-              <th className="px-4 py-3 font-medium">Principal</th>
-              <th className="px-4 py-3 font-medium">Rates</th>
-              <th className="px-4 py-3 font-medium">Stars</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.id} className="border-t">
-                <td className="px-4 py-3">
-                  {row.name}
-                  <p className="text-xs text-[#3A3A3A]">{row.plan_group} · {row.version}</p>
-                </td>
-                <td className="px-4 py-3">{formatGhs(row.principal_pesewas)}</td>
-                <td className="px-4 py-3">{(row.term_rates_percent || []).join('% / ')}%</td>
-                <td className="px-4 py-3">{row.premium_stars}</td>
-                <td className="px-4 py-3"><Badge variant={row.is_active ? 'success' : 'default'}>{row.is_active ? 'Active' : 'Inactive'}</Badge></td>
-                <td className="px-4 py-3">
-                  {editable && <Button size="sm" variant="outline" onClick={() => startEdit(row)}>Edit</Button>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
       {open && (
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 p-4 sm:items-center">
           <form className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 space-y-3" onSubmit={save}>

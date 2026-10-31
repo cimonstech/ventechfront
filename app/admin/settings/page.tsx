@@ -21,6 +21,8 @@ import { useAppSelector } from '@/store';
 import { hasAdminEntry } from '@/lib/roles';
 import { FeaturesCard } from '@/components/admin/FeaturesCard';
 import toast from 'react-hot-toast';
+import { AccessDenied, EmptyState, ErrorState, TableSkeleton, UpdatingNotice } from '@/components/ui-states';
+import { useListQuery } from '@/hooks/useListQuery';
 
 interface DeliveryOption {
   id: string;
@@ -38,8 +40,8 @@ export default function AdminSettingsPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
 
+  const query = useListQuery();
   const [deliveryOptions, setDeliveryOptions] = useState<DeliveryOption[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingOption, setEditingOption] = useState<DeliveryOption | null>(null);
 
@@ -61,16 +63,9 @@ export default function AdminSettingsPage() {
   }, [isAuthenticated, user, router]);
 
   const fetchDeliveryOptions = async () => {
-    try {
-      setLoading(true);
-      const options = await deliveryOptionsService.getAllDeliveryOptions();
-      setDeliveryOptions(options);
-    } catch (error: any) {
-      console.error('Error fetching delivery options:', error);
-      toast.error('Failed to load delivery options');
-    } finally {
-      setLoading(false);
-    }
+    await query.run(async () => {
+      setDeliveryOptions(await deliveryOptionsService.getAllDeliveryOptions());
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -189,19 +184,33 @@ export default function AdminSettingsPage() {
     setEditingOption(null);
   };
 
-  if (loading) {
+  if (query.forbidden) {
     return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-          <div className="h-64 bg-gray-200 rounded"></div>
-        </div>
-      </div>
+      <AccessDenied
+        title="You don't have access"
+        description="You don't have access to this data."
+        primary={{ label: 'Go back', href: '/admin' }}
+      />
     );
+  }
+
+  if (query.error && !query.loaded) {
+    return (
+      <ErrorState
+        title="We couldn't load delivery options"
+        description="Try again in a moment."
+        primary={{ label: 'Try again', onClick: () => void fetchDeliveryOptions() }}
+      />
+    );
+  }
+
+  if (query.loading && !query.loaded) {
+    return <TableSkeleton />;
   }
 
   return (
     <div className="p-6">
+      {query.updating ? <UpdatingNotice /> : null}
       {user?.role === 'superadmin' ? <FeaturesCard /> : null}
       <div className="mb-6 flex items-center justify-between">
         <div>
@@ -349,8 +358,12 @@ export default function AdminSettingsPage() {
             <tbody className="bg-white divide-y divide-gray-200">
               {deliveryOptions.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
-                    No delivery options yet. Click "Add Delivery Option" to create one.
+                  <td colSpan={7}>
+                    <EmptyState
+                      title="No delivery options yet"
+                      description="Add a delivery option so shoppers can choose how orders arrive."
+                      primary={{ label: 'Add delivery option', onClick: () => setShowForm(true) }}
+                    />
                   </td>
                 </tr>
               ) : (

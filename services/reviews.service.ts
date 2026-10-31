@@ -266,8 +266,7 @@ const getAllReviews = async (): Promise<Review[]> => {
     return data || [];
   } catch (error: any) {
     console.error('Failed to fetch all reviews:', error);
-    // Return empty array on error to prevent UI breakage
-    return [];
+    throw error;
   }
 };
 

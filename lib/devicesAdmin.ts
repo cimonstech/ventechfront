@@ -1,8 +1,4 @@
-import { ADMIN_DATA_DENIED } from '@/lib/access';
-import { authHeaders } from '@/lib/authHeaders';
-import { ApiError, emitSessionExpired, failNetwork } from '@/lib/httpErrors';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+import { apiRequest, toApiError } from '@/lib/api';
 
 export type WarrantyStatus = 'active' | 'expired' | 'none' | 'starts_on_delivery';
 export type DeviceStatus = 'pending' | 'active' | 'transferred' | 'retired';
@@ -104,42 +100,16 @@ export async function deviceRequest<T>(
   path: string,
   init: RequestInit = {}
 ): Promise<{ data: T; message: string; pagination?: DevicePage; pending_count?: number }> {
-  const headers = await authHeaders();
-  let response: Response;
-  try {
-    response = await fetch(`${API_URL}${path}`, {
-      ...init,
-      headers: {
-        ...headers,
-        'Content-Type': 'application/json',
-        ...(init.headers || {}),
-      },
-    });
-  } catch {
-    throw failNetwork();
-  }
-
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok || body?.success === false) {
-    const fallback = typeof body?.message === 'string' ? body.message : 'Request failed';
-    if (response.status === 401) {
-      emitSessionExpired();
-      throw new ApiError(401, 'Your session expired. Sign in again.');
-    }
-    if (response.status === 403) {
-      throw new ApiError(403, ADMIN_DATA_DENIED);
-    }
-    if (response.status === 429) {
-      throw new ApiError(429, 'Too many requests. Wait a moment and try again.');
-    }
-    throw new ApiError(response.status || 500, fallback);
+  const result = await apiRequest<T>(path, init);
+  if (!result.ok) {
+    throw toApiError(result);
   }
 
   return {
-    data: body.data as T,
-    message: typeof body?.message === 'string' ? body.message : 'Saved',
-    pagination: body.pagination,
-    pending_count: typeof body.pending_count === 'number' ? body.pending_count : undefined,
+    data: result.data,
+    message: result.message,
+    pagination: result.pagination,
+    pending_count: result.pending_count,
   };
 }
 

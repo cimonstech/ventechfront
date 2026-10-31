@@ -12,6 +12,8 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { AccessDenied, EmptyState, ErrorState, NoResults } from '@/components/ui-states';
+import { noteQueryFail } from '@/lib/queryState';
 import { supabase } from '@/lib/supabase';
 
 interface Notification {
@@ -26,6 +28,9 @@ interface Notification {
 
 export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
 
@@ -42,87 +47,15 @@ export default function NotificationsPage() {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        // Check for table doesn't exist or RLS policy errors
-        const errorMessage = error.message || JSON.stringify(error) || '';
-        const errorCode = error.code || '';
-        const errorDetails = error.details || '';
-        const errorHint = error.hint || '';
-        
-        // Check if it's a "table doesn't exist" error
-        const isTableNotFound = 
-          errorCode === '42P01' || 
-          errorCode === 'PGRST116' || 
-          errorMessage.includes('does not exist') || 
-          errorMessage.includes('relation') || 
-          errorMessage.includes('not found') ||
-          errorMessage.includes('Could not find');
-        
-        // Check if it's an RLS policy error
-        const isRLSError = 
-          errorMessage.includes('policy') ||
-          errorMessage.includes('RLS') ||
-          errorMessage.includes('permission denied') ||
-          errorMessage.includes('new row violates row-level security');
-        
-        if (isTableNotFound) {
-          // Table doesn't exist - set empty array silently
-          setNotifications([]);
-          return;
-        }
-        
-        if (isRLSError) {
-          // RLS policy blocking - log but don't show error to user
-          console.warn('RLS policy may be blocking notifications access. Run create_notifications_table.sql to set up proper policies.');
-          setNotifications([]);
-          return;
-        }
-        
-        // For other errors, log with details
-        if (Object.keys(error).length > 0) {
-          console.error('Error fetching notifications:', {
-            code: errorCode,
-            message: errorMessage,
-            details: errorDetails,
-            hint: errorHint,
-            fullError: error
-          });
-        }
-        
-        setNotifications([]);
-        return;
-      }
+      if (error) throw error;
       setNotifications(data || []);
+      setLoaded(true);
+      setFailed(false);
+      setForbidden(false);
     } catch (error: any) {
-      // Handle caught errors
-      const errorMessage = error?.message || JSON.stringify(error) || 'Unknown error';
-      const errorCode = error?.code || '';
-      
-      // Check if it's a "table doesn't exist" or RLS error
-      const isTableNotFound = 
-        errorCode === '42P01' || 
-        errorCode === 'PGRST116' || 
-        errorMessage.includes('does not exist') || 
-        errorMessage.includes('relation') || 
-        errorMessage.includes('not found');
-      
-      const isRLSError = 
-        errorMessage.includes('policy') ||
-        errorMessage.includes('RLS') ||
-        errorMessage.includes('permission denied');
-      
-      if (!isTableNotFound && !isRLSError) {
-        // Only log unexpected errors
-        if (errorMessage !== '{}' && errorMessage !== 'Unknown error') {
-          console.error('Error fetching notifications:', {
-            code: errorCode,
-            message: errorMessage,
-            error: error
-          });
-        }
-      }
-      
-      setNotifications([]);
+      const kind = noteQueryFail(error);
+      if (kind === 'forbidden') setForbidden(true);
+      else if (kind !== 'unauthorized') setFailed(true);
     } finally {
       setLoading(false);
     }
@@ -275,7 +208,27 @@ export default function NotificationsPage() {
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
-  if (loading) {
+  if (forbidden) {
+    return (
+      <AccessDenied
+        title="You don't have access"
+        description="You don't have access to this data."
+        primary={{ label: 'Go back', href: '/admin' }}
+      />
+    );
+  }
+
+  if (failed && !loaded) {
+    return (
+      <ErrorState
+        title="We couldn't load notifications"
+        description="Try again in a moment."
+        primary={{ label: 'Try again', onClick: () => void fetchNotifications() }}
+      />
+    );
+  }
+
+  if (loading && !loaded) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -334,10 +287,18 @@ export default function NotificationsPage() {
       {/* Notifications List */}
       <div className="space-y-3">
         {filteredNotifications.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
-            <Bell size={48} className="text-gray-300 mx-auto mb-4" />
-            <p className="text-[#3A3A3A]">No notifications to display</p>
-          </div>
+          filter === 'unread' && notifications.length > 0 ? (
+            <NoResults
+              title="No unread notifications"
+              description="Nothing matches this filter."
+              primary={{ label: 'Clear filters', onClick: () => setFilter('all') }}
+            />
+          ) : (
+            <EmptyState
+              title="No notifications yet"
+              description="You'll see updates here when something needs your attention."
+            />
+          )
         ) : (
           filteredNotifications.map((notification) => (
             <div

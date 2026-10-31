@@ -11,6 +11,8 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { AccessDenied, EmptyState, ErrorState, NoResults, StatCardSkeleton } from '@/components/ui-states';
+import { noteQueryFail } from '@/lib/queryState';
 import { supabase } from '@/lib/supabase';
 
 interface WishlistUser {
@@ -26,6 +28,9 @@ interface WishlistUser {
 
 export default function WishlistInsightsPage() {
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
   const [users, setUsers] = useState<WishlistUser[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -94,10 +99,14 @@ export default function WishlistInsightsPage() {
 
       const usersArray = Array.from(userMap.values());
       setUsers(usersArray);
+      setLoaded(true);
+      setFailed(false);
+      setForbidden(false);
     } catch (error) {
       console.error('Error fetching wishlist data:', error);
-      // Fallback to empty array
-      setUsers([]);
+      const kind = noteQueryFail(error);
+      if (kind === 'forbidden') setForbidden(true);
+      else if (kind !== 'unauthorized') setFailed(true);
     } finally {
       setLoading(false);
     }
@@ -118,15 +127,28 @@ export default function WishlistInsightsPage() {
     alert(`Sending reminder email to user ${userId}`);
   };
 
-  if (loading) {
+  if (forbidden) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF7A19] mx-auto mb-4"></div>
-          <p className="text-[#3A3A3A]">Loading wishlist insights...</p>
-        </div>
-      </div>
+      <AccessDenied
+        title="You don't have access"
+        description="You don't have access to this data."
+        primary={{ label: 'Go back', href: '/admin' }}
+      />
     );
+  }
+
+  if (failed && !loaded) {
+    return (
+      <ErrorState
+        title="We couldn't load wishlist insights"
+        description="Try again in a moment. If it keeps failing, contact support."
+        primary={{ label: 'Try again', onClick: () => void fetchWishlistData() }}
+      />
+    );
+  }
+
+  if (loading && !loaded) {
+    return <StatCardSkeleton count={3} />;
   }
 
   return (
@@ -218,9 +240,14 @@ export default function WishlistInsightsPage() {
         </div>
         <div className="divide-y divide-gray-200">
           {filteredUsers.length === 0 ? (
-            <div className="p-12 text-center text-[#3A3A3A]">
-              No users with wishlist items found
-            </div>
+            searchQuery ? (
+              <NoResults primary={{ label: 'Clear filters', onClick: () => setSearchQuery('') }} />
+            ) : (
+              <EmptyState
+                title="No wishlist items yet"
+                description="When customers save products, they'll show up here."
+              />
+            )
           ) : (
             filteredUsers.map((user) => (
               <div key={user.id} className="p-6 hover:bg-gray-50 transition-colors">

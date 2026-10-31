@@ -1,26 +1,26 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { 
-  Star, 
-  Trash2, 
-  Search,
-  Eye,
-  CheckCircle,
-  XCircle
-} from 'lucide-react';
+import { Star } from 'lucide-react';
 import { reviewsService } from '@/services/reviews.service';
 import { Review } from '@/types/review';
 import { useAppSelector } from '@/store';
 import { hasAdminEntry } from '@/lib/roles';
 import { useAccess } from '@/context/AccessContext';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { supabase } from '@/lib/supabase';
-import Image from 'next/image';
+import { AccessDenied, EmptyState, ErrorState, NoResults, TableSkeleton, UpdatingNotice } from '@/components/ui-states';
+import {
+  AdminPageHeader,
+  AdminRowCard,
+  ConfirmDialog,
+  FilterBar,
+  filterSelectClassName,
+  ResponsiveTable,
+  RowActions,
+} from '@/components/admin/list';
+import { useListQuery } from '@/hooks/useListQuery';
 
 interface ReviewWithDetails extends Omit<Review, 'user'> {
   user?: {
@@ -38,15 +38,26 @@ interface ReviewWithDetails extends Omit<Review, 'user'> {
   };
 }
 
+function reviewerName(review: ReviewWithDetails): string {
+  return (
+    review.user?.full_name ||
+    `${review.user?.first_name || ''} ${review.user?.last_name || ''}`.trim() ||
+    review.user?.email ||
+    'Anonymous'
+  );
+}
+
 export default function AdminReviewsPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const { canEdit } = useAccess();
   const canEditProducts = canEdit('products');
+  const query = useListQuery();
   const [reviews, setReviews] = useState<ReviewWithDetails[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterApproved, setFilterApproved] = useState<'all' | 'approved' | 'unapproved'>('all');
+  const [deleteTarget, setDeleteTarget] = useState<ReviewWithDetails | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated && !hasAdminEntry(user?.role)) {
@@ -57,46 +68,40 @@ export default function AdminReviewsPage() {
   }, [isAuthenticated, user, router]);
 
   const fetchReviews = async () => {
-    try {
-      setIsLoading(true);
-      const allReviews = await reviewsService.getAllReviews();
-      setReviews(allReviews as ReviewWithDetails[]);
-    } catch (error) {
-      console.error('Error fetching reviews:', error);
-      toast.error('Failed to fetch reviews');
-    } finally {
-      setIsLoading(false);
-    }
+    await query.run(async () => {
+      setReviews((await reviewsService.getAllReviews()) as ReviewWithDetails[]);
+    });
   };
 
-  const handleDeleteReview = async (reviewId: string) => {
-    if (!confirm('Are you sure you want to delete this review? This action cannot be undone.')) {
-      return;
-    }
-
+  const handleDeleteReview = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await reviewsService.adminDeleteReview(reviewId);
+      await reviewsService.adminDeleteReview(deleteTarget.id);
       toast.success('Review deleted successfully');
-      fetchReviews(); // Refresh list
+      setDeleteTarget(null);
+      fetchReviews();
     } catch (error: any) {
       console.error('Error deleting review:', error);
       toast.error(error.message || 'Failed to delete review');
+    } finally {
+      setDeleting(false);
     }
   };
 
   const filteredReviews = reviews.filter((review) => {
-    const matchesSearch = 
+    const matchesSearch =
       review.product?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       review.user?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       review.user?.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       review.comment?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       review.title?.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesFilter = 
+
+    const matchesFilter =
       filterApproved === 'all' ||
       (filterApproved === 'approved' && review.is_approved) ||
       (filterApproved === 'unapproved' && !review.is_approved);
-    
+
     return matchesSearch && matchesFilter;
   });
 
@@ -114,183 +119,182 @@ export default function AdminReviewsPage() {
     );
   };
 
-  if (isLoading) {
+  const reviewName = (review: ReviewWithDetails) => review.product?.name || reviewerName(review);
+
+  const reviewActions = (review: ReviewWithDetails) => [
+    ...(review.product?.slug
+      ? [{ label: 'View', href: `/product/${review.product.slug}`, target: '_blank' }]
+      : []),
+    ...(canEditProducts
+      ? [{ label: 'Delete', destructive: true, onClick: () => setDeleteTarget(review) }]
+      : []),
+  ];
+
+  const reviewStatus = (review: ReviewWithDetails) => (
+    <div className="flex flex-wrap items-center gap-1">
+      {review.is_verified_purchase ? (
+        <Badge variant="success" size="sm">Verified Purchase</Badge>
+      ) : null}
+      {review.is_approved ? (
+        <Badge variant="success" size="sm">Approved</Badge>
+      ) : (
+        <Badge variant="warning" size="sm">Pending</Badge>
+      )}
+    </div>
+  );
+
+  if (query.forbidden) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF7A19]"></div>
-      </div>
+      <AccessDenied
+        title="You don't have access"
+        description="You don't have access to this data."
+        primary={{ label: 'Go back', href: '/admin' }}
+      />
     );
   }
 
+  if (query.error && !query.loaded) {
+    return (
+      <ErrorState
+        title="We couldn't load reviews"
+        description="Try again in a moment."
+        primary={{ label: 'Try again', onClick: () => void fetchReviews() }}
+      />
+    );
+  }
+
+  if (query.loading && !query.loaded) {
+    return <TableSkeleton />;
+  }
+
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[#1A1A1A] mb-2">Product Reviews</h1>
-        <p className="text-sm text-[#3A3A3A]">Manage and moderate customer reviews</p>
-      </div>
+    <div className="min-w-0">
+      {query.updating ? <UpdatingNotice /> : null}
+      <AdminPageHeader
+        title="Reviews"
+        subtitle={`${reviews.length} review${reviews.length === 1 ? '' : 's'}`}
+      />
 
-      {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
-        <div className="flex flex-col md:flex-row gap-4">
-          {/* Search */}
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-              <input
-                type="text"
-                placeholder="Search by product, customer, or review content..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19] focus:border-transparent"
-              />
-            </div>
-          </div>
+      <FilterBar
+        search={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Search reviews"
+        activeCount={filterApproved === 'all' ? 0 : 1}
+        onClear={() => setFilterApproved('all')}
+      >
+        <select
+          value={filterApproved}
+          onChange={(e) => setFilterApproved(e.target.value as 'all' | 'approved' | 'unapproved')}
+          className={filterSelectClassName()}
+        >
+          <option value="all">All reviews</option>
+          <option value="approved">Approved only</option>
+          <option value="unapproved">Unapproved only</option>
+        </select>
+      </FilterBar>
 
-          {/* Filter */}
-          <div className="flex items-center gap-2">
-            <select
-              value={filterApproved}
-              onChange={(e) => setFilterApproved(e.target.value as 'all' | 'approved' | 'unapproved')}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19] focus:border-transparent"
-            >
-              <option value="all">All Reviews</option>
-              <option value="approved">Approved Only</option>
-              <option value="unapproved">Unapproved Only</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Reviews List */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        {filteredReviews.length === 0 ? (
-          <div className="p-12 text-center">
-            <p className="text-gray-500">No reviews found</p>
-          </div>
+      {filteredReviews.length === 0 ? (
+        searchQuery || filterApproved !== 'all' ? (
+          <NoResults
+            primary={{
+              label: 'Clear filters',
+              onClick: () => {
+                setSearchQuery('');
+                setFilterApproved('all');
+              },
+            }}
+          />
         ) : (
-          <div className="divide-y divide-gray-200">
-            {filteredReviews.map((review) => {
-              const userName = review.user?.full_name || 
-                `${review.user?.first_name || ''} ${review.user?.last_name || ''}`.trim() ||
-                review.user?.email ||
-                'Anonymous';
-              
-              return (
-                <div key={review.id} className="p-6 hover:bg-gray-50 transition-colors">
-                  <div className="flex gap-4">
-                    {/* User Avatar */}
-                    <div className="flex-shrink-0">
-                      {review.user?.avatar_url ? (
-                        <Image
-                          src={review.user.avatar_url}
-                          alt={userName}
-                          width={40}
-                          height={40}
-                          className="rounded-full"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 bg-[#FF7A19] rounded-full flex items-center justify-center text-white font-semibold">
-                          {userName.charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                    </div>
+          <EmptyState title="No reviews yet" description="Customer reviews will show up here." />
+        )
+      ) : (
+        <ResponsiveTable
+          headers={
+            <tr>
+              <th className="px-4 py-3">Review</th>
+              <th className="px-4 py-3">Product</th>
+              <th className="px-4 py-3">Rating</th>
+              <th className="px-4 py-3">Date</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3 text-right">Actions</th>
+            </tr>
+          }
+          cards={filteredReviews.map((review) => (
+            <AdminRowCard
+              key={review.id}
+              name={reviewName(review)}
+              status={reviewStatus(review)}
+              facts={[
+                { label: 'Rating', value: renderStars(review.rating) },
+                { label: 'Date', value: new Date(review.created_at).toLocaleDateString() },
+              ]}
+              actions={<RowActions name={reviewName(review)} actions={reviewActions(review)} />}
+            />
+          ))}
+        >
+          {filteredReviews.map((review) => (
+            <tr key={review.id} className="hover:bg-gray-50">
+              <td className="px-4 py-3">
+                <p className="font-medium text-[#1A1A1A]">{reviewerName(review)}</p>
+                {review.title ? (
+                  <p className="text-sm font-semibold text-[#1A1A1A]">{review.title}</p>
+                ) : null}
+                {review.comment ? (
+                  <p className="mt-1 line-clamp-2 text-sm text-[#3A3A3A]">{review.comment}</p>
+                ) : null}
+              </td>
+              <td className="px-4 py-3 text-[#1A1A1A]">{review.product?.name || '—'}</td>
+              <td className="px-4 py-3">{renderStars(review.rating)}</td>
+              <td className="px-4 py-3 text-[#3A3A3A]">
+                {new Date(review.created_at).toLocaleDateString()}
+              </td>
+              <td className="px-4 py-3">{reviewStatus(review)}</td>
+              <td className="px-4 py-3 text-right">
+                <RowActions name={reviewName(review)} actions={reviewActions(review)} />
+              </td>
+            </tr>
+          ))}
+        </ResponsiveTable>
+      )}
 
-                    {/* Review Content */}
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <p className="font-semibold text-[#1A1A1A] text-sm">{userName}</p>
-                            {review.is_verified_purchase && (
-                              <Badge variant="success" size="sm">Verified Purchase</Badge>
-                            )}
-                            {review.is_approved ? (
-                              <Badge variant="success" size="sm">Approved</Badge>
-                            ) : (
-                              <Badge variant="warning" size="sm">Pending</Badge>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 mb-2">
-                            {renderStars(review.rating)}
-                            <span className="text-xs text-gray-500">
-                              {new Date(review.created_at).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Product Link */}
-                      {review.product && (
-                        <Link
-                          href={`/product/${review.product.slug}`}
-                          className="text-xs text-[#FF7A19] hover:underline mb-2 inline-block"
-                        >
-                          {review.product.name}
-                        </Link>
-                      )}
-
-                      {/* Review Title */}
-                      {review.title && (
-                        <h3 className="text-sm font-semibold text-[#1A1A1A] mb-1">{review.title}</h3>
-                      )}
-
-                      {/* Review Comment */}
-                      {review.comment && (
-                        <p className="text-sm text-[#3A3A3A] mb-3">{review.comment}</p>
-                      )}
-
-                      {/* Actions */}
-                      {canEditProducts && (
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeleteReview(review.id)}
-                          className="text-red-600 hover:text-red-700 hover:border-red-700"
-                        >
-                          <Trash2 size={14} className="mr-1" />
-                          Delete
-                        </Button>
-                      </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Stats */}
-      <div className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl shadow-sm p-4">
-          <p className="text-sm text-[#3A3A3A] mb-1">Total Reviews</p>
+      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-4">
+        <div className="rounded-xl bg-white p-4 shadow-sm">
+          <p className="mb-1 text-sm text-[#3A3A3A]">Total Reviews</p>
           <p className="text-2xl font-bold text-[#1A1A1A]">{reviews.length}</p>
         </div>
-        <div className="bg-white rounded-xl shadow-sm p-4">
-          <p className="text-sm text-[#3A3A3A] mb-1">Approved</p>
+        <div className="rounded-xl bg-white p-4 shadow-sm">
+          <p className="mb-1 text-sm text-[#3A3A3A]">Approved</p>
           <p className="text-2xl font-bold text-green-600">
-            {reviews.filter(r => r.is_approved).length}
+            {reviews.filter((r) => r.is_approved).length}
           </p>
         </div>
-        <div className="bg-white rounded-xl shadow-sm p-4">
-          <p className="text-sm text-[#3A3A3A] mb-1">Pending</p>
+        <div className="rounded-xl bg-white p-4 shadow-sm">
+          <p className="mb-1 text-sm text-[#3A3A3A]">Pending</p>
           <p className="text-2xl font-bold text-orange-600">
-            {reviews.filter(r => !r.is_approved).length}
+            {reviews.filter((r) => !r.is_approved).length}
           </p>
         </div>
-        <div className="bg-white rounded-xl shadow-sm p-4">
-          <p className="text-sm text-[#3A3A3A] mb-1">Average Rating</p>
+        <div className="rounded-xl bg-white p-4 shadow-sm">
+          <p className="mb-1 text-sm text-[#3A3A3A]">Average Rating</p>
           <p className="text-2xl font-bold text-[#1A1A1A]">
-            {reviews.length > 0 
+            {reviews.length > 0
               ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
-              : '0.0'
-            }
+              : '0.0'}
           </p>
         </div>
       </div>
+
+      {deleteTarget ? (
+        <ConfirmDialog
+          title="Delete this review?"
+          confirmLabel="Delete"
+          busy={deleting}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={() => void handleDeleteReview()}
+        >
+          This review will be removed. This cannot be undone.
+        </ConfirmDialog>
+      ) : null}
     </div>
   );
 }
-

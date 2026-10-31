@@ -13,18 +13,31 @@ import {
   type FaqRecord,
 } from '@/lib/contentAdmin';
 import { FAQ_AUDIENCES, type FaqAudience } from '@/lib/portalTargeting';
+import { AccessDenied, EmptyState, ErrorState, TableSkeleton, UpdatingNotice } from '@/components/ui-states';
+import { useListQuery } from '@/hooks/useListQuery';
+import {
+  AdminPageHeader,
+  AdminRowCard,
+  ConfirmDialog,
+  RowActions,
+} from '@/components/admin/list';
+import { Badge } from '@/components/ui/Badge';
 
 function byOrder<T extends { sort_order: number; question?: string; name?: string }>(rows: T[]): T[] {
   return [...rows].sort((a, b) => a.sort_order - b.sort_order || String(a.name || a.question).localeCompare(String(b.name || b.question)));
 }
 
+type DeleteTarget =
+  | { kind: 'category'; category: FaqCategoryRecord }
+  | { kind: 'faq'; faq: FaqRecord };
+
 export default function AdminFaqsPage() {
   const { canEdit } = useAccess();
   const editable = canEdit('content');
+  const query = useListQuery();
   const [categories, setCategories] = useState<FaqCategoryRecord[]>([]);
   const [faqs, setFaqs] = useState<FaqRecord[]>([]);
   const [open, setOpen] = useState<Record<string, boolean>>({});
-  const [loading, setLoading] = useState(true);
   const [newCategory, setNewCategory] = useState('');
   const [newAudience, setNewAudience] = useState<FaqAudience>('store');
   const [categoryAudience, setCategoryAudience] = useState<FaqAudience>('store');
@@ -35,21 +48,18 @@ export default function AdminFaqsPage() {
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
   const [faqStatus, setFaqStatus] = useState<ContentStatus>('published');
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = async () => {
-    setLoading(true);
-    try {
+    await query.run(async () => {
       const [categoryRows, faqRows] = await Promise.all([
         contentRequest<FaqCategoryRecord[]>('/api/admin/content/faq-categories'),
         contentRequest<FaqRecord[]>('/api/admin/content/faqs'),
       ]);
       setCategories(byOrder(categoryRows || []));
       setFaqs(byOrder(faqRows || []));
-    } catch (error) {
-      toast.error(apiMessage(error, 'Could not load FAQs'));
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   useEffect(() => {
@@ -107,7 +117,6 @@ export default function AdminFaqsPage() {
   };
 
   const deleteCategory = async (category: FaqCategoryRecord) => {
-    if (!window.confirm(`Delete ${category.name}?`)) return;
     try {
       await contentRequest(`/api/admin/content/faq-categories/${category.id}`, { method: 'DELETE' });
       toast.success('Category deleted');
@@ -201,13 +210,27 @@ export default function AdminFaqsPage() {
   };
 
   const deleteFaq = async (faq: FaqRecord) => {
-    if (!window.confirm('Delete this FAQ?')) return;
     try {
       await contentRequest(`/api/admin/content/faqs/${faq.id}`, { method: 'DELETE' });
       toast.success('FAQ deleted');
       await load();
     } catch (error) {
       toast.error(apiMessage(error, 'Could not delete the FAQ'));
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      if (deleteTarget.kind === 'category') {
+        await deleteCategory(deleteTarget.category);
+      } else {
+        await deleteFaq(deleteTarget.faq);
+      }
+      setDeleteTarget(null);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -231,8 +254,33 @@ export default function AdminFaqsPage() {
     </div>
   );
 
+  if (query.forbidden) {
+    return (
+      <AccessDenied
+        title="You don't have access"
+        description="You don't have access to this data."
+        primary={{ label: 'Go back', href: '/admin' }}
+      />
+    );
+  }
+
+  if (query.error && !query.loaded) {
+    return (
+      <ErrorState
+        title="We couldn't load FAQs"
+        description="Try again in a moment."
+        primary={{ label: 'Try again', onClick: () => void load() }}
+      />
+    );
+  }
+
+  if (query.loading && !query.loaded) {
+    return <TableSkeleton />;
+  }
+
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
+      {query.updating ? <UpdatingNotice /> : null}
       <style>{`
         .article-body h2 { font-size: 1.5rem; font-weight: 700; margin: 1rem 0 0.5rem; }
         .article-body h3 { font-size: 1.15rem; font-weight: 600; margin: 0.75rem 0 0.4rem; }
@@ -241,7 +289,10 @@ export default function AdminFaqsPage() {
         .article-body ol { list-style: decimal; margin: 0.5rem 0 0.5rem 1.25rem; }
         .article-body a { color: #FF7A19; text-decoration: underline; }
       `}</style>
-      <h1 className="text-2xl font-bold text-[#1A1A1A]">FAQs</h1>
+      <AdminPageHeader
+        title="FAQs"
+        subtitle={`${faqs.length} FAQ${faqs.length === 1 ? '' : 's'}`}
+      />
       {editable && (
         <div className="flex flex-col gap-2 sm:flex-row">
           <input
@@ -262,7 +313,12 @@ export default function AdminFaqsPage() {
           <Button type="button" size="sm" onClick={() => void createCategory()}>Add category</Button>
         </div>
       )}
-      {loading && <p className="text-sm text-gray-500">Loading FAQs...</p>}
+      {categories.length === 0 ? (
+        <EmptyState
+          title="No FAQ categories yet"
+          description="Add a category, then write the first question."
+        />
+      ) : null}
       {categories.map((category, index) => {
         const items = faqsFor(category.id);
         const expanded = open[category.id] !== false;
@@ -274,13 +330,16 @@ export default function AdminFaqsPage() {
                 <span className="ml-2 text-xs text-gray-500">{category.is_active ? 'Active' : 'Inactive'} · {FAQ_AUDIENCES.find((item) => item.value === (category.audience || 'store'))?.label} · {items.length}</span>
               </button>
               {editable && (
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="ghost" size="sm" disabled={index === 0} onClick={() => void moveCategory(index, -1)}>Up</Button>
-                  <Button type="button" variant="ghost" size="sm" disabled={index === categories.length - 1} onClick={() => void moveCategory(index, 1)}>Down</Button>
-                  <Button type="button" variant="outline" size="sm" onClick={() => { setEditingCategory(category.id); setCategoryName(category.name); setCategoryAudience(category.audience || 'store'); }}>{editingCategory === category.id ? 'Editing' : 'Edit'}</Button>
-                  <Button type="button" variant="outline" size="sm" onClick={() => void toggleCategory(category)}>{category.is_active ? 'Deactivate' : 'Activate'}</Button>
-                  <Button type="button" variant="danger" size="sm" onClick={() => void deleteCategory(category)}>Delete</Button>
-                </div>
+                <RowActions
+                  name={category.name}
+                  actions={[
+                    { label: 'Up', onClick: () => void moveCategory(index, -1), hidden: index === 0 },
+                    { label: 'Down', onClick: () => void moveCategory(index, 1), hidden: index === categories.length - 1 },
+                    { label: 'Edit', onClick: () => { setEditingCategory(category.id); setCategoryName(category.name); setCategoryAudience(category.audience || 'store'); } },
+                    { label: category.is_active ? 'Deactivate' : 'Activate', onClick: () => void toggleCategory(category) },
+                    { label: 'Delete', destructive: true, onClick: () => setDeleteTarget({ kind: 'category', category }) },
+                  ]}
+                />
               )}
             </div>
             {expanded && (
@@ -301,27 +360,34 @@ export default function AdminFaqsPage() {
                   </div>
                 )}
                 {items.map((faq, faqIndex) => (
-                  <div key={faq.id} className="rounded-lg border border-gray-100 p-3">
-                    {editingFaq === faq.id ? faqForm(category.id, faq.id) : (
-                      <div className="space-y-2">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                          <div>
-                            <p className="font-medium text-[#1A1A1A]">{faq.question}</p>
-                            <p className="text-xs capitalize text-gray-500">{faq.status}</p>
-                          </div>
-                          {editable && (
-                            <div className="flex flex-wrap gap-2">
-                              <Button type="button" variant="ghost" size="sm" disabled={faqIndex === 0} onClick={() => void moveFaq(category.id, faqIndex, -1)}>Up</Button>
-                              <Button type="button" variant="ghost" size="sm" disabled={faqIndex === items.length - 1} onClick={() => void moveFaq(category.id, faqIndex, 1)}>Down</Button>
-                              <Button type="button" variant="outline" size="sm" onClick={() => startFaq(faq)}>Edit</Button>
-                              <Button type="button" variant="danger" size="sm" onClick={() => void deleteFaq(faq)}>Delete</Button>
-                            </div>
-                          )}
-                        </div>
-                        <div className="article-body text-sm text-[#3A3A3A]" dangerouslySetInnerHTML={{ __html: faq.answer_html || '' }} />
-                      </div>
-                    )}
-                  </div>
+                  editingFaq === faq.id ? (
+                    <div key={faq.id}>{faqForm(category.id, faq.id)}</div>
+                  ) : (
+                    <div key={faq.id} className="space-y-2">
+                      <AdminRowCard
+                        name={faq.question}
+                        status={
+                          <Badge variant={faq.status === 'published' ? 'success' : 'default'} size="sm">
+                            {faq.status}
+                          </Badge>
+                        }
+                        actions={
+                          editable ? (
+                            <RowActions
+                              name={faq.question}
+                              actions={[
+                                { label: 'Up', onClick: () => void moveFaq(category.id, faqIndex, -1), hidden: faqIndex === 0 },
+                                { label: 'Down', onClick: () => void moveFaq(category.id, faqIndex, 1), hidden: faqIndex === items.length - 1 },
+                                { label: 'Edit', onClick: () => startFaq(faq) },
+                                { label: 'Delete', destructive: true, onClick: () => setDeleteTarget({ kind: 'faq', faq }) },
+                              ]}
+                            />
+                          ) : undefined
+                        }
+                      />
+                      <div className="article-body px-1 text-sm text-[#3A3A3A]" dangerouslySetInnerHTML={{ __html: faq.answer_html || '' }} />
+                    </div>
+                  )
                 ))}
                 {editable && addingIn === category.id && faqForm(category.id)}
                 {editable && addingIn !== category.id && (
@@ -332,6 +398,20 @@ export default function AdminFaqsPage() {
           </section>
         );
       })}
+
+      {deleteTarget ? (
+        <ConfirmDialog
+          title={deleteTarget.kind === 'category' ? `Delete ${deleteTarget.category.name}?` : 'Delete this FAQ?'}
+          confirmLabel="Delete"
+          busy={deleting}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={() => void confirmDelete()}
+        >
+          {deleteTarget.kind === 'category'
+            ? `${deleteTarget.category.name} will be removed.`
+            : `${deleteTarget.faq.question} will be removed.`}
+        </ConfirmDialog>
+      ) : null}
     </div>
   );
 }

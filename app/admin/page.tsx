@@ -1,7 +1,9 @@
 'use client';
 
 import { authHeaders } from '@/lib/authHeaders';
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
+import { AccessDenied, ErrorState, LoadGate, StatCardSkeleton, UpdatingNotice } from '@/components/ui-states';
+import { noteQueryFail } from '@/lib/queryState';
 import Link from 'next/link';
 import {
   DollarSign,
@@ -33,6 +35,12 @@ interface DashboardStats {
   ordersChange: number;
   customersChange: number;
   averageOrderValue: number;
+  averageOrderValueChange: number;
+}
+
+function percentChange(current: number, previous: number): number {
+  if (previous === 0) return current === 0 ? 0 : 100;
+  return Number((((current - previous) / previous) * 100).toFixed(1));
 }
 
 interface RecentTransaction {
@@ -54,16 +62,9 @@ export default function AdminDashboard() {
   const { access } = useAccess();
   const showAnalytics = isAdminRole(access?.role || user?.role);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<DashboardStats>({
-    totalRevenue: 0,
-    totalOrders: 0,
-    totalCustomers: 0,
-    totalProducts: 0,
-    revenueChange: 0,
-    ordersChange: 0,
-    customersChange: 0,
-    averageOrderValue: 0,
-  });
+  const [failed, setFailed] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentTransactions, setRecentTransactions] = useState<RecentTransaction[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [insights, setInsights] = useState({
@@ -80,12 +81,13 @@ export default function AdminDashboard() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      setFailed(false);
+      setForbidden(false);
 
-      // Calculate date ranges for comparison
+      // Calculate date ranges for comparison (last month is [start, currentMonthStart))
       const now = new Date();
       const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
 
       // Fetch total revenue (from paid orders)
       const { data: paidOrders, error: revenueError } = await supabase
@@ -94,8 +96,7 @@ export default function AdminDashboard() {
         .eq('payment_status', 'paid');
 
       if (revenueError) {
-        console.error('Error fetching paid orders:', revenueError);
-        // Continue with empty array - don't break the whole dashboard
+        throw revenueError;
       }
 
       const totalRevenue = paidOrders?.reduce((sum, order) => sum + (parseFloat(order.total) || 0), 0) || 0;
@@ -106,14 +107,21 @@ export default function AdminDashboard() {
         return orderDate >= currentMonthStart;
       }).reduce((sum, order) => sum + (parseFloat(order.total) || 0), 0) || 0;
 
-      const lastMonthRevenue = paidOrders?.filter(order => {
+      const lastMonthPaid = paidOrders?.filter((order) => {
         const orderDate = new Date(order.created_at);
-        return orderDate >= lastMonthStart && orderDate <= lastMonthEnd;
-      }).reduce((sum, order) => sum + (parseFloat(order.total) || 0), 0) || 0;
+        return orderDate >= lastMonthStart && orderDate < currentMonthStart;
+      }) || [];
+      const lastMonthRevenue = lastMonthPaid.reduce((sum, order) => sum + (parseFloat(order.total) || 0), 0);
 
-      const revenueChange = lastMonthRevenue > 0 
-        ? ((currentMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 
-        : 0;
+      const currentMonthPaid = paidOrders?.filter((order) => {
+        const orderDate = new Date(order.created_at);
+        return orderDate >= currentMonthStart;
+      }) || [];
+
+      const revenueChange = percentChange(currentMonthRevenue, lastMonthRevenue);
+      const currentMonthAov = currentMonthPaid.length ? currentMonthRevenue / currentMonthPaid.length : 0;
+      const lastMonthAov = lastMonthPaid.length ? lastMonthRevenue / lastMonthPaid.length : 0;
+      const averageOrderValueChange = percentChange(currentMonthAov, lastMonthAov);
 
       // Fetch total orders - combine count and dates in one query
       const { data: allOrders, error: allOrdersError, count: totalOrdersCount } = await supabase
@@ -121,8 +129,7 @@ export default function AdminDashboard() {
         .select('created_at', { count: 'exact' });
 
       if (allOrdersError) {
-        console.error('Error fetching orders:', allOrdersError);
-        // Continue with empty array - don't break the whole dashboard
+        throw allOrdersError;
       }
 
       const currentMonthOrders = allOrders?.filter(order => {
@@ -130,14 +137,12 @@ export default function AdminDashboard() {
         return orderDate >= currentMonthStart;
       }).length || 0;
 
-      const lastMonthOrders = allOrders?.filter(order => {
+      const lastMonthOrders = allOrders?.filter((order) => {
         const orderDate = new Date(order.created_at);
-        return orderDate >= lastMonthStart && orderDate <= lastMonthEnd;
+        return orderDate >= lastMonthStart && orderDate < currentMonthStart;
       }).length || 0;
 
-      const ordersChange = lastMonthOrders > 0 
-        ? ((currentMonthOrders - lastMonthOrders) / lastMonthOrders) * 100 
-        : 0;
+      const ordersChange = percentChange(currentMonthOrders, lastMonthOrders);
 
       // Fetch total customers - try multiple approaches
       let totalCustomersCount: number | null = null;
@@ -202,14 +207,12 @@ export default function AdminDashboard() {
         return userDate >= currentMonthStart;
       }).length || 0;
 
-      const lastMonthCustomers = allCustomers?.filter(user => {
+      const lastMonthCustomers = allCustomers?.filter((user) => {
         const userDate = new Date(user.created_at);
-        return userDate >= lastMonthStart && userDate <= lastMonthEnd;
+        return userDate >= lastMonthStart && userDate < currentMonthStart;
       }).length || 0;
 
-      const customersChange = lastMonthCustomers > 0 
-        ? ((currentMonthCustomers - lastMonthCustomers) / lastMonthCustomers) * 100 
-        : 0;
+      const customersChange = percentChange(currentMonthCustomers, lastMonthCustomers);
 
       // Fetch total products
       const { count: totalProductsCount, error: productsError } = await supabase
@@ -252,10 +255,11 @@ export default function AdminDashboard() {
         totalOrders: totalOrdersCount || 0,
         totalCustomers: actualCustomerCount,
         totalProducts: totalProductsCount || 0,
-        revenueChange: parseFloat(revenueChange.toFixed(1)),
-        ordersChange: parseFloat(ordersChange.toFixed(1)),
-        customersChange: parseFloat(customersChange.toFixed(1)),
+        revenueChange,
+        ordersChange,
+        customersChange,
         averageOrderValue: parseFloat(averageOrderValue.toFixed(2)),
+        averageOrderValueChange,
       });
 
       // Fetch recent transactions (recent orders) - simplified query without join
@@ -266,8 +270,7 @@ export default function AdminDashboard() {
         .limit(5);
 
       if (recentOrdersError) {
-        console.error('Error fetching recent orders:', recentOrdersError);
-        setRecentTransactions([]);
+        throw recentOrdersError;
       } else {
         // Fetch user names separately if needed
         const userIds = [...new Set((recentOrders || []).map(o => o.user_id).filter(Boolean))];
@@ -493,11 +496,37 @@ export default function AdminDashboard() {
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
-      toast.error('Failed to load dashboard data');
+      const kind = noteQueryFail(error);
+      if (kind === 'forbidden') setForbidden(true);
+      else if (kind !== 'unauthorized') setFailed(true);
     } finally {
       setLoading(false);
     }
   };
+
+  if (forbidden) {
+    return (
+      <AccessDenied
+        title="You don't have access"
+        description="You don't have access to this data."
+        primary={{ label: 'Go back', href: '/admin' }}
+      />
+    );
+  }
+
+  if (failed && !stats) {
+    return (
+      <ErrorState
+        title="We couldn't load the dashboard"
+        description="Try again in a moment. If it keeps failing, contact support."
+        primary={{ label: 'Try again', onClick: () => void fetchDashboardData() }}
+      />
+    );
+  }
+
+  if ((loading && !stats) || !stats) {
+    return <StatCardSkeleton count={4} />;
+  }
 
   const statCards = [
     {
@@ -530,7 +559,7 @@ export default function AdminDashboard() {
     {
       title: 'Avg Order Value',
       value: `GHS ${stats.averageOrderValue.toFixed(2)}`,
-      change: 5.8,
+      change: stats.averageOrderValueChange,
       icon: CreditCard,
       color: 'bg-orange-500',
       bgColor: 'bg-orange-50',
@@ -577,19 +606,17 @@ export default function AdminDashboard() {
     },
   ];
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF7A19] mx-auto mb-4"></div>
-          <p className="text-[#3A3A3A]">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
+      {loading ? <UpdatingNotice /> : null}
+      {failed ? (
+        <div className="flex flex-col items-stretch gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between" role="alert">
+          <p className="text-sm text-red-800">We couldn&apos;t refresh this. Your last loaded data is still here.</p>
+          <button type="button" className="min-h-11 text-sm font-semibold text-red-800 underline" onClick={() => void fetchDashboardData()}>
+            Try again
+          </button>
+        </div>
+      ) : null}
       <div className="flex flex-wrap gap-4">
         <OpenServiceRequestsCard />
         <VlbPayoutsDueCard />
@@ -662,7 +689,15 @@ export default function AdminDashboard() {
             </a>
           </div>
           <div className="divide-y divide-gray-200">
-            {recentTransactions.length > 0 ? (
+            {failed && recentTransactions.length === 0 ? (
+              <div className="p-6">
+                <ErrorState
+                  title="We couldn't load recent orders"
+                  description="Try again in a moment."
+                  primary={{ label: 'Try again', onClick: () => void fetchDashboardData() }}
+                />
+              </div>
+            ) : recentTransactions.length > 0 ? (
               recentTransactions.map((transaction) => (
               <div key={transaction.id} className="p-6 hover:bg-gray-50 transition-colors">
                 <div className="flex items-center justify-between mb-2">
@@ -746,24 +781,36 @@ function OpenServiceRequestsCard() {
   const { access } = useAccess();
   const allowed = canViewModule(access, 'tickets');
   const [count, setCount] = useState<number | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  const load = () => {
+    setFailed(false);
+    return deviceRequest<TicketSummary>('/api/admin/tickets/summary')
+      .then((result) => {
+        setCount(openTicketCount(result.data));
+      })
+      .catch((error) => {
+        const kind = noteQueryFail(error);
+        if (kind !== 'unauthorized') setFailed(true);
+      });
+  };
 
   useEffect(() => {
     if (!allowed) return;
-    let cancelled = false;
-    deviceRequest<TicketSummary>('/api/admin/tickets/summary')
-      .then((result) => {
-        if (!cancelled) setCount(openTicketCount(result.data));
-      })
-      .catch((error) => {
-        console.error('open service requests', error);
-        if (!cancelled) toast.error(apiMessage(error, 'Could not load service requests'));
-      });
-    return () => {
-      cancelled = true;
-    };
+    void load();
   }, [allowed]);
 
-  if (!allowed || count === null) return null;
+  if (!allowed) return null;
+  if (failed && count === null) {
+    return (
+      <ErrorState
+        title="We couldn't load service requests"
+        description="Try again in a moment."
+        primary={{ label: 'Try again', onClick: () => void load() }}
+      />
+    );
+  }
+  if (count === null) return null;
 
   return (
     <Link
@@ -780,13 +827,12 @@ function VlbPayoutsDueCard() {
   const { access } = useAccess();
   const allowed = canViewModule(access, 'vlb');
   const [summary, setSummary] = useState<{ count: number; totalNet: number } | null>(null);
+  const [failed, setFailed] = useState(false);
 
-  useEffect(() => {
-    if (!allowed) return;
-    let cancelled = false;
-    deviceRequest<Array<{ net_pesewas?: number }>>('/api/admin/vlb/payouts?range=this_week&limit=100')
+  const load = () => {
+    setFailed(false);
+    return deviceRequest<Array<{ net_pesewas?: number }>>('/api/admin/vlb/payouts?range=this_week&limit=100')
       .then((result) => {
-        if (cancelled) return;
         const rows = result.data || [];
         setSummary({
           count: result.pagination?.total ?? rows.length,
@@ -794,15 +840,27 @@ function VlbPayoutsDueCard() {
         });
       })
       .catch((error) => {
-        console.error('vlb payouts due this week', error);
-        if (!cancelled) toast.error(apiMessage(error, 'Could not load Laptop Banking payouts'));
+        const kind = noteQueryFail(error);
+        if (kind !== 'unauthorized') setFailed(true);
       });
-    return () => {
-      cancelled = true;
-    };
+  };
+
+  useEffect(() => {
+    if (!allowed) return;
+    void load();
   }, [allowed]);
 
-  if (!allowed || !summary) return null;
+  if (!allowed) return null;
+  if (failed && !summary) {
+    return (
+      <ErrorState
+        title="We couldn't load payouts"
+        description="Try again in a moment."
+        primary={{ label: 'Try again', onClick: () => void load() }}
+      />
+    );
+  }
+  if (!summary) return null;
 
   return (
     <Link

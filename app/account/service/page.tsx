@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Wrench } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
-import { AccountListSkeleton, EmptyState, ErrorState } from '@/components/ui-states';
+import { AccessDenied, AccountListSkeleton, EmptyState, ErrorState } from '@/components/ui-states';
+import { noteQueryFail } from '@/lib/queryState';
 import { useOnlineRefetch } from '@/hooks/useOnlineRefetch';
 import { useAppSelector } from '@/store';
 import { safeRedirectPath } from '@/lib/safeRedirect';
@@ -30,16 +31,20 @@ export default function MyServiceRequestsPage() {
   const [tickets, setTickets] = useState<MyTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
 
   const loadTickets = useCallback(async () => {
     if (!isAuthenticated) return;
     setLoading(true);
     setFailed(false);
+    setForbidden(false);
     try {
       const result = await deviceRequest<MyTicket[]>('/api/tickets/mine');
       setTickets(result.data || []);
-    } catch {
-      setFailed(true);
+    } catch (error) {
+      const kind = noteQueryFail(error);
+      if (kind === 'forbidden') setForbidden(true);
+      else if (kind !== 'unauthorized') setFailed(true);
     } finally {
       setLoading(false);
     }
@@ -67,7 +72,13 @@ export default function MyServiceRequestsPage() {
           <h1 className="hidden text-2xl font-bold text-[#1A1A1A] md:block">Service requests</h1>
           <Link href="/account/service/new" className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-[#FF7A19] px-4 text-sm font-semibold text-white sm:w-auto">New request</Link>
         </div>
-        {failed && tickets.length === 0 ? (
+        {forbidden ? (
+          <AccessDenied
+            title="You don't have access"
+            description="You don't have access to this data."
+            primary={{ label: 'Go to your account', href: '/account' }}
+          />
+        ) : failed && tickets.length === 0 ? (
           <ErrorState
             title="We couldn't load your requests"
             description="Try again in a moment. Existing tickets are still with our team."

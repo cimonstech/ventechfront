@@ -30,13 +30,13 @@ export function AffiliatePrompt({
       title={title}
       onClose={onClose}
       footer={(
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button type="button" variant="ghost" className="w-full sm:w-auto" disabled={busy} onClick={onClose}>
+        <div className="flex flex-row justify-end gap-2">
+          <Button type="button" variant="ghost" className="min-w-0 flex-1 sm:flex-none sm:w-auto" disabled={busy} onClick={onClose}>
             Cancel
           </Button>
           <Button
             type="button"
-            className="w-full sm:w-auto"
+            className="min-w-0 flex-1 sm:flex-none sm:w-auto"
             isLoading={busy}
             disabled={busy || !value.trim()}
             onClick={() => onSubmit(value.trim())}

@@ -18,6 +18,8 @@ import { couponService } from '@/services/coupon.service';
 import { DeliveryOption } from '@/types/order';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
+import { PAYMENT_COPY } from '@/lib/paymentCopy';
+import { FieldError } from '@/components/ui-states';
 import { 
   PRE_ORDER_SHIPPING_OPTIONS, 
   PreOrderShippingOption,
@@ -33,6 +35,8 @@ export default function CheckoutPage() {
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [checkoutError, setCheckoutError] = useState('');
+  const CHECKOUT_DRAFT_KEY = 'checkout_form_draft';
   
   // Get applied coupon from sessionStorage (set by cart page)
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
@@ -47,6 +51,21 @@ export default function CheckoutPage() {
           setAppliedCoupon(JSON.parse(storedCoupon));
         } catch (e) {
           console.error('Error parsing stored coupon:', e);
+        }
+      }
+      const storedDraft = sessionStorage.getItem(CHECKOUT_DRAFT_KEY);
+      if (storedDraft) {
+        try {
+          const draft = JSON.parse(storedDraft);
+          if (draft.customerBio) setCustomerBio((prev) => ({ ...prev, ...draft.customerBio }));
+          if (draft.deliveryInfo) setDeliveryInfo((prev) => ({ ...prev, ...draft.deliveryInfo }));
+          if (typeof draft.deliverToSomeoneElse === 'boolean') setDeliverToSomeoneElse(draft.deliverToSomeoneElse);
+          if (typeof draft.notes === 'string') setNotes(draft.notes);
+          if (draft.paymentMethod === 'paystack' || draft.paymentMethod === 'cash_on_delivery') {
+            setPaymentMethod(draft.paymentMethod);
+          }
+        } catch (e) {
+          console.error('Error parsing checkout draft:', e);
         }
       }
     }
@@ -183,6 +202,17 @@ export default function CheckoutPage() {
   const [selectedDelivery, setSelectedDelivery] = useState<DeliveryOption | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'cash_on_delivery' | 'paystack'>('paystack'); // Paystack as default
   const [notes, setNotes] = useState('');
+
+  const saveCheckoutDraft = () => {
+    if (typeof window === 'undefined') return;
+    sessionStorage.setItem(CHECKOUT_DRAFT_KEY, JSON.stringify({
+      customerBio,
+      deliveryInfo,
+      deliverToSomeoneElse,
+      notes,
+      paymentMethod,
+    }));
+  };
 
   // Fetch delivery options function
   const fetchDeliveryOptions = async () => {
@@ -355,6 +385,8 @@ export default function CheckoutPage() {
       return;
     }
 
+    setCheckoutError('');
+    saveCheckoutDraft();
     setIsProcessing(true);
 
     try {
@@ -474,16 +506,13 @@ export default function CheckoutPage() {
       });
 
       if (!paymentResult.success) {
-        throw new Error(paymentResult.message || 'Failed to initialize payment');
+        setCheckoutError(paymentResult.message || PAYMENT_COPY.startFailed);
+        setIsProcessing(false);
+        return;
       }
-
-      // Payment popup/redirect will be handled by paymentService
-      // Order will be created after payment verification in callback page
-      // Don't set isProcessing to false here - let the redirect/callback handle it
-      // The loading state will be cleared when user is redirected to callback page
-    } catch (error: any) {
+    } catch (error) {
       console.error('Paystack payment error:', error);
-      toast.error(error.message || 'Failed to initialize payment. Please try again.');
+      setCheckoutError(PAYMENT_COPY.startFailed);
       setIsProcessing(false);
     }
   };
@@ -511,6 +540,8 @@ export default function CheckoutPage() {
       return;
     }
 
+    setCheckoutError('');
+    saveCheckoutDraft();
     setIsProcessing(true);
 
     try {
@@ -564,8 +595,7 @@ export default function CheckoutPage() {
           console.log('✅ Regular order created:', regularOrder.id);
         } catch (error: any) {
           console.error('❌ Regular order failed:', error);
-          const errorMessage = error?.message || error?.response?.data?.message || 'Failed to create regular order';
-          errors.push(`Regular order: ${errorMessage}`);
+          errors.push(error instanceof Error ? error.message : PAYMENT_COPY.placeFailed);
         }
       }
 
@@ -628,20 +658,17 @@ export default function CheckoutPage() {
           console.log('✅ Pre-order created:', preOrder.id);
         } catch (error: any) {
           console.error('❌ Pre-order failed:', error);
-          const errorMessage = error?.message || error?.response?.data?.message || 'Failed to create pre-order';
-          errors.push(`Pre-order: ${errorMessage}`);
+          errors.push(error instanceof Error ? error.message : PAYMENT_COPY.placeFailed);
         }
       }
 
       // Handle results
       if (errors.length > 0 && orders.length === 0) {
-        // All orders failed
-        toast.error(`Failed to place orders: ${errors.join('; ')}`);
+        setCheckoutError(errors[0] || PAYMENT_COPY.placeFailed);
         setIsProcessing(false);
         return;
       } else if (errors.length > 0) {
-        // Some orders succeeded, some failed
-        toast.error(`Some orders were placed successfully, but some failed: ${errors.join('; ')}`);
+        setCheckoutError(errors[0] || PAYMENT_COPY.placeFailed);
       } else {
         // All orders succeeded
         if (hasMixedCart) {
@@ -662,37 +689,9 @@ export default function CheckoutPage() {
       } else {
         setIsProcessing(false);
       }
-    } catch (error: any) {
-      console.error('Order error:', {
-        error,
-        message: error?.message || 'Unknown error',
-        stack: error?.stack,
-        name: error?.name,
-        response: error?.response,
-        data: error?.data,
-        details: error?.details,
-        hint: error?.hint,
-        code: error?.code,
-        fullError: JSON.stringify(error, null, 2),
-      });
-      
-      // Extract error message from various possible locations
-      let errorMessage = 'Failed to place order';
-      if (error?.message) {
-        errorMessage = error.message;
-      } else if (error?.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error?.data?.message) {
-        errorMessage = error.data.message;
-      } else if (error?.details) {
-        errorMessage = error.details;
-      } else if (error?.hint) {
-        errorMessage = error.hint;
-      } else if (typeof error === 'string') {
-        errorMessage = error;
-      }
-      
-      toast.error(errorMessage);
+    } catch (error) {
+      console.error('Order error:', error);
+      setCheckoutError(error instanceof Error && error.message ? error.message : PAYMENT_COPY.placeFailed);
     } finally {
       setIsProcessing(false);
     }
@@ -1103,16 +1102,30 @@ export default function CheckoutPage() {
                   />
                 </div>
 
+                {checkoutError ? (
+                  <FieldError id="checkout-pay-error" message={checkoutError} />
+                ) : null}
+
                 <Button
                   variant="primary"
                   size="lg"
                   className="w-full"
                   onClick={handlePlaceOrder}
                   isLoading={isProcessing || couponBusy}
-                  disabled={couponBusy}
+                  disabled={isProcessing || couponBusy}
+                  aria-describedby={checkoutError ? 'checkout-pay-error' : isProcessing || couponBusy ? 'checkout-pay-status' : undefined}
                 >
                   {paymentMethod === 'paystack' ? 'Pay now' : 'Place order'}
                 </Button>
+                {(isProcessing || couponBusy) ? (
+                  <p id="checkout-pay-status" className="mt-2 text-sm text-[#3A3A3A]" role="status">
+                    {couponBusy
+                      ? 'Checking your coupon…'
+                      : paymentMethod === 'paystack'
+                        ? 'Starting your payment…'
+                        : 'Placing your order…'}
+                  </p>
+                ) : null}
               </div>
             </div>
           </div>

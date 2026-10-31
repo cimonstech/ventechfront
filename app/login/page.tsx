@@ -13,6 +13,7 @@ import { setUser } from '@/store/authSlice';
 import { supabase } from '@/lib/supabase';
 import { postSignInPath } from '@/lib/landing';
 import { clearRememberedRedirect, peekRememberedRedirect, rememberRedirect, safeRedirectPath } from '@/lib/safeRedirect';
+import { mapSignInError } from '@/lib/authErrors';
 import toast from 'react-hot-toast';
 
 export default function LoginPage() {
@@ -40,8 +41,8 @@ export default function LoginPage() {
       [e.target.name]: e.target.value,
     });
     // Clear error for this field
-    if (errors[e.target.name]) {
-      setErrors({ ...errors, [e.target.name]: '' });
+    if (errors[e.target.name] || errors.form || errors.unconfirmed) {
+      setErrors({ ...errors, [e.target.name]: '', form: '', unconfirmed: '' });
     }
   };
 
@@ -113,34 +114,13 @@ export default function LoginPage() {
           router.push(await postSignInPath(remembered));
         }
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Login error:', error);
-      
-      // Provide more specific error messages
-      let errorMessage = 'Login failed. Please check your credentials.';
-      
-      if (error?.message) {
-        const message = error.message.toLowerCase();
-        
-        if (message.includes('invalid login credentials') || message.includes('invalid credentials')) {
-          errorMessage = 'Invalid email or password. Please check your credentials and try again.';
-        } else if (message.includes('email not confirmed') || message.includes('email not verified')) {
-          errorMessage = 'Please verify your email before logging in. Check your inbox for the verification link.';
-          // Optionally redirect to verification page
-          setTimeout(() => {
-            router.push('/verify-email');
-          }, 2000);
-        } else if (message.includes('user not found')) {
-          errorMessage = 'No account found with this email. Please sign up first.';
-        } else if (message.includes('too many requests') || message.includes('rate limit')) {
-          errorMessage = 'Too many login attempts. Please wait a few minutes and try again.';
-        } else {
-          errorMessage = error.message;
-        }
-      }
-      
-      toast.error(errorMessage);
-      setErrors({ form: errorMessage });
+      const mapped = mapSignInError(error);
+      setErrors({
+        form: mapped.message,
+        unconfirmed: mapped.kind === 'unconfirmed' ? '1' : '',
+      });
     } finally {
       setIsLoading(false);
     }
@@ -168,7 +148,7 @@ export default function LoginPage() {
             </Link>
           </p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit} aria-describedby={errors.form ? 'login-form-error' : undefined}>
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
               <label htmlFor="email" className="sr-only">
@@ -254,6 +234,16 @@ export default function LoginPage() {
           </div>
 
           <FieldError id="login-form-error" message={errors.form} />
+          {errors.unconfirmed ? (
+            <p className="text-sm text-[#3A3A3A]">
+              <Link
+                href={`/verify-email?email=${encodeURIComponent(formData.email)}`}
+                className="font-medium text-[#FF7A19] hover:text-orange-600"
+              >
+                Resend link
+              </Link>
+            </p>
+          ) : null}
 
           <div>
             <Button

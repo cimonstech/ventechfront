@@ -3,11 +3,21 @@ export const ONLINE_REFETCH_EVENT = 'vt-online-refetch';
 
 export class ApiError extends Error {
   status: number;
+  kind?: string;
+  retryAfterSeconds?: number;
+  reference?: string;
 
-  constructor(status: number, message: string) {
+  constructor(
+    status: number,
+    message: string,
+    extra?: { kind?: string; retryAfterSeconds?: number; reference?: string }
+  ) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.kind = extra?.kind;
+    this.retryAfterSeconds = extra?.retryAfterSeconds;
+    this.reference = extra?.reference;
   }
 }
 

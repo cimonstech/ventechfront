@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { SidebarAds } from '@/components/navigation/SidebarAds';
+import { LoadGate, ProductGridSkeleton } from '@/components/ui-states';
+import { useListQuery } from '@/hooks/useListQuery';
 import { productService } from '@/services/product.service';
 import { getCategories } from '@/services/category.service';
 import { getFilterBrands, Brand } from '@/services/brand.service';
@@ -39,6 +41,7 @@ export function ShopContent() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const catalog = useListQuery();
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [filters, setFilters] = useState<ProductFilters>({
@@ -57,7 +60,6 @@ export function ShopContent() {
       }));
       // Reset to page 1 when filter changes
       setCurrentPage(1);
-      setProducts([]);
     } else if (featured === null || featured === 'false') {
       // Clear featured filter if not in URL or explicitly false
       setFilters(prev => {
@@ -88,43 +90,32 @@ export function ShopContent() {
   useEffect(() => {
     const fetchProducts = async () => {
       setIsLoading(true);
-      try {
+      await catalog.run(async () => {
         const offset = (currentPage - 1) * productsPerPage;
-        // Build query params - explicitly include featured and preOrder if they're set
         const queryParams: any = {
           ...filters,
           limit: productsPerPage,
           offset
         };
-        
-        // Explicitly set featured filter if it exists
         if (filters.featured !== undefined) {
           queryParams.featured = filters.featured;
         }
-        
-        // Explicitly set preOrder filter if it exists
         if (filters.preOrder !== undefined) {
           queryParams.preOrder = filters.preOrder;
         }
-        
         const productsData = await productService.getProducts(queryParams);
-        
         if (currentPage === 1) {
           setProducts(productsData);
         } else {
           setProducts(prev => [...prev, ...productsData]);
         }
-        
         setHasMore(productsData.length === productsPerPage);
-      } catch (error) {
-        console.error('Error fetching products:', error);
-      } finally {
-        setIsLoading(false);
-      }
+      });
+      setIsLoading(false);
     };
     
     fetchProducts();
-  }, [currentPage, filters]);
+  }, [currentPage, filters, catalog.run]);
 
   // Update filtered products when products or filters change
   useEffect(() => {
@@ -215,6 +206,31 @@ export function ShopContent() {
     if (searchParams.get('featured')) {
       window.history.pushState({}, '', '/shop');
     }
+  };
+
+  const hasActiveFilters = Boolean(
+    filters.category ||
+    filters.brand ||
+    filters.minPrice !== undefined ||
+    filters.maxPrice !== undefined ||
+    filters.inStock !== undefined ||
+    filters.featured ||
+    filters.preOrder
+  );
+
+  const reloadProducts = () => {
+    setCurrentPage(1);
+    void catalog.run(async () => {
+      const productsData = await productService.getProducts({
+        ...filters,
+        featured: filters.featured,
+        preOrder: filters.preOrder,
+        limit: productsPerPage,
+        offset: 0,
+      } as any);
+      setProducts(productsData);
+      setHasMore(productsData.length === productsPerPage);
+    });
   };
 
   return (
@@ -450,19 +466,20 @@ export function ShopContent() {
             </div>
 
             {/* Products Grid/List */}
-            {isLoading && products.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF7A19] mx-auto mb-4"></div>
-                <p className="text-gray-600">Loading products...</p>
-              </div>
-            ) : filteredProducts.length === 0 ? (
-              <div className="text-center py-12 bg-white rounded-lg shadow-sm">
-                <p className="text-gray-600 mb-4">No products found</p>
-                <Button variant="outline" onClick={clearFilters}>
-                  Clear Filters
-                </Button>
-              </div>
-            ) : (
+            <LoadGate
+              loaded={catalog.loaded}
+              loading={catalog.loading}
+              updating={catalog.updating}
+              error={catalog.error}
+              isEmpty={filteredProducts.length === 0}
+              filtered={hasActiveFilters}
+              onRetry={reloadProducts}
+              onClearFilters={clearFilters}
+              skeleton={<ProductGridSkeleton count={8} />}
+              emptyTitle="No products yet"
+              emptyDescription="New gadgets will show up here as they are added."
+              emptyPrimary={{ label: 'View categories', href: '/categories' }}
+            >
               <>
                 <div className={viewMode === 'grid' 
                   ? 'grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3 lg:gap-4 xl:gap-6'
@@ -477,7 +494,6 @@ export function ShopContent() {
                   ))}
                 </div>
 
-                {/* Load More Button */}
                 {hasMore && (
                   <div className="text-center mt-8">
                     <Button
@@ -490,7 +506,7 @@ export function ShopContent() {
                   </div>
                 )}
               </>
-            )}
+            </LoadGate>
           </div>
 
           {/* Sidebar Ads (Desktop Only) */}

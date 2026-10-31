@@ -132,9 +132,13 @@ const getProducts = async (params: GetProductsParams = {}): Promise<Product[]> =
           basicQuery = basicQuery.eq('is_pre_order', params.preOrder);
         }
         
-        const { data: productsBasic } = await basicQuery
+        const { data: productsBasic, error: basicError } = await basicQuery
           .order('created_at', { ascending: false })
           .limit(params.limit || 50);
+
+        if (basicError) {
+          throw basicError;
+        }
         
         const basicProducts = (productsBasic || []).map((p: any) => ({
           ...p,
@@ -323,8 +327,7 @@ const getProducts = async (params: GetProductsParams = {}): Promise<Product[]> =
     return productsWithRanges;
   } catch (error) {
     console.error('Error fetching products:', error);
-    console.error('Error details:', JSON.stringify(error, null, 2));
-    return [];
+    throw error;
   }
 };
 
@@ -397,11 +400,9 @@ export const getProductBySlug = async (slug: string): Promise<Product | null> =>
     }
 
     if (error) {
-      // Only log actual errors, not "not found" errors (PGRST116 is expected when product doesn't exist)
-      if (error.code !== 'PGRST116') {
-        console.error('Error fetching product by slug:', error);
-      }
-      return null;
+      if (error.code === 'PGRST116') return null;
+      console.error('Error fetching product by slug:', error);
+      throw error;
     }
 
     if (!data) {
@@ -500,7 +501,7 @@ export const getProductBySlug = async (slug: string): Promise<Product | null> =>
     return product;
   } catch (error) {
     console.error('Error fetching product by slug:', error);
-    return null;
+    throw error;
   }
 };
 
@@ -544,7 +545,7 @@ const getFeaturedProducts = async (limit: number = 8): Promise<Product[]> => {
     });
   } catch (error) {
     console.error('Error fetching featured products:', error);
-    return [];
+    throw error;
   }
 };
 

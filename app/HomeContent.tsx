@@ -7,6 +7,8 @@ import { HeroSlider } from '@/components/banners/HeroSlider';
 import { ProductCard } from '@/components/cards/ProductCard';
 import { CategoryCard } from '@/components/cards/CategoryCard';
 import { ProductListSkeleton } from '@/components/loaders/ProductCardSkeleton';
+import { LoadGate } from '@/components/ui-states';
+import { useListQuery } from '@/hooks/useListQuery';
 import { QuickView } from '@/components/shop/QuickView';
 // import { FlashDeals } from '@/components/shop/FlashDeals'; // Disabled for now
 import { Button } from '@/components/ui/Button';
@@ -34,8 +36,8 @@ export function HomeContent() {
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
+  const catalog = useListQuery();
 
   // Fetch banners separately to allow refresh
   const fetchBanners = useCallback(async () => {
@@ -159,41 +161,23 @@ export function HomeContent() {
   }, []);
 
 
+  const loadCatalog = useCallback(() => {
+    return catalog.run(async () => {
+      const [productsData, categoriesData, featuredData] = await Promise.all([
+        productService.getProducts({ featured: false, limit: 20 }),
+        getCategories(),
+        productService.getProducts({ featured: true, limit: 10 }),
+      ]);
+      const actualFeaturedProducts = featuredData.filter(p => p.featured === true && !(p as any).is_pre_order);
+      setFeaturedProducts(actualFeaturedProducts);
+      const featuredProductIds = new Set(actualFeaturedProducts.map(p => p.id));
+      setAllProducts(productsData.filter(p => !p.featured && !featuredProductIds.has(p.id)));
+      setCategories(categoriesData.filter(cat => !cat.parent_id));
+    });
+  }, [catalog.run]);
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-
-        // Fetch all data in parallel
-        const [productsData, categoriesData] = await Promise.all([
-          productService.getProducts({ featured: false, limit: 20 }),
-          getCategories(),
-        ]);
-
-        // Get featured products separately - only products explicitly marked as featured
-        // Note: Pre-order products are excluded from featured products
-        const featuredData = await productService.getProducts({ featured: true, limit: 10 });
-        // Filter to ensure only products with featured=true and NOT pre-order are included
-        const actualFeaturedProducts = featuredData.filter(p => p.featured === true && !(p as any).is_pre_order);
-        setFeaturedProducts(actualFeaturedProducts);
-
-        // Filter out featured products from all products - exclude products that are featured
-        const featuredProductIds = new Set(actualFeaturedProducts.map(p => p.id));
-        const nonFeaturedProducts = productsData.filter(p => !p.featured && !featuredProductIds.has(p.id));
-        setAllProducts(nonFeaturedProducts);
-
-        // Set categories (main categories only for homepage)
-        // Don't slice here - let CategoryCarousel handle the display limit
-        const mainCategories = categoriesData.filter(cat => !cat.parent_id);
-        setCategories(mainCategories);
-      } catch (error) {
-        console.error('Error fetching homepage data:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchData();
+    void loadCatalog();
     
     // Set up interval to refresh banners every 30 seconds (for admin updates)
     const bannerRefreshInterval = setInterval(() => {
@@ -203,7 +187,7 @@ export function HomeContent() {
     return () => {
       clearInterval(bannerRefreshInterval);
     };
-  }, [fetchBanners]);
+  }, [fetchBanners, loadCatalog]);
 
   const [heroBanners, setHeroBanners] = useState<Banner[]>([]);
 
@@ -264,9 +248,18 @@ export function HomeContent() {
           </Link>
         </div>
 
-        {isLoading ? (
-          <ProductListSkeleton count={5} />
-        ) : featuredProducts.length > 0 ? (
+        <LoadGate
+          loaded={catalog.loaded}
+          loading={catalog.loading}
+          updating={catalog.updating}
+          error={catalog.error}
+          isEmpty={featuredProducts.length === 0}
+          onRetry={() => void loadCatalog()}
+          skeleton={<ProductListSkeleton count={5} />}
+          emptyTitle="No featured products yet"
+          emptyDescription="Browse the shop for the latest laptops and gadgets."
+          emptyPrimary={{ label: 'Browse all products', href: '/shop' }}
+        >
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3 md:gap-4">
             {featuredProducts.slice(0, 10).map((product) => (
               <ProductCard
@@ -276,15 +269,7 @@ export function HomeContent() {
               />
             ))}
           </div>
-        ) : (
-          <div className="text-center py-12 bg-gray-50 rounded-xl">
-            <Star className="mx-auto mb-4 text-gray-400" size={48} />
-            <p className="text-[#3A3A3A] mb-4">No featured products yet</p>
-            <Link href="/shop">
-              <Button variant="outline">Browse All Products</Button>
-            </Link>
-          </div>
-        )}
+        </LoadGate>
       </section>
 
       {/* Categories */}
@@ -302,24 +287,20 @@ export function HomeContent() {
             </Link>
           </div>
 
-          {isLoading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
-              {[...Array(8)].map((_, i) => (
-                <div key={i} className="bg-white rounded-xl p-4 animate-pulse">
-                  <div className="w-full h-32 bg-gray-200 rounded-lg mb-3" />
-                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
-                  <div className="h-3 bg-gray-200 rounded w-1/2" />
-                </div>
-              ))}
-            </div>
-          ) : categories.length > 0 ? (
+          <LoadGate
+            loaded={catalog.loaded}
+            loading={catalog.loading}
+            updating={catalog.updating}
+            error={catalog.error}
+            isEmpty={categories.length === 0}
+            onRetry={() => void loadCatalog()}
+            skeleton={<ProductListSkeleton count={8} />}
+            emptyTitle="No categories yet"
+            emptyDescription="Products will be grouped here once categories are added."
+            emptyPrimary={{ label: 'Browse the shop', href: '/shop' }}
+          >
             <CategoryCarousel categories={categories} />
-          ) : (
-            <div className="text-center py-12 bg-white rounded-xl">
-              <Tag className="mx-auto mb-4 text-gray-400" size={48} />
-              <p className="text-[#3A3A3A] mb-4">No categories yet</p>
-            </div>
-          )}
+          </LoadGate>
         </div>
       </section>
 
@@ -345,16 +326,18 @@ export function HomeContent() {
             </Link>
           </div>
 
-        {isLoading ? (
-          <ProductListSkeleton count={20} />
-        ) : allProducts.length === 0 ? (
-          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-            <p className="text-[#3A3A3A] text-sm mb-4">No products available yet</p>
-            <Link href="/shop">
-              <Button variant="outline">Browse Categories</Button>
-            </Link>
-          </div>
-        ) : (
+        <LoadGate
+          loaded={catalog.loaded}
+          loading={catalog.loading}
+          updating={catalog.updating}
+          error={catalog.error}
+          isEmpty={allProducts.length === 0}
+          onRetry={() => void loadCatalog()}
+          skeleton={<ProductListSkeleton count={20} />}
+          emptyTitle="No products yet"
+          emptyDescription="New gadgets will show up here as they are added."
+          emptyPrimary={{ label: 'Browse categories', href: '/categories' }}
+        >
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3 md:gap-4">
             {allProducts.slice(0, 20).map((product) => (
               <ProductCard
@@ -364,7 +347,7 @@ export function HomeContent() {
               />
             ))}
           </div>
-        )}
+        </LoadGate>
       </section>
 
       {/* Special Offers Banner */}

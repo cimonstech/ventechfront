@@ -1,5 +1,7 @@
 import { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import Script from 'next/script';
+import { RetryError } from '@/components/ui-states';
 import { generateCategoryMetadata } from '@/lib/seo.utils';
 import { generateStructuredData } from '@/lib/seo.config';
 import { CategoryContent } from './CategoryContent';
@@ -12,10 +14,20 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function CategoryProductsPage({ params }: { params: Promise<{ slug: string }> }) {
   const resolvedParams = await params;
-  const category = await getCategoryBySlug(resolvedParams.slug);
+  let category;
+  try {
+    category = await getCategoryBySlug(resolvedParams.slug);
+  } catch {
+    return (
+      <RetryError
+        title="We couldn't load this category"
+        description="Try again in a moment, or browse all categories."
+      />
+    );
+  }
   
   if (!category) {
-    return <div>Category not found</div>;
+    notFound();
   }
 
   const breadcrumbData = {

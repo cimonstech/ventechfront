@@ -3,17 +3,24 @@
 import { ADMIN_DATA_DENIED, isAccessDeniedStatus } from '@/lib/access';
 import { authHeaders } from '@/lib/authHeaders';
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import {
-  Search,
-  Filter,
   Download,
   CheckCircle,
   Clock,
   XCircle,
   RotateCcw,
 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import {
+  AdminPageHeader,
+  AdminRowCard,
+  ConfirmDialog,
+  FilterBar,
+  filterSelectClassName,
+  ResponsiveTable,
+  RowActions,
+} from '@/components/admin/list';
+import { LoadGate, TableSkeleton } from '@/components/ui-states';
+import { noteQueryFail } from '@/lib/queryState';
 import { useAccess } from '@/context/AccessContext';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
@@ -35,12 +42,15 @@ export default function TransactionsPage() {
   const { canEdit } = useAccess();
   const canEditFinance = canEdit('finance');
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [denied, setDenied] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set());
   const [isRefunding, setIsRefunding] = useState(false);
+  const [refundTarget, setRefundTarget] = useState<Transaction | 'bulk' | null>(null);
 
   // Fetch real data from Supabase
   useEffect(() => {
@@ -151,17 +161,33 @@ export default function TransactionsPage() {
       }));
 
       setTransactions(formattedTransactions);
+      setLoaded(true);
+      setFailed(false);
     } catch (error) {
       console.error('Error fetching transactions:', error);
-      setTransactions([]);
-      if (error instanceof Error && error.message === ADMIN_DATA_DENIED) {
+      const kind = noteQueryFail(error);
+      if (kind === 'forbidden' || (error instanceof Error && error.message === ADMIN_DATA_DENIED)) {
         setDenied(true);
-        toast.error(ADMIN_DATA_DENIED);
-      } else {
-        toast.error('Failed to load transactions. Please check console for details.');
+      } else if (kind !== 'unauthorized') {
+        setFailed(true);
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const statusLabel = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'Completed';
+      case 'pending':
+        return 'Pending';
+      case 'failed':
+        return 'Failed';
+      case 'refunded':
+        return 'Refunded';
+      default:
+        return status;
     }
   };
 
@@ -195,6 +221,13 @@ export default function TransactionsPage() {
     }
   };
 
+  const statusBadge = (status: string) => (
+    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(status)}`}>
+      {getStatusIcon(status)}
+      {statusLabel(status)}
+    </span>
+  );
+
   const filteredTransactions = transactions.filter((transaction) => {
     const matchesSearch =
       transaction.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -206,6 +239,10 @@ export default function TransactionsPage() {
 
     return matchesSearch && matchesStatus;
   });
+
+  const refundableSelected = filteredTransactions.filter(
+    (transaction) => selectedTransactions.has(transaction.id) && transaction.status === 'completed'
+  );
 
   const handleSelectAll = () => {
     if (selectedTransactions.size === filteredTransactions.length) {
@@ -225,32 +262,17 @@ export default function TransactionsPage() {
     setSelectedTransactions(newSelected);
   };
 
-  const handleBulkRefund = async () => {
-    if (selectedTransactions.size === 0) {
-      toast.error('Please select at least one transaction to refund');
-      return;
-    }
-
-    const selected = Array.from(selectedTransactions);
-    const transactionsToRefund = filteredTransactions.filter(t => selected.includes(t.id));
-    
-    // Only allow refunding completed transactions
-    const refundableTransactions = transactionsToRefund.filter(t => t.status === 'completed');
-    
-    if (refundableTransactions.length === 0) {
+  const refundTransactions = async (items: Transaction[]) => {
+    if (items.length === 0) {
       toast.error('Only completed transactions can be refunded');
-      return;
-    }
-
-    if (!confirm(`Are you sure you want to refund ${refundableTransactions.length} transaction(s)?`)) {
       return;
     }
 
     setIsRefunding(true);
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      
-      const refundPromises = refundableTransactions.map(async (transaction) => {
+
+      const refundPromises = items.map(async (transaction) => {
         const response = await fetch(`${API_URL}/api/transactions/${transaction.id}/refund`, {
           method: 'POST',
           headers: {
@@ -268,9 +290,10 @@ export default function TransactionsPage() {
       });
 
       await Promise.all(refundPromises);
-      
-      toast.success(`Successfully refunded ${refundableTransactions.length} transaction(s)`);
+
+      toast.success(items.length === 1 ? 'Transaction refunded successfully' : `Successfully refunded ${items.length} transaction(s)`);
       setSelectedTransactions(new Set());
+      setRefundTarget(null);
       fetchTransactions();
     } catch (error: any) {
       console.error('Error refunding transactions:', error);
@@ -280,267 +303,237 @@ export default function TransactionsPage() {
     }
   };
 
-  const handleSingleRefund = async (transaction: Transaction) => {
+  const requestBulkRefund = () => {
+    if (selectedTransactions.size === 0) {
+      toast.error('Please select at least one transaction to refund');
+      return;
+    }
+    if (refundableSelected.length === 0) {
+      toast.error('Only completed transactions can be refunded');
+      return;
+    }
+    setRefundTarget('bulk');
+  };
+
+  const requestSingleRefund = (transaction: Transaction) => {
     if (transaction.status !== 'completed') {
       toast.error('Only completed transactions can be refunded');
       return;
     }
-
-    if (!confirm(`Are you sure you want to refund transaction ${transaction.order_number}?`)) {
-      return;
-    }
-
-    setIsRefunding(true);
-    try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${API_URL}/api/transactions/${transaction.id}/refund`, {
-        method: 'POST',
-        headers: {
-          ...(await authHeaders()),
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Refund failed');
-      }
-
-      toast.success('Transaction refunded successfully');
-      fetchTransactions();
-    } catch (error: any) {
-      console.error('Error refunding transaction:', error);
-      toast.error(error.message || 'Failed to refund transaction');
-    } finally {
-      setIsRefunding(false);
-    }
+    setRefundTarget(transaction);
   };
 
+  const ready = loaded || (!loading && !failed && !denied);
   const totalAmount = filteredTransactions.reduce(
     (sum, t) => sum + (t.status === 'completed' ? t.amount : 0),
     0
   );
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF7A19] mx-auto mb-4"></div>
-          <p className="text-[#3A3A3A]">Loading transactions...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (denied) {
-    return (
-      <p className="rounded-xl bg-white p-6 text-sm text-[#3A3A3A] shadow-sm">{ADMIN_DATA_DENIED}</p>
-    );
-  }
+  const refundActions = (transaction: Transaction) =>
+    canEditFinance && transaction.status === 'completed'
+      ? [{ label: 'Refund', destructive: true, onClick: () => requestSingleRefund(transaction) }]
+      : [];
 
   return (
-    <div className="space-y-6">
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-          <p className="text-sm text-[#3A3A3A] mb-1">Total Transactions</p>
+    <div className="min-w-0">
+      <AdminPageHeader
+        title="Transactions"
+        subtitle={`${filteredTransactions.length} transaction${filteredTransactions.length === 1 ? '' : 's'}`}
+        secondary={[
+          {
+            label: 'Export csv',
+            icon: <Download size={16} />,
+          },
+        ]}
+        extra={
+          canEditFinance && selectedTransactions.size > 0 ? (
+            <button
+              type="button"
+              onClick={requestBulkRefund}
+              disabled={isRefunding}
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-gray-300 px-3 text-sm font-medium text-[#1A1A1A] hover:bg-gray-50 disabled:opacity-50 sm:w-auto"
+            >
+              <RotateCcw size={16} />
+              Refund selected ({selectedTransactions.size})
+            </button>
+          ) : null
+        }
+      />
+
+      <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-4">
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <p className="mb-1 text-sm text-[#3A3A3A]">Total transactions</p>
           <p className="text-3xl font-bold text-[#1A1A1A]">
             {filteredTransactions.length}
           </p>
         </div>
-        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-          <p className="text-sm text-[#3A3A3A] mb-1">Completed</p>
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <p className="mb-1 text-sm text-[#3A3A3A]">Completed</p>
           <p className="text-3xl font-bold text-green-600">
             {filteredTransactions.filter((t) => t.status === 'completed').length}
           </p>
         </div>
-        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-          <p className="text-sm text-[#3A3A3A] mb-1">Pending</p>
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <p className="mb-1 text-sm text-[#3A3A3A]">Pending</p>
           <p className="text-3xl font-bold text-yellow-600">
             {filteredTransactions.filter((t) => t.status === 'pending').length}
           </p>
         </div>
-        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-          <p className="text-sm text-[#3A3A3A] mb-1">Total Amount</p>
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <p className="mb-1 text-sm text-[#3A3A3A]">Total amount</p>
           <p className="text-3xl font-bold text-[#FF7A19]">
             GHS {totalAmount.toLocaleString()}
           </p>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-        <div className="flex flex-col md:flex-row gap-4">
-          {/* Search */}
-          <div className="flex-1 relative">
-            <Search
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-              size={20}
-            />
-            <input
-              type="text"
-              placeholder="Search by customer, email, or order ID..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
-            />
-          </div>
+      <FilterBar
+        search={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Search by customer, email, or order"
+        activeCount={statusFilter !== 'all' ? 1 : 0}
+        onClear={() => setStatusFilter('all')}
+      >
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className={filterSelectClassName()}
+        >
+          <option value="all">All statuses</option>
+          <option value="completed">Completed</option>
+          <option value="pending">Pending</option>
+          <option value="failed">Failed</option>
+          <option value="refunded">Refunded</option>
+        </select>
+      </FilterBar>
 
-          {/* Status Filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
-          >
-            <option value="all">All Status</option>
-            <option value="completed">Completed</option>
-            <option value="pending">Pending</option>
-            <option value="failed">Failed</option>
-            <option value="refunded">Refunded</option>
-          </select>
-
-          {/* Bulk Actions */}
-          {canEditFinance && selectedTransactions.size > 0 && (
-            <Button 
-              variant="outline" 
-              icon={<RotateCcw size={18} />}
-              onClick={handleBulkRefund}
-              disabled={isRefunding}
-            >
-              Refund Selected ({selectedTransactions.size})
-            </Button>
-          )}
-
-          {/* Export */}
-          <Button variant="outline" icon={<Download size={18} />}>
-            Export CSV
-          </Button>
-        </div>
-      </div>
-
-      {/* Transactions Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                {canEditFinance && (
-                <th className="px-6 py-3 text-left text-xs font-semibold text-[#1A1A1A] uppercase">
+      <LoadGate
+        loaded={ready}
+        loading={loading}
+        updating={loading && ready}
+        error={failed}
+        forbidden={denied}
+        isEmpty={filteredTransactions.length === 0}
+        filtered={Boolean(searchQuery || statusFilter !== 'all')}
+        onRetry={() => void fetchTransactions()}
+        onClearFilters={() => {
+          setSearchQuery('');
+          setStatusFilter('all');
+        }}
+        skeleton={<TableSkeleton rows={8} />}
+        emptyTitle="No transactions yet"
+        emptyDescription="Completed payments will show up here."
+        denyHome="/admin"
+      >
+        <ResponsiveTable
+          headers={
+            <tr>
+              {canEditFinance ? (
+                <th className="px-4 py-3">
                   <input
                     type="checkbox"
                     checked={selectedTransactions.size === filteredTransactions.length && filteredTransactions.length > 0}
                     onChange={handleSelectAll}
                     className="rounded border-gray-300 text-[#FF7A19] focus:ring-[#FF7A19]"
+                    aria-label="Select all transactions"
                   />
                 </th>
-                )}
-                <th className="px-6 py-3 text-left text-xs font-semibold text-[#1A1A1A] uppercase">
-                  Order ID
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-[#1A1A1A] uppercase">
-                  Customer
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-[#1A1A1A] uppercase">
-                  Amount
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-[#1A1A1A] uppercase">
-                  Payment Method
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-[#1A1A1A] uppercase">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-[#1A1A1A] uppercase">
-                  Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-[#1A1A1A] uppercase">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filteredTransactions.length === 0 ? (
-                <tr>
-                  <td colSpan={canEditFinance ? 8 : 7} className="px-6 py-12 text-center text-[#3A3A3A]">
-                    No transactions found
-                  </td>
-                </tr>
-              ) : (
-                filteredTransactions.map((transaction) => (
-                  <tr key={transaction.id} className="hover:bg-gray-50 transition-colors">
-                    {canEditFinance && (
-                    <td className="px-6 py-4">
-                      <input
-                        type="checkbox"
-                        checked={selectedTransactions.has(transaction.id)}
-                        onChange={() => handleSelectTransaction(transaction.id)}
-                        className="rounded border-gray-300 text-[#FF7A19] focus:ring-[#FF7A19]"
-                      />
-                    </td>
-                    )}
-                    <td className="px-6 py-4">
-                      <span className="font-mono text-sm font-semibold text-[#1A1A1A]">
-                        {transaction.order_number}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <p className="font-medium text-[#1A1A1A]">
-                          {transaction.customer_name}
-                        </p>
-                        <p className="text-sm text-[#3A3A3A]">
-                          {transaction.customer_email}
-                        </p>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-bold text-[#1A1A1A]">
-                        GHS {transaction.amount.toFixed(2)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-[#3A3A3A]">
-                        {transaction.payment_method}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(
-                          transaction.status
-                        )}`}
-                      >
-                        {getStatusIcon(transaction.status)}
-                        {transaction.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-[#3A3A3A]">
-                        {new Date(transaction.created_at).toLocaleDateString()}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      {canEditFinance && transaction.status === 'completed' ? (
-                        <button
-                          onClick={() => handleSingleRefund(transaction)}
-                          disabled={isRefunding}
-                          className="p-2 hover:bg-red-50 rounded-lg transition-colors text-red-600 disabled:opacity-50"
-                          title="Refund transaction"
-                        >
-                          <RotateCcw size={18} />
-                        </button>
-                      ) : (
-                        <span className="text-gray-400 text-sm">-</span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+              ) : null}
+              <th className="px-4 py-3">Order</th>
+              <th className="px-4 py-3">Customer</th>
+              <th className="px-4 py-3">Amount</th>
+              <th className="px-4 py-3">Payment method</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Date</th>
+              <th className="px-4 py-3 text-right">Actions</th>
+            </tr>
+          }
+          cards={filteredTransactions.map((transaction) => (
+            <AdminRowCard
+              key={transaction.id}
+              name={transaction.order_number}
+              status={statusBadge(transaction.status)}
+              facts={[
+                { label: 'Customer', value: transaction.customer_name },
+                { label: 'Amount', value: `GHS ${transaction.amount.toFixed(2)}` },
+                { label: 'Method', value: transaction.payment_method },
+                { label: 'Date', value: new Date(transaction.created_at).toLocaleDateString() },
+              ]}
+              actions={
+                <RowActions
+                  name={transaction.order_number}
+                  actions={refundActions(transaction)}
+                />
+              }
+            />
+          ))}
+        >
+          {filteredTransactions.map((transaction) => (
+            <tr key={transaction.id} className="hover:bg-gray-50">
+              {canEditFinance ? (
+                <td className="px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedTransactions.has(transaction.id)}
+                    onChange={() => handleSelectTransaction(transaction.id)}
+                    className="rounded border-gray-300 text-[#FF7A19] focus:ring-[#FF7A19]"
+                    aria-label={`Select ${transaction.order_number}`}
+                  />
+                </td>
+              ) : null}
+              <td className="px-4 py-3">
+                <span className="font-mono text-sm font-semibold text-[#1A1A1A]">
+                  {transaction.order_number}
+                </span>
+              </td>
+              <td className="px-4 py-3">
+                <p className="font-medium text-[#1A1A1A]">
+                  {transaction.customer_name}
+                </p>
+                <p className="text-sm text-[#3A3A3A]">
+                  {transaction.customer_email}
+                </p>
+              </td>
+              <td className="px-4 py-3">
+                <span className="font-bold text-[#1A1A1A]">
+                  GHS {transaction.amount.toFixed(2)}
+                </span>
+              </td>
+              <td className="px-4 py-3 text-sm text-[#3A3A3A]">
+                {transaction.payment_method}
+              </td>
+              <td className="px-4 py-3">{statusBadge(transaction.status)}</td>
+              <td className="px-4 py-3 text-sm text-[#3A3A3A]">
+                {new Date(transaction.created_at).toLocaleDateString()}
+              </td>
+              <td className="px-4 py-3 text-right">
+                <RowActions
+                  name={transaction.order_number}
+                  actions={refundActions(transaction)}
+                />
+              </td>
+            </tr>
+          ))}
+        </ResponsiveTable>
+      </LoadGate>
+
+      {refundTarget ? (
+        <ConfirmDialog
+          title={refundTarget === 'bulk' ? 'Refund these transactions?' : 'Refund this transaction?'}
+          confirmLabel="Refund"
+          busy={isRefunding}
+          onClose={() => setRefundTarget(null)}
+          onConfirm={() =>
+            void refundTransactions(
+              refundTarget === 'bulk' ? refundableSelected : [refundTarget]
+            )
+          }
+        >
+          {refundTarget === 'bulk'
+            ? `${refundableSelected.length} completed transaction${refundableSelected.length === 1 ? '' : 's'} will be refunded.`
+            : `${refundTarget.order_number} will be refunded.`}
+        </ConfirmDialog>
+      ) : null}
     </div>
   );
 }
-
-
-

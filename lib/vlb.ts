@@ -198,12 +198,10 @@ export function payoutStatusVariant(status: string): 'default' | 'success' | 'wa
 }
 
 export async function fetchPublicVlbPlans(): Promise<VlbPublicPlan[]> {
-  const response = await fetch(`${API_URL}/api/vlb/plans`, { cache: 'no-store' });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok || body?.success === false) {
-    throw new Error(typeof body?.message === 'string' ? body.message : 'Could not load plans.');
-  }
-  return (body.data || []) as VlbPublicPlan[];
+  const { apiRequest, toApiError } = await import('@/lib/api');
+  const result = await apiRequest<VlbPublicPlan[]>('/api/vlb/plans');
+  if (!result.ok) throw toApiError(result);
+  return result.data || [];
 }
 
 export async function submitVlbApplication(input: {

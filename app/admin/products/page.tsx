@@ -1,22 +1,26 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
 import Image from 'next/image';
-import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { ProductModal } from '@/components/admin/ProductModal';
-import { 
-  Plus, 
-  Search, 
-  Edit, 
-  Trash2, 
-  Eye,
-  Package,
-  Download
-} from 'lucide-react';
+import {
+  AdminPageHeader,
+  AdminPagination,
+  AdminRowCard,
+  AttentionCard,
+  ConfirmDialog,
+  FilterBar,
+  filterSelectClassName,
+  ResponsiveTable,
+  RowActions,
+} from '@/components/admin/list';
+import { Plus, Download } from 'lucide-react';
 import { Product } from '@/types/product';
 import { productService } from '@/services/product.service';
+import { AccessDenied, EmptyState, ErrorState, LoadGate, TableSkeleton } from '@/components/ui-states';
+import { apiRequest, toApiError } from '@/lib/api';
+import { noteQueryFail } from '@/lib/queryState';
 import { formatCurrency } from '@/lib/helpers';
 import { useAppSelector } from '@/store';
 import { hasAdminEntry } from '@/lib/roles';
@@ -36,6 +40,9 @@ export default function AdminProductsPage() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -51,6 +58,16 @@ export default function AdminProductsPage() {
     limit: 20,
     total: 0,
     totalPages: 0,
+  });
+  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const mapProduct = (product: any): Product => ({
+    ...product,
+    original_price: product.price || product.original_price || 0,
+    category_name: product.category?.name || product.categories?.name || product.category_name || null,
+    brand: product.brands?.name || product.brand_name || product.brand || '',
+    featured: product.is_featured || product.featured || false,
   });
 
   useEffect(() => {
@@ -87,70 +104,79 @@ export default function AdminProductsPage() {
   const fetchProducts = async () => {
     try {
       setIsLoading(true);
-      let productsData: Product[] = [];
       const gapIds = missingOsOnly ? osGaps.ids : missingWarrantyOnly ? warrantyGaps.ids : [];
       if (gapIds.length) {
-        const { data, error } = await supabase
+        const from = (pagination.page - 1) * pagination.limit;
+        let query = supabase
           .from('products')
-          .select(`
+          .select(
+            `
             *,
             categories!products_category_id_fkey(id, name, slug),
             brands!products_brand_id_fkey(id, name, slug)
-          `)
+          `,
+            { count: 'exact' }
+          )
           .in('id', gapIds)
           .order('name');
+        const cleaned = searchQuery.trim().slice(0, 100).replace(/[,():*%\\]/g, '');
+        if (cleaned) {
+          query = query.or(`name.ilike.%${cleaned}%,description.ilike.%${cleaned}%,sku.ilike.%${cleaned}%`);
+        }
+        if (osFilter) query = query.eq('operating_system', osFilter);
+        if (conditionFilter) query = query.eq('condition', conditionFilter);
+        const { data, error, count } = await query.range(from, from + pagination.limit - 1);
         if (error) throw error;
-        productsData = (data || []) as Product[];
+        setProducts((data || []).map(mapProduct));
+        setPagination((current) => ({
+          ...current,
+          total: count || 0,
+          totalPages: Math.max(1, Math.ceil((count || 0) / current.limit)),
+        }));
       } else {
-        productsData = await productService.getProducts({
-          limit: pagination.limit,
-          offset: (pagination.page - 1) * pagination.limit,
+        const params = new URLSearchParams({
+          page: String(pagination.page),
+          limit: String(pagination.limit),
+          sortBy: 'created_at',
         });
+        if (searchQuery.trim()) params.set('search', searchQuery.trim());
+        if (osFilter) params.set('operating_system', osFilter);
+        if (conditionFilter) params.set('condition', conditionFilter);
+        const result = await apiRequest<any[]>(`/api/products?${params.toString()}`);
+        if (!result.ok) throw toApiError(result);
+        setProducts((result.data || []).map(mapProduct));
+        setPagination((current) => ({
+          ...current,
+          total: result.pagination?.total || 0,
+          totalPages: result.pagination?.totalPages || 1,
+        }));
       }
-      
-      // Apply search filter client-side
-      if (searchQuery) {
-        const searchLower = searchQuery.toLowerCase();
-        productsData = productsData.filter(product =>
-          product.name.toLowerCase().includes(searchLower) ||
-          (product as any).sku?.toLowerCase().includes(searchLower) ||
-          product.id.toLowerCase().includes(searchLower) ||
-          product.description?.toLowerCase().includes(searchLower)
-        );
-      }
-      if (osFilter) {
-        productsData = productsData.filter((product) => (product.operating_system || '') === osFilter);
-      }
-      if (conditionFilter) {
-        productsData = productsData.filter((product) => (product.condition || 'new') === conditionFilter);
-      }
-      
-      setProducts(productsData);
-      setPagination({
-        ...pagination,
-        total: productsData.length,
-        totalPages: Math.ceil(productsData.length / pagination.limit),
-      });
+      setLoaded(true);
+      setFailed(false);
+      setForbidden(false);
     } catch (error: any) {
       console.error('Error fetching products:', error);
-      toast.error('Failed to load products');
+      const kind = noteQueryFail(error);
+      if (kind === 'forbidden') setForbidden(true);
+      else if (kind !== 'unauthorized') setFailed(true);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this product?')) {
-      return;
-    }
-
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await productService.deleteProduct(id);
+      await productService.deleteProduct(deleteTarget.id);
       toast.success('Product deleted successfully');
+      setDeleteTarget(null);
       fetchProducts();
     } catch (error: any) {
       console.error('Error deleting product:', error);
-      toast.error('Failed to delete product');
+      toast.error('Could not delete this product');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -258,305 +284,245 @@ export default function AdminProductsPage() {
     toast.success('Example spreadsheet exported! Use this template to import products.');
   };
 
+  const productPrice = (product: Product) => {
+    if (product.price_range?.hasRange) {
+      return `${formatCurrency(product.price_range.min)} - ${formatCurrency(product.price_range.max)}`;
+    }
+    return formatCurrency(product.discount_price || product.original_price || (product as any).price || 0);
+  };
+
+  const activeFilterCount = [osFilter, conditionFilter, missingWarrantyOnly, missingOsOnly].filter(Boolean).length;
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Product Management</h1>
-              <p className="text-gray-600">{pagination.total} products total</p>
-            </div>
-            <div className="flex gap-2">
-              <Link href="/admin/dashboard">
-                <Button variant="outline" size="sm">
-                  Back to Dashboard
-                </Button>
-              </Link>
-              {canEditProducts && (
-              <Button 
-                variant="primary" 
-                size="sm" 
-                icon={<Plus size={16} />}
-                onClick={() => setShowAddModal(true)}
-              >
-                Add Product
-              </Button>
-              )}
-              <Button 
-                variant="outline" 
-                size="sm"
-                icon={<Download size={16} />}
-                onClick={handleExportProducts}
-              >
-                Export {selectedProducts.length > 0 ? `(${selectedProducts.length})` : 'All'}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="min-w-0">
+      <AdminPageHeader
+        title="Products"
+        subtitle={`${pagination.total} product${pagination.total === 1 ? '' : 's'}`}
+        primary={
+          canEditProducts
+            ? { label: 'Add product', icon: <Plus size={16} />, onClick: () => setShowAddModal(true) }
+            : undefined
+        }
+        secondary={[
+          {
+            label: selectedProducts.length > 0 ? `Export (${selectedProducts.length})` : 'Export all',
+            icon: <Download size={16} />,
+            onClick: handleExportProducts,
+          },
+        ]}
+      />
 
-      {/* Content */}
-      <div className="container mx-auto px-4 py-8">
-        {warrantyGaps.count > 0 ? (
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-            <p className="text-sm font-medium text-[#1A1A1A]">
-              {warrantyGaps.count} laptop product{warrantyGaps.count === 1 ? '' : 's'} have no default warranty
-            </p>
-            <button
-              type="button"
-              className="text-sm font-semibold text-[#FF7A19]"
-              onClick={() => {
-                setMissingOsOnly(false);
-                setMissingWarrantyOnly((current) => !current);
-                setPagination((current) => ({ ...current, page: 1 }));
-              }}
-            >
-              {missingWarrantyOnly ? 'Show all products' : 'Show them'}
-            </button>
-          </div>
-        ) : null}
-        {osGaps.count > 0 ? (
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-            <p className="text-sm font-medium text-[#1A1A1A]">
-              {osGaps.count} laptop product{osGaps.count === 1 ? '' : 's'} have no operating system set
-            </p>
-            <button
-              type="button"
-              className="text-sm font-semibold text-[#FF7A19]"
-              onClick={() => {
-                setMissingWarrantyOnly(false);
-                setMissingOsOnly((current) => !current);
-                setPagination((current) => ({ ...current, page: 1 }));
-              }}
-            >
-              {missingOsOnly ? 'Show all products' : 'Show them'}
-            </button>
-          </div>
-        ) : null}
-        {/* Search & Filters */}
-        <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
-          <div className="flex gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-              <input
-                type="text"
-                placeholder="Search by product name, SKU, ID or description..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <select
-              value={osFilter}
-              onChange={(event) => setOsFilter(event.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All operating systems</option>
-              {OPERATING_SYSTEMS.map((item) => (
-                <option key={item.value} value={item.value}>{item.label}</option>
-              ))}
-            </select>
-            <select
-              value={conditionFilter}
-              onChange={(event) => setConditionFilter(event.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All conditions</option>
-              {PRODUCT_CONDITIONS.map((item) => (
-                <option key={item.value} value={item.value}>{item.label}</option>
-              ))}
-            </select>
-            <select className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option>All Categories</option>
-              <option>Smartphones</option>
-              <option>Laptops</option>
-              <option>Accessories</option>
-            </select>
-            <select className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option>All Status</option>
-              <option>In Stock</option>
-              <option>Out of Stock</option>
-            </select>
-          </div>
-        </div>
+      <AttentionCard
+        items={[
+          warrantyGaps.count > 0
+            ? {
+                id: 'warranty',
+                message: `${warrantyGaps.count} laptop product${warrantyGaps.count === 1 ? '' : 's'} have no default warranty`,
+                showing: missingWarrantyOnly,
+                onShow: () => {
+                  setMissingOsOnly(false);
+                  setMissingWarrantyOnly((current) => !current);
+                  setPagination((current) => ({ ...current, page: 1 }));
+                },
+              }
+            : null,
+          osGaps.count > 0
+            ? {
+                id: 'os',
+                message: `${osGaps.count} laptop product${osGaps.count === 1 ? '' : 's'} have no operating system set`,
+                showing: missingOsOnly,
+                onShow: () => {
+                  setMissingWarrantyOnly(false);
+                  setMissingOsOnly((current) => !current);
+                  setPagination((current) => ({ ...current, page: 1 }));
+                },
+              }
+            : null,
+        ].filter(Boolean) as { id: string; message: string; showing?: boolean; onShow: () => void }[]}
+      />
 
-        {/* Products Table */}
-        {isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF7A19]"></div>
-          </div>
-        ) : products.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-            <Package className="mx-auto mb-4 text-gray-400" size={48} />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No products found</h3>
-            <p className="text-gray-600 mb-6">Get started by adding your first product</p>
-            {canEditProducts && (
-            <Link href="/admin/products/new">
-              <Button variant="primary" icon={<Plus size={16} />}>
-                Add Product
-              </Button>
-            </Link>
-            )}
-          </div>
-        ) : (
+      <FilterBar
+        search={searchQuery}
+        onSearchChange={(value) => {
+          setSearchQuery(value);
+          setPagination((current) => ({ ...current, page: 1 }));
+        }}
+        searchPlaceholder="Search products"
+        activeCount={activeFilterCount}
+        onClear={() => {
+          setOsFilter('');
+          setConditionFilter('');
+          setMissingWarrantyOnly(false);
+          setMissingOsOnly(false);
+          setPagination((current) => ({ ...current, page: 1 }));
+        }}
+      >
+        <select
+          value={osFilter}
+          onChange={(event) => {
+            setOsFilter(event.target.value);
+            setPagination((current) => ({ ...current, page: 1 }));
+          }}
+          className={filterSelectClassName()}
+        >
+          <option value="">All operating systems</option>
+          {OPERATING_SYSTEMS.map((item) => (
+            <option key={item.value} value={item.value}>{item.label}</option>
+          ))}
+        </select>
+        <select
+          value={conditionFilter}
+          onChange={(event) => {
+            setConditionFilter(event.target.value);
+            setPagination((current) => ({ ...current, page: 1 }));
+          }}
+          className={filterSelectClassName()}
+        >
+          <option value="">All conditions</option>
+          {PRODUCT_CONDITIONS.map((item) => (
+            <option key={item.value} value={item.value}>{item.label}</option>
+          ))}
+        </select>
+      </FilterBar>
+
+        <LoadGate
+          loaded={loaded}
+          loading={isLoading}
+          updating={isLoading && loaded}
+          error={failed}
+          forbidden={forbidden}
+          isEmpty={products.length === 0}
+          filtered={Boolean(searchQuery || osFilter || conditionFilter || missingWarrantyOnly || missingOsOnly)}
+          onRetry={() => void fetchProducts()}
+          onClearFilters={() => {
+            setSearchQuery('');
+            setOsFilter('');
+            setConditionFilter('');
+            setMissingWarrantyOnly(false);
+            setMissingOsOnly(false);
+          }}
+          skeleton={<TableSkeleton rows={8} />}
+          emptyTitle="No products yet"
+          emptyDescription="Add your first product to start selling."
+          emptyPrimary={canEditProducts ? { label: 'Add product', href: '/admin/products/new' } : undefined}
+          denyHome="/admin"
+        >
           <>
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Product
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Category
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Price
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Stock
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {products.map((product) => (
-                      <tr key={product.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-3">
-                            <div className="relative w-12 h-12 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
-                              <Image
-                                src={product.thumbnail || '/placeholder-product.webp'}
-                                alt={product.name}
-                                fill
-                                className="object-cover"
-                              />
-                            </div>
-                            <div>
-                              <p className="font-medium text-gray-900">{product.name}</p>
-                              <p className="text-sm text-gray-500">{product.brand}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm text-gray-900">
-                            {product.category_name || (product as any).category?.name || 'Uncategorized'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div>
-                            {product.price_range?.hasRange ? (
-                              <p className="text-sm font-medium text-gray-900">
-                                {formatCurrency(product.price_range.min)} - {formatCurrency(product.price_range.max)}
-                              </p>
-                            ) : (
-                              <>
-                                <p className="text-sm font-medium text-gray-900">
-                                  {formatCurrency(
-                                    product.discount_price || 
-                                    product.original_price || 
-                                    (product as any).price || 
-                                    0
-                                  )}
-                                </p>
-                                {product.discount_price && product.discount_price < product.original_price && (
-                                  <p className="text-xs text-gray-500 line-through">
-                                    {formatCurrency(product.original_price)}
-                                  </p>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {product.stock_quantity < 5 && product.stock_quantity > 0 ? (
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-semibold text-red-600">{product.stock_quantity}</span>
-                              <span className="text-xs font-medium text-red-600 bg-red-50 px-2 py-1 rounded">Low Stock</span>
-                            </div>
-                          ) : (
-                            <span className="text-sm text-gray-900">{product.stock_quantity}</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <Badge
-                            variant={product.in_stock ? 'success' : 'error'}
-                            size="sm"
-                          >
-                            {product.in_stock ? 'In Stock' : 'Out of Stock'}
-                          </Badge>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex items-center justify-end gap-2">
-                            <Link href={`/product/${product.slug}`} target="_blank">
-                              <button className="text-gray-600 hover:text-blue-600 p-1">
-                                <Eye size={16} />
-                              </button>
-                            </Link>
-                            {canEditProducts && (
-                            <>
-                            <button 
-                              onClick={() => setEditingProduct(product)}
-                              className="text-gray-600 hover:text-blue-600 p-1"
-                            >
-                              <Edit size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(product.id)}
-                              className="text-gray-600 hover:text-red-600 p-1"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                            </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <ResponsiveTable
+              headers={
+                <tr>
+                  <th className="px-4 py-3">Product</th>
+                  <th className="px-4 py-3">Category</th>
+                  <th className="px-4 py-3">Price</th>
+                  <th className="px-4 py-3">Stock</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
+                </tr>
+              }
+              cards={products.map((product) => (
+                <AdminRowCard
+                  key={product.id}
+                  name={product.name}
+                  thumbnail={product.thumbnail || '/placeholder-product.webp'}
+                  status={
+                    <Badge variant={product.in_stock ? 'success' : 'error'} size="sm">
+                      {product.in_stock ? 'In stock' : 'Out of stock'}
+                    </Badge>
+                  }
+                  facts={[
+                    { label: 'Price', value: productPrice(product) },
+                    { label: 'Stock', value: product.stock_quantity },
+                    { label: 'Category', value: product.category_name || (product as any).category?.name || 'Uncategorized' },
+                  ]}
+                  actions={
+                    <RowActions
+                      name={product.name}
+                      actions={[
+                        { label: 'View', href: `/product/${product.slug}`, target: '_blank' },
+                        ...(canEditProducts
+                          ? [
+                              { label: 'Edit', onClick: () => setEditingProduct(product) },
+                              { label: 'Delete', destructive: true, onClick: () => setDeleteTarget(product) },
+                            ]
+                          : []),
+                      ]}
+                    />
+                  }
+                />
+              ))}
+            >
+              {products.map((product) => (
+                <tr key={product.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                        <Image
+                          src={product.thumbnail || '/placeholder-product.webp'}
+                          alt=""
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-[#1A1A1A]">{product.name}</p>
+                        <p className="truncate text-sm text-[#3A3A3A]">{product.brand}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-[#1A1A1A]">
+                    {product.category_name || (product as any).category?.name || 'Uncategorized'}
+                  </td>
+                  <td className="px-4 py-3 font-medium text-[#1A1A1A]">{productPrice(product)}</td>
+                  <td className="px-4 py-3">
+                    {product.stock_quantity < 5 && product.stock_quantity > 0 ? (
+                      <span className="font-semibold text-red-600">{product.stock_quantity}</span>
+                    ) : (
+                      product.stock_quantity
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge variant={product.in_stock ? 'success' : 'error'} size="sm">
+                      {product.in_stock ? 'In stock' : 'Out of stock'}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <RowActions
+                      name={product.name}
+                      actions={[
+                        { label: 'View', href: `/product/${product.slug}`, target: '_blank' },
+                        ...(canEditProducts
+                          ? [
+                              { label: 'Edit', onClick: () => setEditingProduct(product) },
+                              { label: 'Delete', destructive: true, onClick: () => setDeleteTarget(product) },
+                            ]
+                          : []),
+                      ]}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </ResponsiveTable>
 
-            {/* Pagination */}
-            {pagination.totalPages > 1 && (
-              <div className="flex justify-center items-center gap-2 mt-6">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={pagination.page === 1}
-                  onClick={() => setPagination({ ...pagination, page: pagination.page - 1 })}
-                >
-                  Previous
-                </Button>
-
-                <span className="text-sm text-gray-600">
-                  Page {pagination.page} of {pagination.totalPages}
-                </span>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={pagination.page === pagination.totalPages}
-                  onClick={() => setPagination({ ...pagination, page: pagination.page + 1 })}
-                >
-                  Next
-                </Button>
-              </div>
-            )}
+            <AdminPagination
+              page={pagination.page}
+              totalPages={pagination.totalPages}
+              onPage={(page) => setPagination((current) => ({ ...current, page }))}
+            />
           </>
-        )}
-      </div>
+        </LoadGate>
 
-      {/* Product Modal */}
+      {deleteTarget ? (
+        <ConfirmDialog
+          title="Delete this product?"
+          confirmLabel="Delete"
+          busy={deleting}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={() => void handleDelete()}
+        >
+          {deleteTarget.name} will be removed from the shop.
+        </ConfirmDialog>
+      ) : null}
+
       <ProductModal
         isOpen={showAddModal || !!editingProduct}
         onClose={() => {

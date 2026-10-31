@@ -43,6 +43,7 @@ import { rememberRedirect } from '@/lib/safeRedirect';
 import { useAccess } from '@/context/AccessContext';
 import { AreaSwitcher } from '@/components/navigation/AreaSwitcher';
 import { AdminHeadingProvider, useAdminHeadingValue } from '@/components/admin/AdminHeading';
+import { AdminMobileDock } from '@/components/admin/AdminMobileDock';
 import { deviceRequest, type TicketSummary } from '@/lib/ticketsAdmin';
 import { affiliateQueueBadge } from '@/lib/affiliatesAdmin';
 import toast from 'react-hot-toast';
@@ -572,7 +573,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Main Content */}
       <main
-        className={`flex-1 min-w-0 ml-0 ${sidebarOpen ? 'lg:ml-64' : 'lg:ml-20'} transition-all duration-300 print:ml-0`}
+        className={`flex-1 min-w-0 overflow-y-auto ml-0 ${sidebarOpen ? 'lg:ml-64' : 'lg:ml-20'} transition-all duration-300 print:ml-0 print:overflow-visible`}
       >
         {/* Top Bar */}
         <div className="bg-white border-b border-gray-200 px-4 py-3 lg:px-8 lg:py-4 sticky top-0 z-40 print:hidden">
@@ -610,7 +611,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         {/* Page Content */}
-        <div className="p-4 lg:p-8 print:p-0 max-w-full overflow-x-hidden">
+        <div className="max-w-full overflow-x-clip p-4 pb-24 print:p-0 md:pb-8 lg:p-8">
           {accessLoading ? (
             <LoadingMessage label="Checking what you can open" />
           ) : !access ? (
@@ -630,6 +631,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           )}
         </div>
       </main>
+      <AdminMobileDock items={visibleMenuItems} pathname={pathname} />
     </div>
     </AdminHeadingProvider>
   );
@@ -637,9 +639,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
 function AdminPageTitle({ pathname, welcome }: { pathname: string; welcome: string }) {
   const heading = useAdminHeadingValue();
-  const fallback = pathname === '/admin'
-    ? 'Dashboard'
-    : pathname.split('/').pop()?.replace('-', ' ').toUpperCase();
+  const isDashboard = pathname === '/admin' || pathname === '/admin/dashboard';
 
   const copyId = async () => {
     if (!heading?.id) return;
@@ -651,18 +651,25 @@ function AdminPageTitle({ pathname, welcome }: { pathname: string; welcome: stri
     }
   };
 
+  if (!isDashboard && !heading?.id) {
+    return <div className="min-w-0" />;
+  }
+
   return (
     <div className="min-w-0">
-      <h1 className="truncate text-lg font-bold text-[#1A1A1A] lg:text-2xl">{heading?.title || fallback}</h1>
-      {heading?.id ? (
+      {isDashboard ? (
+        <>
+          <p className="truncate text-lg font-bold text-[#1A1A1A] lg:text-2xl">Dashboard</p>
+          <p className="mt-1 text-sm text-[#3A3A3A]">Welcome back, {welcome}</p>
+        </>
+      ) : heading?.id ? (
         <p className="mt-1 flex items-center gap-2 text-xs text-gray-500">
           <span className="font-mono break-all">{heading.id}</span>
-          <button type="button" onClick={copyId} className="shrink-0 font-semibold text-[#FF7A19]">
+          <button type="button" onClick={copyId} className="inline-flex min-h-11 shrink-0 items-center font-semibold text-[#FF7A19]">
             Copy
           </button>
         </p>
       ) : null}
-      <p className="text-sm text-[#3A3A3A] mt-1">Welcome back, {welcome}</p>
     </div>
   );
 }

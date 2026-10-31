@@ -169,12 +169,9 @@ export async function affiliateRequest<T>(
 }
 
 export async function loadAffiliateMe(): Promise<AffiliateMe | null> {
-  const headers = await authHeaders();
-  const response = await fetch(`${API_URL}/api/affiliates/me`, { headers });
-  if (response.status === 404) return null;
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok || body?.success === false) {
-    throw new Error(typeof body?.message === 'string' ? body.message : 'Could not load your affiliate account.');
-  }
-  return body.data as AffiliateMe;
+  const { apiRequest, toApiError } = await import('@/lib/api');
+  const result = await apiRequest<AffiliateMe>('/api/affiliates/me');
+  if (result.ok) return result.data;
+  if (result.kind === 'not_found') return null;
+  throw toApiError(result);
 }

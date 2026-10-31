@@ -1,4 +1,5 @@
 import { authHeaders } from '@/lib/authHeaders';
+import { apiRequest, toApiError } from '@/lib/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
@@ -9,48 +10,15 @@ export interface MediaFile {
   lastModified?: Date;
 }
 
-interface MediaListResponse {
-  success: boolean;
-  files?: MediaFile[];
-  count?: number;
-  error?: string;
-}
-
 export const mediaService = {
   // List all media files (optionally filtered by folder)
   async listFiles(folder?: string, maxKeys?: number): Promise<MediaFile[]> {
-    try {
-      const params = new URLSearchParams();
-      if (folder) params.append('folder', folder);
-      if (maxKeys) params.append('maxKeys', maxKeys.toString());
-
-      const url = `${API_URL}/api/upload/list?${params.toString()}`;
-      console.log(`📡 Fetching media files from: ${url}`);
-      
-      const response = await fetch(url, { headers: await authHeaders() });
-      
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error');
-        console.error(`❌ API error (${response.status}):`, errorText);
-        throw new Error(`Failed to fetch files: ${response.status} ${response.statusText}`);
-      }
-      
-      const data: MediaListResponse = await response.json();
-      console.log(`✅ API response:`, { success: data.success, count: data.count, files: data.files?.length || 0 });
-
-      if (data.success && data.files) {
-        console.log(`📦 Returning ${data.files.length} files`);
-        return data.files;
-      }
-
-      const errorMsg = data.error || 'Failed to list files';
-      console.error(`❌ API returned error:`, errorMsg);
-      throw new Error(errorMsg);
-    } catch (error) {
-      console.error('Error listing media files:', error);
-      // Return empty array instead of throwing to prevent UI crashes
-      return [];
-    }
+    const params = new URLSearchParams();
+    if (folder) params.append('folder', folder);
+    if (maxKeys) params.append('maxKeys', maxKeys.toString());
+    const result = await apiRequest<MediaFile[]>(`/api/upload/list?${params.toString()}`);
+    if (!result.ok) throw toApiError(result);
+    return result.data || [];
   },
 
   // Upload a single file

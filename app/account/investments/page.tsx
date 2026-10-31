@@ -138,8 +138,8 @@ export default function AccountInvestmentsPage() {
   if (!allowed) {
     return (
       <AccessDenied
-        title="Investor access only"
-        description="This dashboard is for active Laptop Banking investors. If you already invest with VENTECH, ask an admin to enable your investor role."
+        title="You don't have access"
+        description="You don't have access to this data. If you think that's a mistake, contact support."
         primary={{ label: 'Go to your account', href: '/account' }}
         secondary={{ label: 'Contact support', href: 'mailto:ventechgadgets@gmail.com', variant: 'ghost' }}
       />

@@ -1,5 +1,7 @@
 import { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import Script from 'next/script';
+import { RetryError } from '@/components/ui-states';
 import { generateProductMetadata } from '@/lib/seo.utils';
 import { generateStructuredData, getProductSEO } from '@/lib/seo.config';
 import { ProductContent } from './ProductContent';
@@ -15,10 +17,20 @@ export const revalidate = 60;
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const resolvedParams = await params;
-  const product = await getProductBySlug(resolvedParams.slug);
+  let product;
+  try {
+    product = await getProductBySlug(resolvedParams.slug);
+  } catch {
+    return (
+      <RetryError
+        title="We couldn't load this product"
+        description="Try again in a moment. If it keeps failing, browse the shop."
+      />
+    );
+  }
   
   if (!product) {
-    return <div>Product not found</div>;
+    notFound();
   }
 
   const breadcrumbData = {

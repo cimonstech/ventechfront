@@ -4,7 +4,16 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
+import { AccessDenied, EmptyState, ErrorState, NoResults, TableSkeleton } from '@/components/ui-states';
+import { noteQueryFail } from '@/lib/queryState';
+import {
+  AdminPageHeader,
+  AdminPagination,
+  AdminRowCard,
+  FilterBar,
+  ResponsiveTable,
+  RowActions,
+} from '@/components/admin/list';
 import { AffiliatesNav } from '@/components/admin/AffiliatesNav';
 import { useSetAdminHeading } from '@/components/admin/AdminHeading';
 import {
@@ -38,6 +47,9 @@ export default function AdminAffiliatesPage() {
   const [rows, setRows] = useState<AffiliateListRow[]>([]);
   const [metrics, setMetrics] = useState<AffiliateMetrics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
@@ -65,8 +77,15 @@ export default function AdminAffiliatesPage() {
         if (cancelled) return;
         setRows(result.data || []);
         setTotalPages(result.pagination?.totalPages || 1);
+        setLoaded(true);
+        setFailed(false);
+        setForbidden(false);
       } catch (error) {
-        if (!cancelled) toast.error(apiMessage(error, 'Could not load affiliates'));
+        if (!cancelled) {
+          const kind = noteQueryFail(error);
+          if (kind === 'forbidden') setForbidden(true);
+          else if (kind !== 'unauthorized') setFailed(true);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -91,30 +110,30 @@ export default function AdminAffiliatesPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <AffiliatesNav current="/admin/affiliates" />
-        <Button
-          size="sm"
-          variant="outline"
-          isLoading={exporting}
-          onClick={async () => {
-            setExporting(true);
-            const params = new URLSearchParams({ status: tab });
-            if (query) params.set('search', query);
-            try {
-              await downloadAffiliateCsv('affiliates', params);
-              toast.success('Export downloaded.');
-            } catch (error) {
-              toast.error(apiMessage(error, 'Could not export this file.'));
-            } finally {
-              setExporting(false);
-            }
-          }}
-        >
-          Export CSV
-        </Button>
-      </div>
+    <div className="min-w-0 space-y-6">
+      <AdminPageHeader
+        title="Affiliates"
+        subtitle={metrics ? `${metrics.total_affiliates} affiliates` : undefined}
+        secondary={[
+          {
+            label: exporting ? 'Exporting' : 'Export all',
+            onClick: async () => {
+              setExporting(true);
+              const params = new URLSearchParams({ status: tab });
+              if (query) params.set('search', query);
+              try {
+                await downloadAffiliateCsv('affiliates', params);
+                toast.success('Export downloaded.');
+              } catch (error) {
+                toast.error(apiMessage(error, 'Could not export this file.'));
+              } finally {
+                setExporting(false);
+              }
+            },
+          },
+        ]}
+      />
+      <AffiliatesNav current="/admin/affiliates" />
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {cards.map((card) => (
@@ -134,7 +153,7 @@ export default function AdminAffiliatesPage() {
               setTab(item.id);
               setPage(1);
             }}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium ${
+            className={`min-h-11 rounded-full px-3 py-1.5 text-sm font-medium ${
               tab === item.id ? 'bg-[#FF7A19] text-white' : 'bg-white border border-gray-200 text-[#1A1A1A]'
             }`}
           >
@@ -143,70 +162,92 @@ export default function AdminAffiliatesPage() {
         ))}
       </div>
 
-      <form
-        className="flex flex-wrap gap-2"
-        onSubmit={(event) => {
-          event.preventDefault();
+      <FilterBar
+        search={search}
+        onSearchChange={(value) => {
+          setSearch(value);
+          setQuery(value.trim());
           setPage(1);
-          setQuery(search.trim());
         }}
-      >
-        <input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Name, email, affiliate number"
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm min-w-[240px]"
-        />
-        <button type="submit" className="px-3 py-2 rounded-lg bg-[#1A1A1A] text-white text-sm font-medium">
-          Search
-        </button>
-      </form>
+        searchPlaceholder="Search affiliates"
+      />
 
-      <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto sticky-first">
-        <table className="min-w-[720px] w-full text-sm">
-          <thead className="bg-gray-50 text-left text-[#3A3A3A]">
+      {forbidden ? (
+        <AccessDenied title="You don't have access" description="You don't have access to this data." primary={{ label: 'Go back', href: '/admin' }} />
+      ) : failed && !loaded ? (
+        <ErrorState title="We couldn't load affiliates" description="Try again in a moment." primary={{ label: 'Try again', onClick: () => setPage(1) }} />
+      ) : loading && !loaded ? (
+        <TableSkeleton rows={6} />
+      ) : rows.length === 0 && query ? (
+        <NoResults primary={{ label: 'Clear filters', onClick: () => { setQuery(''); setSearch(''); }} } />
+      ) : rows.length === 0 ? (
+        <EmptyState title="No affiliates in this list yet" description="Applications and accounts for this status will show up here." />
+      ) : (
+        <ResponsiveTable
+          headers={
             <tr>
               <th className="px-4 py-3">Affiliate</th>
               <th className="px-4 py-3">Person</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Fee paid</th>
               <th className="px-4 py-3">Applied</th>
+              <th className="px-4 py-3 text-right">Actions</th>
             </tr>
-          </thead>
-          <tbody className="divide-y">
-            {loading ? (
-              <tr><td colSpan={5} className="px-4 py-10 text-center text-[#3A3A3A]">Loading affiliates…</td></tr>
-            ) : rows.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-10 text-center text-[#3A3A3A]">No affiliates in this list.</td></tr>
-            ) : rows.map((row) => (
-              <tr key={row.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3">
-                  <Link href={`/admin/affiliates/${row.id}`} className="font-semibold text-[#FF7A19]">
-                    {row.affiliate_no || 'Application'}
-                  </Link>
-                </td>
-                <td className="px-4 py-3">
-                  <p className="text-[#1A1A1A]">{row.user?.name || '—'}</p>
-                  <p className="text-xs text-[#3A3A3A]">{row.user?.email || ''}</p>
-                </td>
-                <td className="px-4 py-3">
-                  <Badge size="sm" variant={affiliateStatusVariant(row.status)}>
-                    {AFFILIATE_STATUS_LABEL[row.status] || row.status}
-                  </Badge>
-                </td>
-                <td className="px-4 py-3">{row.fee_paid_at ? formatWhen(row.fee_paid_at) : '—'}</td>
-                <td className="px-4 py-3 whitespace-nowrap">{formatWhen(row.created_at)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+          }
+          cards={rows.map((row) => (
+            <AdminRowCard
+              key={row.id}
+              name={row.affiliate_no || row.user?.name || 'Application'}
+              href={`/admin/affiliates/${row.id}`}
+              status={
+                <Badge size="sm" variant={affiliateStatusVariant(row.status)}>
+                  {AFFILIATE_STATUS_LABEL[row.status] || row.status}
+                </Badge>
+              }
+              facts={[
+                { label: 'Person', value: row.user?.name || '—' },
+                { label: 'Fee paid', value: row.fee_paid_at ? formatWhen(row.fee_paid_at) : '—' },
+                { label: 'Applied', value: formatWhen(row.created_at) },
+              ]}
+              actions={
+                <RowActions
+                  name={row.affiliate_no || row.user?.name || 'affiliate'}
+                  actions={[{ label: 'View', href: `/admin/affiliates/${row.id}` }]}
+                />
+              }
+            />
+          ))}
+        >
+          {rows.map((row) => (
+            <tr key={row.id} className="hover:bg-gray-50">
+              <td className="px-4 py-3">
+                <Link href={`/admin/affiliates/${row.id}`} className="font-semibold text-[#FF7A19]">
+                  {row.affiliate_no || 'Application'}
+                </Link>
+              </td>
+              <td className="px-4 py-3">
+                <p className="text-[#1A1A1A]">{row.user?.name || '—'}</p>
+                <p className="text-xs text-[#3A3A3A]">{row.user?.email || ''}</p>
+              </td>
+              <td className="px-4 py-3">
+                <Badge size="sm" variant={affiliateStatusVariant(row.status)}>
+                  {AFFILIATE_STATUS_LABEL[row.status] || row.status}
+                </Badge>
+              </td>
+              <td className="px-4 py-3">{row.fee_paid_at ? formatWhen(row.fee_paid_at) : '—'}</td>
+              <td className="px-4 py-3 whitespace-nowrap">{formatWhen(row.created_at)}</td>
+              <td className="px-4 py-3 text-right">
+                <RowActions
+                  name={row.affiliate_no || row.user?.name || 'affiliate'}
+                  actions={[{ label: 'View', href: `/admin/affiliates/${row.id}` }]}
+                />
+              </td>
+            </tr>
+          ))}
+        </ResponsiveTable>
+      )}
 
-      <div className="flex items-center justify-between text-sm">
-        <button type="button" className="text-[#FF7A19] font-semibold disabled:text-gray-400" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</button>
-        <span className="text-[#3A3A3A]">Page {page} of {totalPages}</span>
-        <button type="button" className="text-[#FF7A19] font-semibold disabled:text-gray-400" disabled={page >= totalPages} onClick={() => setPage((value) => value + 1)}>Next</button>
-      </div>
+      <AdminPagination page={page} totalPages={totalPages} onPage={setPage} />
     </div>
   );
 }

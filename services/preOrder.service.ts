@@ -81,10 +81,7 @@ export const getPreOrderProducts = async (): Promise<PreOrderProduct[]> => {
       .eq('is_pre_order', true)
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching pre-order products:', error);
-      return [];
-    }
+    if (error) throw error;
 
     // Transform products to ensure proper structure
     const transformedProducts = (data || []).map((product: any) => ({
@@ -118,7 +115,7 @@ export const getPreOrderProducts = async (): Promise<PreOrderProduct[]> => {
     });
   } catch (error) {
     console.error('Error fetching pre-order products:', error);
-    return [];
+    throw error;
   }
 };
 

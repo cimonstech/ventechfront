@@ -3,34 +3,26 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import CheckmarkLoader from '@/components/loaders/CheckmarkLoader';
 import { PreOrderProductCard } from '@/components/cards/PreOrderProductCard';
+import { LoadGate, ProductGridSkeleton } from '@/components/ui-states';
+import { useListQuery } from '@/hooks/useListQuery';
 import { getPreOrderProducts, PreOrderProduct } from '@/services/preOrder.service';
 import { Package, Clock, Lock, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
 export default function PreOrderPage() {
   const [products, setProducts] = useState<PreOrderProduct[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetchPreOrderProducts();
-  }, []);
+  const catalog = useListQuery();
 
   const fetchPreOrderProducts = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      const data = await getPreOrderProducts();
-      setProducts(data);
-    } catch (err) {
-      console.error('Error fetching pre-order products:', err);
-      setError('Failed to load pre-order products. Please try again later.');
-    } finally {
-      setIsLoading(false);
-    }
+    await catalog.run(async () => {
+      setProducts(await getPreOrderProducts());
+    });
   };
+
+  useEffect(() => {
+    void fetchPreOrderProducts();
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -145,33 +137,24 @@ export default function PreOrderPage() {
             Available for Pre-Order
           </h2>
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 max-w-2xl mx-auto">
-              <p className="text-red-800">{error}</p>
-            </div>
-          )}
-
-          {isLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <CheckmarkLoader size={72} color="#FF7A19" speedMs={600} />
-            </div>
-          ) : products.length === 0 ? (
-            <div className="text-center py-16">
-              <Package className="w-16 h-16 mx-auto mb-4" style={{ color: '#ffffff' }} />
-              <h3 className="pre-order-empty-title text-2xl font-bold mb-2" style={{ color: '#ffffff' }}>
-                No Pre-Order Products Available
-              </h3>
-              <p className="pre-order-empty-text mb-6" style={{ color: '#ffffff' }}>
-                Check back soon for new pre-order opportunities!
-              </p>
-            </div>
-          ) : (
+          <LoadGate
+            loaded={catalog.loaded}
+            loading={catalog.loading}
+            updating={catalog.updating}
+            error={catalog.error}
+            isEmpty={products.length === 0}
+            onRetry={() => void fetchPreOrderProducts()}
+            skeleton={<ProductGridSkeleton count={8} />}
+            emptyTitle="No pre-order products yet"
+            emptyDescription="Check back soon, or browse the shop for items that are in stock now."
+            emptyPrimary={{ label: 'Browse the shop', href: '/shop' }}
+          >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {products.map((product) => (
                 <PreOrderProductCard key={product.id} product={product} />
               ))}
             </div>
-          )}
+          </LoadGate>
         </div>
       </section>
     </div>

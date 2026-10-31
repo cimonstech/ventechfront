@@ -1,7 +1,4 @@
-import { accessDeniedMessage } from '@/lib/access';
-import { authHeaders } from '@/lib/authHeaders';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+import { apiRequest, toApiError } from '@/lib/api';
 
 export const ARTICLE_TYPES = [
   { value: 'user_guide', label: 'User guide' },
@@ -78,28 +75,9 @@ export function apiMessage(error: unknown, fallback: string): string {
 }
 
 export async function contentRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const headers = await authHeaders();
-  const isForm = typeof FormData !== 'undefined' && init.body instanceof FormData;
-  const response = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: {
-      ...headers,
-      ...(isForm ? {} : { 'Content-Type': 'application/json' }),
-      ...(init.headers || {}),
-    },
-  });
-
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const fallback = typeof body?.message === 'string'
-      ? body.message
-      : typeof body?.error === 'string'
-        ? body.error
-        : 'Request failed';
-    throw new Error(accessDeniedMessage(response.status, fallback));
-  }
-
-  return body.data as T;
+  const result = await apiRequest<T>(path, init);
+  if (result.ok) return result.data;
+  throw toApiError(result);
 }
 
 export function articleTypeLabel(type: string): string {

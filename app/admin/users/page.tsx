@@ -2,19 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { 
-  Users, 
-  Search, 
-  ChevronLeft,
-  Mail,
-  Phone,
-  Calendar,
-  Eye,
-  Download
-} from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { Download } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
+import {
+  AdminPageHeader,
+  AdminRowCard,
+  FilterBar,
+  ResponsiveTable,
+  RowActions,
+} from '@/components/admin/list';
+import { LoadGate, TableSkeleton } from '@/components/ui-states';
+import { noteQueryFail } from '@/lib/queryState';
 import { useAppSelector } from '@/store';
 import { hasAdminEntry } from '@/lib/roles';
 import { supabase } from '@/lib/supabase';
@@ -37,6 +35,9 @@ export default function AdminUsersPage() {
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const [users, setUsers] = useState<UserData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
@@ -57,16 +58,15 @@ export default function AdminUsersPage() {
         .eq('role', 'customer')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        toast.error(error.message || 'Failed to load users');
-        setUsers([]);
-        return;
-      }
-
+      if (error) throw error;
       setUsers(data || []);
+      setLoaded(true);
+      setFailed(false);
+      setForbidden(false);
     } catch (error: any) {
-      toast.error(error.message || 'Failed to load users');
-      setUsers([]);
+      const kind = noteQueryFail(error);
+      if (kind === 'forbidden') setForbidden(true);
+      else if (kind !== 'unauthorized') setFailed(true);
     } finally {
       setIsLoading(false);
     }
@@ -98,188 +98,130 @@ export default function AdminUsersPage() {
     toast.success(`Exported ${exportData.length} customer(s)!`);
   };
 
+  const customerName = (userData: UserData) =>
+    `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.email;
+
+  const userActions = (userData: UserData) => [
+    { label: 'View', href: `/admin/users/${userData.id}` },
+    { label: 'View orders', href: `/admin/users/${userData.id}/orders` },
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link href="/admin">
-                <Button variant="ghost" size="sm">
-                  <ChevronLeft size={20} />
-                  Back
-                </Button>
-              </Link>
-              <div>
-                <h1 className="text-3xl font-bold text-[#1A1A1A]">Customers</h1>
-                <p className="text-sm text-[#3A3A3A] mt-1">
-                  Manage customer accounts
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="outline" 
-                size="sm"
-                icon={<Download size={16} />}
-                onClick={handleExportCustomers}
-              >
-                Export
-              </Button>
-              <Badge variant="info">{filteredUsers.length} customers</Badge>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="min-w-0">
+      <AdminPageHeader
+        title="Customers"
+        subtitle={`${filteredUsers.length} customer${filteredUsers.length === 1 ? '' : 's'}`}
+        secondary={[{ label: 'Export all', icon: <Download size={16} />, onClick: handleExportCustomers }]}
+      />
 
-      <div className="container mx-auto px-4 py-8">
-        {/* Filters */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#3A3A3A]" size={20} />
-            <input
-              type="text"
-              placeholder="Search by name, email, phone or user ID..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
+      <FilterBar
+        search={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Search customers"
+      />
+
+      <LoadGate
+        loaded={loaded}
+        loading={isLoading}
+        updating={isLoading && loaded}
+        error={failed}
+        forbidden={forbidden}
+        isEmpty={filteredUsers.length === 0}
+        filtered={Boolean(searchQuery)}
+        onRetry={() => void fetchUsers()}
+        onClearFilters={() => setSearchQuery('')}
+        skeleton={<TableSkeleton rows={6} />}
+        emptyTitle="No customers yet"
+        emptyDescription="Customer accounts will show up here."
+        denyHome="/admin"
+      >
+        <ResponsiveTable
+          headers={
+            <tr>
+              <th className="px-4 py-3">Name</th>
+              <th className="px-4 py-3">Email</th>
+              <th className="px-4 py-3">Phone</th>
+              <th className="px-4 py-3">Joined</th>
+              <th className="px-4 py-3">Newsletter</th>
+              <th className="px-4 py-3 text-right">Actions</th>
+            </tr>
+          }
+          cards={filteredUsers.map((userData) => (
+            <AdminRowCard
+              key={userData.id}
+              name={customerName(userData)}
+              status={
+                userData.newsletter_subscribed ? (
+                  <Badge variant="success">Subscribed</Badge>
+                ) : (
+                  <Badge variant="default">Not subscribed</Badge>
+                )
+              }
+              facts={[
+                { label: 'Email', value: userData.email },
+                { label: 'Phone', value: userData.phone || '—' },
+                { label: 'Joined', value: new Date(userData.created_at).toLocaleDateString() },
+              ]}
+              actions={<RowActions name={customerName(userData)} actions={userActions(userData)} />}
             />
-          </div>
-        </div>
+          ))}
+        >
+          {filteredUsers.map((userData) => (
+            <tr key={userData.id} className="hover:bg-gray-50">
+              <td className="px-4 py-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-100">
+                    <span className="font-semibold text-[#FF7A19]">
+                      {userData.first_name?.[0]}{userData.last_name?.[0]}
+                    </span>
+                  </div>
+                  <p className="truncate font-medium text-[#1A1A1A]">
+                    {customerName(userData)}
+                  </p>
+                </div>
+              </td>
+              <td className="px-4 py-3 text-sm text-[#3A3A3A]">{userData.email}</td>
+              <td className="px-4 py-3 text-sm text-[#3A3A3A]">{userData.phone || '—'}</td>
+              <td className="px-4 py-3 text-sm text-[#3A3A3A]">
+                {new Date(userData.created_at).toLocaleDateString()}
+              </td>
+              <td className="px-4 py-3">
+                {userData.newsletter_subscribed ? (
+                  <Badge variant="success">Subscribed</Badge>
+                ) : (
+                  <Badge variant="default">Not subscribed</Badge>
+                )}
+              </td>
+              <td className="px-4 py-3 text-right">
+                <RowActions name={customerName(userData)} actions={userActions(userData)} />
+              </td>
+            </tr>
+          ))}
+        </ResponsiveTable>
+      </LoadGate>
 
-        {/* Users List */}
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF7A19]"></div>
-            </div>
-          ) : filteredUsers.length === 0 ? (
-            /* Empty State */
-            <div className="text-center py-20">
-              <div className="bg-orange-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Users className="w-10 h-10 text-[#FF7A19]" />
-              </div>
-              <h3 className="text-xl font-bold text-[#1A1A1A] mb-2">No Users Found</h3>
-              <p className="text-[#3A3A3A]">
-                No users match your search criteria
-              </p>
-            </div>
-          ) : (
-            /* Users Table */
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-[#1A1A1A]">Name</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-[#1A1A1A]">Email</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-[#1A1A1A]">Phone</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-[#1A1A1A]">Joined</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-[#1A1A1A]">Newsletter</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-[#1A1A1A]">Orders</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-[#1A1A1A]">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {filteredUsers.map((userData) => (
-                    <tr key={userData.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
-                            <span className="text-[#FF7A19] font-semibold">
-                              {userData.first_name?.[0]}{userData.last_name?.[0]}
-                            </span>
-                          </div>
-                          <div>
-                            <p className="font-medium text-sm text-[#1A1A1A]">
-                              {userData.first_name} {userData.last_name}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2 text-sm text-[#3A3A3A]">
-                          <Mail size={14} />
-                          {userData.email}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        {userData.phone ? (
-                          <div className="flex items-center gap-2 text-sm text-[#3A3A3A]">
-                            <Phone size={14} />
-                            {userData.phone}
-                          </div>
-                        ) : (
-                          <span className="text-sm text-gray-400">—</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2 text-sm text-[#3A3A3A]">
-                          <Calendar size={14} />
-                          {new Date(userData.created_at).toLocaleDateString()}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        {userData.newsletter_subscribed ? (
-                          <Badge variant="success">Subscribed</Badge>
-                        ) : (
-                          <Badge variant="default">Not subscribed</Badge>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <Link href={`/admin/users/${userData.id}/orders`}>
-                          <span className="text-sm text-[#FF7A19] hover:underline cursor-pointer">
-                            View Orders
-                          </span>
-                        </Link>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <Link href={`/admin/users/${userData.id}`}>
-                            <button 
-                              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                              title="View Details"
-                            >
-                              <Eye size={16} className="text-[#3A3A3A]" />
-                            </button>
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+      <div className="mt-6 grid gap-4 md:grid-cols-3">
+        <div className="rounded-lg border bg-white p-4">
+          <p className="mb-1 text-sm text-[#3A3A3A]">Total customers</p>
+          <p className="text-2xl font-bold text-[#1A1A1A]">{users.length}</p>
         </div>
-
-        {/* Stats */}
-        <div className="grid md:grid-cols-3 gap-4 mt-6">
-          <div className="bg-white rounded-lg p-4 border">
-            <p className="text-sm text-[#3A3A3A] mb-1">Total Customers</p>
-            <p className="text-2xl font-bold text-[#1A1A1A]">{users.length}</p>
-          </div>
-          <div className="bg-white rounded-lg p-4 border">
-            <p className="text-sm text-[#3A3A3A] mb-1">Newsletter Subscribers</p>
-            <p className="text-2xl font-bold text-[#1A1A1A]">
-              {users.filter(u => u.newsletter_subscribed).length}
-            </p>
-          </div>
-          <div className="bg-white rounded-lg p-4 border">
-            <p className="text-sm text-[#3A3A3A] mb-1">Active This Month</p>
-            <p className="text-2xl font-bold text-[#1A1A1A]">
-              {users.filter(u => {
-                const created = new Date(u.created_at);
-                const now = new Date();
-                return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
-              }).length}
-            </p>
-          </div>
+        <div className="rounded-lg border bg-white p-4">
+          <p className="mb-1 text-sm text-[#3A3A3A]">Newsletter subscribers</p>
+          <p className="text-2xl font-bold text-[#1A1A1A]">
+            {users.filter(u => u.newsletter_subscribed).length}
+          </p>
+        </div>
+        <div className="rounded-lg border bg-white p-4">
+          <p className="mb-1 text-sm text-[#3A3A3A]">Active this month</p>
+          <p className="text-2xl font-bold text-[#1A1A1A]">
+            {users.filter(u => {
+              const created = new Date(u.created_at);
+              const now = new Date();
+              return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
+            }).length}
+          </p>
         </div>
       </div>
     </div>
   );
 }
-
-

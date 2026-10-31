@@ -2,11 +2,18 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import toast from 'react-hot-toast';
 import { Badge } from '@/components/ui/Badge';
+import { AccessDenied, EmptyState, ErrorState, TableSkeleton } from '@/components/ui-states';
+import { noteQueryFail } from '@/lib/queryState';
 import { VlbNav } from '@/components/admin/VlbNav';
-import { useSetAdminHeading } from '@/components/admin/AdminHeading';
-import { apiMessage, deviceRequest, nested, type VlbApplicationRow } from '@/lib/vlbAdmin';
+import {
+  AdminPageHeader,
+  AdminPagination,
+  AdminRowCard,
+  ResponsiveTable,
+  RowActions,
+} from '@/components/admin/list';
+import { deviceRequest, nested, type VlbApplicationRow } from '@/lib/vlbAdmin';
 import { formatDeviceDate } from '@/lib/devicesAdmin';
 import { payoutStatusVariant } from '@/lib/vlb';
 
@@ -19,12 +26,15 @@ const TABS = [
 ];
 
 export default function AdminVlbApplicationsPage() {
-  useSetAdminHeading('Laptop Banking');
   const [tab, setTab] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const [rows, setRows] = useState<VlbApplicationRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,8 +47,16 @@ export default function AdminVlbApplicationsPage() {
         if (cancelled) return;
         setRows(result.data || []);
         setTotalPages(result.pagination?.totalPages || 1);
+        setTotal(result.pagination?.total || 0);
+        setLoaded(true);
+        setFailed(false);
+        setForbidden(false);
       } catch (error) {
-        if (!cancelled) toast.error(apiMessage(error, 'Could not load applications'));
+        if (!cancelled) {
+          const kind = noteQueryFail(error);
+          if (kind === 'forbidden') setForbidden(true);
+          else if (kind !== 'unauthorized') setFailed(true);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -49,8 +67,14 @@ export default function AdminVlbApplicationsPage() {
     };
   }, [tab, page]);
 
+  const count = total || rows.length;
+
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
+      <AdminPageHeader
+        title="Laptop Banking"
+        subtitle={`${count} application${count === 1 ? '' : 's'}`}
+      />
       <VlbNav current="/admin/vlb" />
       <div className="flex flex-wrap gap-2">
         {TABS.map((item) => (
@@ -69,44 +93,70 @@ export default function AdminVlbApplicationsPage() {
           </button>
         ))}
       </div>
-      <div className="overflow-x-auto sticky-first rounded-xl bg-white shadow-sm">
-        <table className="min-w-full text-left text-sm">
-          <thead>
-            <tr className="border-b text-[#3A3A3A]">
-              <th className="px-4 py-3 font-medium">Name</th>
-              <th className="px-4 py-3 font-medium">Plan</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td className="px-4 py-6 text-[#3A3A3A]" colSpan={4}>Loading…</td></tr>
-            ) : rows.length === 0 ? (
-              <tr><td className="px-4 py-6 text-[#3A3A3A]" colSpan={4}>No applications.</td></tr>
-            ) : (
-              rows.map((row) => (
-                <tr key={row.id} className="border-t border-gray-100">
-                  <td className="px-4 py-3">
-                    <Link href={`/admin/vlb/applications/${row.id}`} className="font-medium text-[#FF7A19]">
-                      {row.full_name}
-                    </Link>
-                    <p className="text-xs text-[#3A3A3A]">{row.email}</p>
-                  </td>
-                  <td className="px-4 py-3">{nested(row.vlb_plans)?.name || '—'}</td>
-                  <td className="px-4 py-3"><Badge variant={payoutStatusVariant(row.status)}>{row.status}</Badge></td>
-                  <td className="px-4 py-3">{formatDeviceDate(row.created_at)}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-      {totalPages > 1 && (
-        <div className="flex gap-2">
-          <button type="button" className="rounded-lg border px-3 py-2 text-sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button>
-          <button type="button" className="rounded-lg border px-3 py-2 text-sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Next</button>
-        </div>
+      {forbidden ? (
+        <AccessDenied title="You don't have access" description="You don't have access to this data." primary={{ label: 'Go back', href: '/admin' }} />
+      ) : failed && !loaded ? (
+        <ErrorState title="We couldn't load applications" description="Try again in a moment." primary={{ label: 'Try again', onClick: () => setPage(1) }} />
+      ) : loading && !loaded ? (
+        <TableSkeleton rows={6} />
+      ) : rows.length === 0 && tab ? (
+        <EmptyState title="No applications in this list yet" description="Try another status, or wait for new applications." />
+      ) : rows.length === 0 ? (
+        <EmptyState title="No applications yet" description="Laptop Banking applications will show up here." />
+      ) : (
+        <>
+          <ResponsiveTable
+            headers={
+              <tr>
+                <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">Plan</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3 text-right">Actions</th>
+              </tr>
+            }
+            cards={rows.map((row) => (
+              <AdminRowCard
+                key={row.id}
+                name={row.full_name}
+                href={`/admin/vlb/applications/${row.id}`}
+                status={<Badge variant={payoutStatusVariant(row.status)}>{row.status}</Badge>}
+                facts={[
+                  { label: 'Email', value: row.email },
+                  { label: 'Plan', value: nested(row.vlb_plans)?.name || '—' },
+                  { label: 'Date', value: formatDeviceDate(row.created_at) },
+                ]}
+                actions={
+                  <RowActions
+                    name={row.full_name}
+                    actions={[{ label: 'View', href: `/admin/vlb/applications/${row.id}` }]}
+                  />
+                }
+              />
+            ))}
+          >
+            {rows.map((row) => (
+              <tr key={row.id} className="hover:bg-gray-50">
+                <td className="px-4 py-3">
+                  <Link href={`/admin/vlb/applications/${row.id}`} className="font-medium text-[#FF7A19]">
+                    {row.full_name}
+                  </Link>
+                  <p className="text-xs text-[#3A3A3A]">{row.email}</p>
+                </td>
+                <td className="px-4 py-3">{nested(row.vlb_plans)?.name || '—'}</td>
+                <td className="px-4 py-3"><Badge variant={payoutStatusVariant(row.status)}>{row.status}</Badge></td>
+                <td className="px-4 py-3">{formatDeviceDate(row.created_at)}</td>
+                <td className="px-4 py-3 text-right">
+                  <RowActions
+                    name={row.full_name}
+                    actions={[{ label: 'View', href: `/admin/vlb/applications/${row.id}` }]}
+                  />
+                </td>
+              </tr>
+            ))}
+          </ResponsiveTable>
+          <AdminPagination page={page} totalPages={totalPages} onPage={setPage} />
+        </>
       )}
     </div>
   );

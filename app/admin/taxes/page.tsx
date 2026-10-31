@@ -1,9 +1,18 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Percent, DollarSign, Settings } from 'lucide-react';
+import { Plus, Percent, DollarSign, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import {
+  AdminPageHeader,
+  AdminRowCard,
+  ConfirmDialog,
+  ResponsiveTable,
+  RowActions,
+} from '@/components/admin/list';
+import { LoadGate, TableSkeleton } from '@/components/ui-states';
+import { noteQueryFail } from '@/lib/queryState';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 
@@ -22,6 +31,9 @@ interface Tax {
 export default function AdminTaxesPage() {
   const [taxes, setTaxes] = useState<Tax[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingTax, setEditingTax] = useState<Tax | null>(null);
   const [newTax, setNewTax] = useState<Partial<Tax>>({
@@ -32,6 +44,8 @@ export default function AdminTaxesPage() {
     is_active: true,
     applies_to: 'all',
   });
+  const [deleteTarget, setDeleteTarget] = useState<Tax | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchTaxes();
@@ -45,55 +59,16 @@ export default function AdminTaxesPage() {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        // Check if table doesn't exist - handle silently
-        const errorStr = String(JSON.stringify(error)).toLowerCase();
-        const errorMessage = String(error.message || '').toLowerCase();
-        const errorCode = String(error.code || '');
-        
-        // PGRST205 = table not found in schema cache
-        if (errorCode === '42P01' || errorCode === 'PGRST116' || errorCode === 'PGRST205' ||
-            errorMessage.includes('does not exist') || 
-            errorMessage.includes('could not find the table') ||
-            errorMessage.includes('relation') || 
-            errorMessage.includes('not found') ||
-            errorStr.includes('does not exist') ||
-            errorStr.includes('could not find the table') ||
-            errorStr.includes('relation') ||
-            errorStr.includes('not found') ||
-            Object.keys(error).length === 0) {
-          // Table doesn't exist or empty error - set empty array silently
-          setTaxes([]);
-          return;
-        }
-        throw error;
-      }
+      if (error) throw error;
       setTaxes(data || []);
+      setLoaded(true);
+      setFailed(false);
+      setForbidden(false);
     } catch (error: any) {
-      // Check if it's a "table doesn't exist" error
-      const errorStr = String(JSON.stringify(error || {})).toLowerCase();
-      const errorMessage = String(error?.message || '').toLowerCase();
-      const errorCode = String(error?.code || '');
-      
-      // PGRST205 = table not found in schema cache
-      if (errorCode === '42P01' || errorCode === 'PGRST116' || errorCode === 'PGRST205' ||
-          errorMessage.includes('does not exist') || 
-          errorMessage.includes('could not find the table') ||
-          errorMessage.includes('relation') || 
-          errorMessage.includes('not found') ||
-          errorStr.includes('does not exist') ||
-          errorStr.includes('could not find the table') ||
-          errorStr.includes('relation') ||
-          errorStr.includes('not found') ||
-          Object.keys(error || {}).length === 0) {
-        // Table doesn't exist or empty error - set empty array silently
-        setTaxes([]);
-      } else {
-        // Real error - log it
-        console.error('Error fetching taxes:', error);
-        toast.error('Failed to fetch taxes');
-        setTaxes([]);
-      }
+      console.error('Error fetching taxes:', error);
+      const kind = noteQueryFail(error);
+      if (kind === 'forbidden') setForbidden(true);
+      else if (kind !== 'unauthorized') setFailed(true);
     } finally {
       setIsLoading(false);
     }
@@ -122,7 +97,7 @@ export default function AdminTaxesPage() {
             errorStr.includes('relation') ||
             errorStr.includes('not found') ||
             Object.keys(error || {}).length === 0) {
-          toast.error('Taxes table does not exist. Please run the create_taxes_discounts_system.sql migration in Supabase.');
+          toast.error('Could not save this tax.');
           return;
         }
         throw error;
@@ -154,7 +129,7 @@ export default function AdminTaxesPage() {
           errorStr.includes('relation') ||
           errorStr.includes('not found') ||
           Object.keys(error || {}).length === 0) {
-        toast.error('Taxes table does not exist. Please run the create_taxes_discounts_system.sql migration in Supabase.');
+        toast.error('Could not save this tax.');
       } else {
         console.error('Error creating tax:', error);
         toast.error('Failed to create tax');
@@ -188,7 +163,7 @@ export default function AdminTaxesPage() {
             errorStr.includes('relation') ||
             errorStr.includes('not found') ||
             Object.keys(error || {}).length === 0) {
-          toast.error('Taxes table does not exist. Please run the create_taxes_discounts_system.sql migration in Supabase.');
+          toast.error('Could not save this tax.');
           return;
         }
         throw error;
@@ -220,7 +195,7 @@ export default function AdminTaxesPage() {
           errorStr.includes('relation') ||
           errorStr.includes('not found') ||
           Object.keys(error || {}).length === 0) {
-        toast.error('Taxes table does not exist. Please run the create_taxes_discounts_system.sql migration in Supabase.');
+        toast.error('Could not save this tax.');
       } else {
         console.error('Error updating tax:', error);
         toast.error('Failed to update tax');
@@ -228,14 +203,15 @@ export default function AdminTaxesPage() {
     }
   };
 
-  const handleDeleteTax = async (taxId: string) => {
-    if (!confirm('Are you sure you want to delete this tax?')) return;
+  const handleDeleteTax = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
 
     try {
       const { error } = await supabase
         .from('taxes')
         .delete()
-        .eq('id', taxId);
+        .eq('id', deleteTarget.id);
 
       if (error) {
         // Check if table doesn't exist - handle silently
@@ -259,6 +235,7 @@ export default function AdminTaxesPage() {
         throw error;
       }
       toast.success('Tax deleted successfully!');
+      setDeleteTarget(null);
       fetchTaxes();
     } catch (error: any) {
       // Only log if it's not a "table doesn't exist" error
@@ -279,6 +256,8 @@ export default function AdminTaxesPage() {
         console.error('Error deleting tax:', error);
         toast.error('Failed to delete tax');
       }
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -317,111 +296,88 @@ export default function AdminTaxesPage() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="p-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-16 bg-gray-200 rounded"></div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const taxActions = (tax: Tax) => [
+    { label: 'Edit', onClick: () => handleEditTax(tax) },
+    { label: 'Delete', destructive: true, onClick: () => setDeleteTarget(tax) },
+  ];
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-[#1A1A1A]">Tax Management</h1>
-        <Button
-          variant="primary"
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Add Tax
-        </Button>
-      </div>
+    <div className="min-w-0">
+      <AdminPageHeader
+        title="Taxes"
+        subtitle={`${taxes.length} tax${taxes.length === 1 ? '' : 'es'}`}
+        primary={{ label: 'Add tax', icon: <Plus size={16} />, onClick: () => setShowCreateModal(true) }}
+      />
 
-      {/* Taxes Table */}
-      <div className="bg-white rounded-lg shadow-sm border">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Name
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Type
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Rate
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Applies To
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {taxes.map((tax) => (
-                <tr key={tax.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{tax.name}</div>
-                      {tax.description && (
-                        <div className="text-sm text-gray-500">{tax.description}</div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <Badge className={`${getTypeColor(tax.type)} flex items-center gap-1 w-fit`}>
-                      {getTypeIcon(tax.type)}
-                      {tax.type}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {formatRate(tax.rate, tax.type)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {tax.applies_to}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <Badge variant={tax.is_active ? 'success' : 'error'}>
-                      {tax.is_active ? 'Active' : 'Inactive'}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleEditTax(tax)}
-                        className="text-[#FF7A19] hover:text-[#FF7A19]/80"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteTax(tax.id)}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <LoadGate
+        loaded={loaded}
+        loading={isLoading}
+        updating={isLoading && loaded}
+        error={failed}
+        forbidden={forbidden}
+        isEmpty={taxes.length === 0}
+        onRetry={() => void fetchTaxes()}
+        skeleton={<TableSkeleton rows={4} />}
+        emptyTitle="No taxes yet"
+        emptyDescription="Add a tax to apply at checkout."
+        emptyPrimary={{ label: 'Add tax', onClick: () => setShowCreateModal(true) }}
+        denyHome="/admin"
+      >
+        <ResponsiveTable
+          headers={
+            <tr>
+              <th className="px-4 py-3">Name</th>
+              <th className="px-4 py-3">Type</th>
+              <th className="px-4 py-3">Rate</th>
+              <th className="px-4 py-3">Applies to</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3 text-right">Actions</th>
+            </tr>
+          }
+          cards={taxes.map((tax) => (
+            <AdminRowCard
+              key={tax.id}
+              name={tax.name}
+              status={
+                <Badge variant={tax.is_active ? 'success' : 'error'}>
+                  {tax.is_active ? 'Active' : 'Inactive'}
+                </Badge>
+              }
+              facts={[
+                { label: 'Type', value: tax.type },
+                { label: 'Rate', value: formatRate(tax.rate, tax.type) },
+                { label: 'Applies to', value: tax.applies_to },
+              ]}
+              actions={<RowActions name={tax.name} actions={taxActions(tax)} />}
+            />
+          ))}
+        >
+          {taxes.map((tax) => (
+            <tr key={tax.id} className="hover:bg-gray-50">
+              <td className="px-4 py-3">
+                <p className="font-medium text-[#1A1A1A]">{tax.name}</p>
+                {tax.description ? <p className="text-sm text-[#3A3A3A]">{tax.description}</p> : null}
+              </td>
+              <td className="px-4 py-3">
+                <Badge className={`${getTypeColor(tax.type)} flex w-fit items-center gap-1`}>
+                  {getTypeIcon(tax.type)}
+                  {tax.type}
+                </Badge>
+              </td>
+              <td className="px-4 py-3 text-sm text-[#1A1A1A]">{formatRate(tax.rate, tax.type)}</td>
+              <td className="px-4 py-3 text-sm text-[#3A3A3A]">{tax.applies_to}</td>
+              <td className="px-4 py-3">
+                <Badge variant={tax.is_active ? 'success' : 'error'}>
+                  {tax.is_active ? 'Active' : 'Inactive'}
+                </Badge>
+              </td>
+              <td className="px-4 py-3 text-right">
+                <RowActions name={tax.name} actions={taxActions(tax)} />
+              </td>
+            </tr>
+          ))}
+        </ResponsiveTable>
+      </LoadGate>
 
       {/* Create/Edit Modal */}
       {(showCreateModal || editingTax) && (
@@ -560,6 +516,18 @@ export default function AdminTaxesPage() {
           </div>
         </div>
       )}
+
+      {deleteTarget ? (
+        <ConfirmDialog
+          title="Delete this tax?"
+          confirmLabel="Delete"
+          busy={deleting}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={() => void handleDeleteTax()}
+        >
+          {deleteTarget.name} will be removed.
+        </ConfirmDialog>
+      ) : null}
     </div>
   );
 }

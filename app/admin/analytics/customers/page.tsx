@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { Users, UserPlus, Heart, ShoppingCart, Download } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { AccessDenied, EmptyState, ErrorState, StatCardSkeleton, UpdatingNotice } from '@/components/ui-states';
+import { noteQueryFail } from '@/lib/queryState';
 import { supabase } from '@/lib/supabase';
-import toast from 'react-hot-toast';
 
 interface CustomerData {
   totalCustomers: number;
@@ -17,15 +18,11 @@ interface CustomerData {
 
 export default function CustomersAnalyticsPage() {
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
   const [timeFilter, setTimeFilter] = useState<'7days' | '30days' | '90days'>('30days');
-  const [customerData, setCustomerData] = useState<CustomerData>({
-    totalCustomers: 0,
-    newCustomers: 0,
-    returningRate: 0,
-    avgLifetimeValue: 0,
-    topCustomers: [],
-    customerSegments: [],
-  });
+  const [customerData, setCustomerData] = useState<CustomerData | null>(null);
 
   useEffect(() => {
     fetchCustomerData();
@@ -132,27 +129,45 @@ export default function CustomersAnalyticsPage() {
         topCustomers,
         customerSegments,
       });
+      setLoaded(true);
+      setFailed(false);
+      setForbidden(false);
     } catch (error) {
-      console.error('Error fetching customer data:', error);
-      toast.error('Failed to load customer analytics');
+      const kind = noteQueryFail(error);
+      if (kind === 'forbidden') setForbidden(true);
+      else if (kind !== 'unauthorized') setFailed(true);
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading) {
+  if (forbidden) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF7A19] mx-auto mb-4"></div>
-          <p className="text-[#3A3A3A]">Loading customer analytics...</p>
-        </div>
-      </div>
+      <AccessDenied
+        title="You don't have access"
+        description="You don't have access to this data."
+        primary={{ label: 'Go back', href: '/admin' }}
+      />
     );
+  }
+
+  if (failed && !customerData) {
+    return (
+      <ErrorState
+        title="We couldn't load customer analytics"
+        description="Try again in a moment."
+        primary={{ label: 'Try again', onClick: () => void fetchCustomerData() }}
+      />
+    );
+  }
+
+  if ((loading && !customerData) || !customerData) {
+    return <StatCardSkeleton count={4} />;
   }
 
   return (
     <div className="space-y-6">
+      {loading && loaded ? <UpdatingNotice /> : null}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

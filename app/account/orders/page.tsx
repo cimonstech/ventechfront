@@ -6,8 +6,9 @@ import { useRouter } from 'next/navigation';
 import { Package, Eye, Calendar, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { AccountListSkeleton, EmptyState, ErrorState } from '@/components/ui-states';
+import { AccessDenied, AccountListSkeleton, EmptyState, ErrorState, UpdatingNotice } from '@/components/ui-states';
 import { useOnlineRefetch } from '@/hooks/useOnlineRefetch';
+import { noteQueryFail } from '@/lib/queryState';
 import { useAppSelector } from '@/store';
 import { orderService } from '@/services/order.service';
 import { formatCurrency } from '@/lib/helpers';
@@ -28,12 +29,14 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
 
   const fetchOrders = useCallback(async () => {
     if (!user?.id) return;
     try {
       setIsLoading(true);
       setFailed(false);
+      setForbidden(false);
       const ordersData = await orderService.getUserOrders(user.id);
       const formattedOrders = (ordersData || []).map((order: any) => ({
         id: order.id,
@@ -47,7 +50,9 @@ export default function OrdersPage() {
       setOrders(formattedOrders);
     } catch (error: any) {
       console.error('Error fetching orders:', error);
-      setFailed(true);
+      const kind = noteQueryFail(error);
+      if (kind === 'forbidden') setForbidden(true);
+      else if (kind !== 'unauthorized') setFailed(true);
     } finally {
       setIsLoading(false);
     }
@@ -103,7 +108,13 @@ export default function OrdersPage() {
           <p className="text-[#3A3A3A]">View and track your order history</p>
         </div>
 
-        {failed && orders.length === 0 ? (
+        {forbidden ? (
+          <AccessDenied
+            title="You don't have access"
+            description="You don't have access to this data."
+            primary={{ label: 'Go to your account', href: '/account' }}
+          />
+        ) : failed && orders.length === 0 ? (
           <ErrorState
             title="We couldn't load your orders"
             description="Try again in a moment. If it keeps failing, contact support."
@@ -118,6 +129,15 @@ export default function OrdersPage() {
           />
         ) : (
           <div className="space-y-4">
+            {isLoading ? <UpdatingNotice /> : null}
+            {failed ? (
+              <div className="flex flex-col items-stretch gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between" role="alert">
+                <p className="text-sm text-red-800">We couldn&apos;t refresh this. Your last loaded data is still here.</p>
+                <button type="button" className="min-h-11 text-sm font-semibold text-red-800 underline" onClick={() => void fetchOrders()}>
+                  Try again
+                </button>
+              </div>
+            ) : null}
             {orders.map((order) => (
               <div key={order.id} className="bg-white rounded-xl shadow-lg p-4 sm:p-6 hover:shadow-xl transition-shadow">
                 <div className="flex flex-wrap items-center justify-between gap-4 mb-4">

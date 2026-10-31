@@ -6,13 +6,15 @@ import { useState, useEffect } from 'react';
 import {
   DollarSign,
   TrendingUp,
-  TrendingDown,
-  Calendar,
   Download,
 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import {
+  AdminPageHeader,
+  filterSelectClassName,
+} from '@/components/admin/list';
+import { LoadGate, StatCardSkeleton } from '@/components/ui-states';
+import { noteQueryFail } from '@/lib/queryState';
 import { supabase } from '@/lib/supabase';
-import toast from 'react-hot-toast';
 
 interface RevenueData {
   total: number;
@@ -26,15 +28,9 @@ interface RevenueData {
 export default function RevenueAnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [denied, setDenied] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [timeFilter, setTimeFilter] = useState<'7days' | '30days' | '90days' | 'year'>('30days');
-  const [revenueData, setRevenueData] = useState<RevenueData>({
-    total: 0,
-    growth: 0,
-    transactions: 0,
-    averageOrder: 0,
-    byDay: [],
-    byCategory: [],
-  });
+  const [revenueData, setRevenueData] = useState<RevenueData | null>(null);
 
   useEffect(() => {
     fetchRevenueData();
@@ -248,63 +244,54 @@ export default function RevenueAnalyticsPage() {
         byDay,
         byCategory,
       });
+      setFailed(false);
     } catch (error) {
       console.error('Error fetching revenue data:', error);
-      const deniedAccess = error instanceof Error && error.message === ADMIN_DATA_DENIED;
-      if (deniedAccess) {
+      const kind = noteQueryFail(error);
+      if (kind === 'forbidden' || (error instanceof Error && error.message === ADMIN_DATA_DENIED)) {
         setDenied(true);
-        toast.error(ADMIN_DATA_DENIED);
-      } else {
-        toast.error('Failed to load revenue analytics');
+      } else if (kind !== 'unauthorized') {
+        setFailed(true);
       }
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF7A19] mx-auto mb-4"></div>
-          <p className="text-[#3A3A3A]">Loading revenue analytics...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (denied) {
-    return (
-      <p className="rounded-xl bg-white p-6 text-sm text-[#3A3A3A] shadow-sm">{ADMIN_DATA_DENIED}</p>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-[#1A1A1A]">Revenue Analytics</h1>
-          <p className="text-sm text-[#3A3A3A] mt-1">
-            Track your sales revenue and growth
-          </p>
-        </div>
-        <div className="flex gap-3">
+    <div className="min-w-0 space-y-6">
+      <AdminPageHeader
+        title="Revenue"
+        subtitle="Track your sales revenue and growth"
+        secondary={[{ label: 'Export report', icon: <Download size={16} /> }]}
+        extra={
           <select
             value={timeFilter}
             onChange={(e) => setTimeFilter(e.target.value as any)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
+            className={filterSelectClassName()}
           >
-            <option value="7days">Last 7 Days</option>
-            <option value="30days">Last 30 Days</option>
-            <option value="90days">Last 90 Days</option>
-            <option value="year">This Year</option>
+            <option value="7days">Last 7 days</option>
+            <option value="30days">Last 30 days</option>
+            <option value="90days">Last 90 days</option>
+            <option value="year">This year</option>
           </select>
-          <Button variant="outline" icon={<Download size={18} />}>
-            Export Report
-          </Button>
-        </div>
-      </div>
+        }
+      />
+
+      <LoadGate
+        loaded={Boolean(revenueData)}
+        loading={loading || !revenueData}
+        error={failed}
+        forbidden={denied}
+        isEmpty={false}
+        onRetry={() => void fetchRevenueData()}
+        skeleton={<StatCardSkeleton count={4} />}
+        emptyTitle="No revenue yet"
+        emptyDescription="Paid orders will show up here."
+        denyHome="/admin"
+      >
+        {revenueData ? (
+          <>
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -312,7 +299,7 @@ export default function RevenueAnalyticsPage() {
           <div className="flex items-center gap-3 mb-4">
             <DollarSign className="text-green-600" size={32} />
           </div>
-          <p className="text-sm text-green-700 mb-1">Total Revenue</p>
+          <p className="text-sm text-green-700 mb-1">Total revenue</p>
           <p className="text-3xl font-bold text-green-900">
             GHS {revenueData.total.toLocaleString()}
           </p>
@@ -323,7 +310,7 @@ export default function RevenueAnalyticsPage() {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-          <p className="text-sm text-[#3A3A3A] mb-1">Total Transactions</p>
+          <p className="text-sm text-[#3A3A3A] mb-1">Total transactions</p>
           <p className="text-3xl font-bold text-[#1A1A1A]">
             {revenueData.transactions}
           </p>
@@ -331,7 +318,7 @@ export default function RevenueAnalyticsPage() {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-          <p className="text-sm text-[#3A3A3A] mb-1">Average Order Value</p>
+          <p className="text-sm text-[#3A3A3A] mb-1">Average order value</p>
           <p className="text-3xl font-bold text-[#FF7A19]">
             GHS {revenueData.averageOrder}
           </p>
@@ -339,7 +326,7 @@ export default function RevenueAnalyticsPage() {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-          <p className="text-sm text-[#3A3A3A] mb-1">Growth Rate</p>
+          <p className="text-sm text-[#3A3A3A] mb-1">Growth rate</p>
           <p className="text-3xl font-bold text-green-600">+{revenueData.growth}%</p>
           <p className="text-sm text-[#3A3A3A] mt-2">Month over month</p>
         </div>
@@ -347,7 +334,7 @@ export default function RevenueAnalyticsPage() {
 
       {/* Revenue Chart Placeholder */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-bold text-[#1A1A1A] mb-6">Revenue Trend</h2>
+        <h2 className="mb-6 text-lg font-bold text-[#1A1A1A]">Revenue trend</h2>
         <div className="h-64 flex items-end justify-between gap-2">
           {revenueData.byDay.map((day, index) => {
             const maxRevenue = Math.max(...revenueData.byDay.map((d) => d.revenue));
@@ -372,7 +359,7 @@ export default function RevenueAnalyticsPage() {
 
       {/* Revenue by Category */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-bold text-[#1A1A1A] mb-6">Revenue by Category</h2>
+        <h2 className="mb-6 text-lg font-bold text-[#1A1A1A]">Revenue by category</h2>
         <div className="space-y-4">
           {revenueData.byCategory.map((category, index) => (
             <div key={index}>
@@ -397,6 +384,9 @@ export default function RevenueAnalyticsPage() {
           ))}
         </div>
       </div>
+          </>
+        ) : null}
+      </LoadGate>
     </div>
   );
 }

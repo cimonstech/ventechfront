@@ -8,6 +8,8 @@ import { Mail, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { resendVerificationEmail } from '@/services/auth.service';
 import { safeRedirectPath } from '@/lib/safeRedirect';
+import { mapResendError } from '@/lib/authErrors';
+import { FieldError } from '@/components/ui-states';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 
@@ -20,6 +22,7 @@ export default function VerifyEmailPage() {
   const [email, setEmail] = useState(emailParam || '');
   const [isResending, setIsResending] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [resendError, setResendError] = useState('');
 
   // If there's a verification code, redirect to callback page
   useEffect(() => {
@@ -58,10 +61,11 @@ export default function VerifyEmailPage() {
 
   const handleResend = async () => {
     if (!email) {
-      toast.error('Email address not found');
+      setResendError('Enter the email you used to register.');
       return;
     }
 
+    setResendError('');
     setIsResending(true);
 
     try {
@@ -72,17 +76,13 @@ export default function VerifyEmailPage() {
       }
 
       toast.success('Verification email sent! Please check your inbox.');
-      setResendCooldown(60); // 60 second cooldown
-    } catch (error: any) {
+      setResendCooldown(60);
+    } catch (error) {
       console.error('Resend error:', error);
-      // Handle rate limiting (429 error)
-      if ((error?.status === 429) || error.message?.includes('429') || error.message?.toLowerCase().includes('rate limit')) {
-        toast.error('Too many requests. Please wait a few minutes before requesting another email.', {
-          duration: 5000,
-        });
-        setResendCooldown(300); // 5 minute cooldown for rate limiting
-      } else {
-      toast.error(error.message || 'Failed to resend email. Please try again.');
+      const message = mapResendError(error);
+      setResendError(message);
+      if (message.includes('Too many attempts')) {
+        setResendCooldown(300);
       }
     } finally {
       setIsResending(false);
@@ -126,6 +126,7 @@ export default function VerifyEmailPage() {
           </div>
 
           <div className="space-y-3">
+            <FieldError id="verify-resend-error" message={resendError} />
             <Button
               variant="primary"
               size="lg"
@@ -141,6 +142,7 @@ export default function VerifyEmailPage() {
               className="w-full"
               onClick={handleResend}
               disabled={isResending || resendCooldown > 0}
+              aria-describedby={resendError ? 'verify-resend-error' : undefined}
             >
               {isResending ? (
                 <>

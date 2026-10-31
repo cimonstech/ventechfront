@@ -1,4 +1,6 @@
+import { apiRequest, toApiError } from '@/lib/api';
 import { authHeaders } from '@/lib/authHeaders';
+import { PAYMENT_COPY } from '@/lib/paymentCopy';
 import { referralForCheckout } from '@/lib/referralCookie';
 import { supabase } from '@/lib/supabase';
 import { CheckoutData, Order } from '@/types/order';
@@ -7,8 +9,6 @@ export const orderService = {
   // Create new order (supports guest checkout with null userId)
   // Uses backend API to handle emails and notifications
   async createOrder(checkoutData: CheckoutData, userId: string | null) {
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-    
     // Calculate totals
     // Use delivery_fee from checkoutData if provided (for pre-orders), otherwise calculate from delivery_option
     const subtotal = checkoutData.items.reduce((sum, item) => sum + item.subtotal, 0);
@@ -51,7 +51,12 @@ export const orderService = {
       const productId = item.id;
       
       if (!productId) {
-        throw new Error(`Item missing id: ${JSON.stringify(item)}`);
+        throw toApiError({
+          ok: false,
+          kind: 'validation',
+          status: 400,
+          message: PAYMENT_COPY.placeFailed,
+        });
       }
       
       return {
@@ -65,128 +70,46 @@ export const orderService = {
       };
     });
 
-    // Try to call backend API first, fallback to Supabase if it fails
-    try {
-      const referral = checkoutData.referral || (await referralForCheckout());
-      const orderPayload = {
-        user_id: userId,
-        // order_number not provided - backend will generate sequential number
-        subtotal,
-        discount: checkoutData.discount || 0,
-        coupon_id: (checkoutData as any).coupon_id || null,
-        tax,
-        delivery_fee: deliveryFee,
-        total,
-        payment_method: checkoutData.payment_method,
-        delivery_address: checkoutData.delivery_address, // Backend will map this to shipping_address
-        delivery_option: checkoutData.delivery_option,
-        notes: checkoutData.notes || null,
-        payment_reference: checkoutData.payment_reference || null, // Include payment reference for transaction linking
-        customer_bio: (checkoutData as any).customer_bio || null,
-        order_items,
-        // Pre-order fields
-        is_pre_order: (checkoutData as any).is_pre_order || false,
-        pre_order_shipping_option: (checkoutData as any).pre_order_shipping_option || null,
-        estimated_arrival_date: (checkoutData as any).estimated_arrival_date || null,
-        ...(referral ? { referral: { click_id: referral.click_id } } : {}),
-      };
-      
-      console.log('Creating order via backend API:', {
-        API_URL,
-        endpoint: `${API_URL}/api/orders`,
-        payload: {
-          ...orderPayload,
-          order_items: orderPayload.order_items.map(item => ({
-            product_id: item.product_id,
-            quantity: item.quantity,
-            unit_price: item.unit_price,
-          })),
-        },
-      });
-      
-      const response = await fetch(`${API_URL}/api/orders`, {
-        method: 'POST',
-        headers: {
-          ...(await authHeaders()),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(orderPayload),
-      });
-      
-      // Backend API response received
+    const referral = checkoutData.referral || (await referralForCheckout());
+    const orderPayload = {
+      user_id: userId,
+      subtotal,
+      discount: checkoutData.discount || 0,
+      coupon_id: (checkoutData as any).coupon_id || null,
+      tax,
+      delivery_fee: deliveryFee,
+      total,
+      payment_method: checkoutData.payment_method,
+      delivery_address: checkoutData.delivery_address,
+      delivery_option: checkoutData.delivery_option,
+      notes: checkoutData.notes || null,
+      payment_reference: checkoutData.payment_reference || null,
+      customer_bio: (checkoutData as any).customer_bio || null,
+      order_items,
+      is_pre_order: (checkoutData as any).is_pre_order || false,
+      pre_order_shipping_option: (checkoutData as any).pre_order_shipping_option || null,
+      estimated_arrival_date: (checkoutData as any).estimated_arrival_date || null,
+      ...(referral ? { referral: { click_id: referral.click_id } } : {}),
+    };
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success && result.data) {
-          return result.data;
-        } else {
-          throw new Error(result.message || 'Order creation failed');
-        }
-      } else {
-        // Try to parse error response
-        let errorMessage = 'Backend API failed';
-        let errorData: any = {};
-        try {
-          errorData = await response.json();
-          // Check multiple possible error message fields
-          errorMessage = errorData.message || errorData.error || errorData.details || errorMessage;
-          
-          // If error message contains product-related issues, make it user-friendly
-          if (errorMessage.includes('product_id') || errorMessage.includes('Products not found') || errorMessage.includes('foreign key constraint')) {
-            errorMessage = 'Some products in your order are no longer available. Please remove them from your cart and try again.';
-          }
-          
-          console.error('Backend API error response:', {
-            status: response.status,
-            statusText: response.statusText,
-            error: errorData,
-            message: errorMessage,
-          });
-        } catch (parseError) {
-          errorMessage = `HTTP ${response.status}: ${response.statusText || 'Unknown error'}`;
-          console.error('Backend API error (non-JSON):', {
-            status: response.status,
-            statusText: response.statusText,
-          });
-        }
-        
-        // Don't fallback to Supabase - throw error instead
-        // Supabase RLS will block frontend inserts anyway
-        const error = new Error(errorMessage);
-        (error as any).response = { status: response.status, data: errorData };
-        throw error;
-      }
-    } catch (apiError: any) {
-      // Don't fallback to Supabase - RLS will block it
-      // Instead, throw the error so the user knows what went wrong
-      console.error('Backend API failed - cannot create order:', {
-        error: apiError,
-        message: apiError?.message,
-        status: apiError?.response?.status,
-        responseData: apiError?.response?.data,
-      });
-      
-      // Re-throw with a clearer message, but preserve the actual error message if it's user-friendly
-      if (apiError?.message?.includes('products are no longer available') || 
-          apiError?.message?.includes('Products not found') ||
-          apiError?.message?.includes('product_id')) {
-        // Already user-friendly, use as-is
-        throw apiError;
-      } else if (apiError?.response?.status === 500) {
-        // For 500 errors, use the actual error message from backend if available
-        const backendError = apiError?.response?.data?.error || apiError?.response?.data?.message;
-        if (backendError && !backendError.includes('Unknown error')) {
-          throw new Error(backendError);
-        }
-        throw new Error('Server error: Unable to create order. Please try again or contact support.');
-      } else if (apiError?.response?.status === 400) {
-        throw new Error(apiError.message || 'Invalid order data. Please check your order details.');
-      } else if (apiError?.message?.includes('Failed to fetch') || apiError?.message?.includes('NetworkError')) {
-        throw new Error('Network error: Unable to connect to server. Please check your internet connection and try again.');
-      } else {
-        throw apiError;
-      }
+    const paid = checkoutData.payment_method === 'paystack' && Boolean(checkoutData.payment_reference);
+    const result = await apiRequest<any>('/api/orders', {
+      method: 'POST',
+      returnPath: '/checkout',
+      body: JSON.stringify(orderPayload),
+    });
+
+    if (!result.ok) {
+      const message =
+        result.kind === 'network' || result.kind === 'rate_limited' || result.kind === 'unauthorized'
+          ? result.message
+          : paid
+            ? PAYMENT_COPY.confirmFailed(checkoutData.payment_reference)
+            : PAYMENT_COPY.placeFailed;
+      throw toApiError({ ...result, message });
     }
+
+    return result.data;
   },
 
   // Get user orders
@@ -204,47 +127,16 @@ export const orderService = {
 
   // Get order by ID (uses backend API to support both authenticated and guest orders)
   async getOrderById(orderId: string, email?: string | null) {
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
     const query = email ? `?email=${encodeURIComponent(email)}` : '';
-    
-    try {
-      const response = await fetch(`${API_URL}/api/orders/${orderId}${query}`, {
-        method: 'GET',
-        headers: {
-          ...(await authHeaders()),
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error('Order not found');
-        }
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to fetch order');
-      }
-
-      const result = await response.json();
-      if (result.success && result.data) {
-        // Transform the data to match Order interface
-        const data = result.data;
-        return {
-          ...data,
-          items: data.order_items || data.items || [],
-          delivery_address: data.shipping_address || data.delivery_address,
-          delivery_fee: data.shipping_fee || data.delivery_fee || 0,
-        };
-      } else {
-        throw new Error(result.message || 'Failed to fetch order');
-      }
-    } catch (error: any) {
-      console.error('Error fetching order by ID:', error);
-      // Re-throw with a clearer message
-      if (error.message?.includes('not found') || error.message?.includes('404')) {
-        throw new Error('Order not found');
-      }
-      throw error;
-    }
+    const result = await apiRequest<any>(`/api/orders/${orderId}${query}`);
+    if (!result.ok) throw toApiError(result);
+    const data = result.data;
+    return {
+      ...data,
+      items: data.order_items || data.items || [],
+      delivery_address: data.shipping_address || data.delivery_address,
+      delivery_fee: data.shipping_fee || data.delivery_fee || 0,
+    };
   },
 
   // Get order by order number

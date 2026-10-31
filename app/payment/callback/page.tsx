@@ -9,6 +9,7 @@ import { orderService } from '@/services/order.service';
 import { useAppDispatch } from '@/store';
 import { clearCart } from '@/store/cartSlice';
 import { PRE_ORDER_SHIPPING_OPTIONS } from '@/services/preOrder.service';
+import { PAYMENT_COPY, messageForChargeStatus } from '@/lib/paymentCopy';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 
@@ -16,8 +17,9 @@ export default function PaymentCallbackPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const dispatch = useAppDispatch();
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'pending' | 'abandoned' | 'failed'>('loading');
   const [message, setMessage] = useState('Verifying payment...');
+  const [paymentReference, setPaymentReference] = useState('');
   const hasProcessedRef = React.useRef(false);
 
   useEffect(() => {
@@ -32,9 +34,10 @@ export default function PaymentCallbackPage() {
     // Only run if we have a reference
     if (!reference) {
       setStatus('error');
-      setMessage('No payment reference found');
+      setMessage(PAYMENT_COPY.confirmFailed());
       return;
     }
+    setPaymentReference(reference);
 
     const handlePaymentCallback = async () => {
       try {
@@ -42,60 +45,47 @@ export default function PaymentCallbackPage() {
 
         // Verify payment with backend
         const verifyResult = await paymentService.verifyPayment(reference);
+        const chargeStatus = verifyResult.data?.status || verifyResult.status;
 
-        if (verifyResult.success && verifyResult.data?.status === 'success') {
+        if (!verifyResult.success) {
+          setStatus('error');
+          setMessage(verifyResult.message || PAYMENT_COPY.confirmFailed(reference));
+          return;
+        }
+
+        if (chargeStatus === 'pending') {
+          setStatus('pending');
+          setMessage(messageForChargeStatus('pending', reference));
+          return;
+        }
+
+        if (chargeStatus === 'abandoned') {
+          setStatus('abandoned');
+          setMessage(messageForChargeStatus('abandoned', reference));
+          return;
+        }
+
+        if (chargeStatus !== 'success') {
+          setStatus('failed');
+          setMessage(messageForChargeStatus('failed', reference));
+          return;
+        }
+
+        if (chargeStatus === 'success') {
           // Payment verified successfully
           // ✅ CRITICAL: NEVER use prices from Paystack metadata
           // Paystack metadata may contain prices in pesewas, not GHS
           // ALWAYS use sessionStorage checkout data (prices in GHS)
           const checkoutDataStr = sessionStorage.getItem('pending_checkout_data');
-          const metadata = verifyResult.data?.metadata || {};
-          
-          // Retrieve checkout data (only log errors, not verbose success)
-          
-          // ✅ Get checkout data - ONLY from sessionStorage (prices in GHS)
-          // NEVER use metadata.checkout_data for prices - it may be in pesewas
           let checkoutData: any = null;
           
           if (checkoutDataStr) {
             try {
               const parsed = JSON.parse(checkoutDataStr);
-              
-              // If it has checkout_data nested, use that instead
-              if (parsed.checkout_data) {
-                checkoutData = parsed.checkout_data;
-              } else {
-                checkoutData = parsed;
-              }
+              checkoutData = parsed.checkout_data || parsed;
             } catch (e) {
-              console.error('❌ Error parsing checkout data from sessionStorage:', e);
-              console.error('Raw checkout data string:', checkoutDataStr?.substring(0, 200));
+              console.error('Error parsing checkout data from sessionStorage:', e);
             }
-          }
-          
-          // ⚠️ If no sessionStorage data, metadata is last resort (but recalculate all prices)
-          if (!checkoutData && metadata.checkout_data) {
-            // ⚠️ WARNING: Using Paystack metadata as fallback - prices may be in pesewas!
-            // This should only happen if sessionStorage was cleared
-            if (process.env.NODE_ENV === 'development') {
-              console.warn('⚠️ Using Paystack metadata as fallback - recalculating prices');
-            }
-            
-            // Use metadata but recalculate all prices from items (don't trust metadata prices)
-            checkoutData = {
-              ...metadata.checkout_data,
-              // Recalculate subtotal from items (prices should be in GHS from database)
-              subtotal: undefined, // Force recalculation
-              total: undefined, // Force recalculation
-              // Keep non-price data from metadata
-              user_id: metadata.user_id || metadata.checkout_data.user_id,
-              payment_reference: metadata.payment_reference || reference,
-            };
-          }
-          
-          // Validate checkout data exists
-          if (!checkoutData) {
-            console.error('❌ No checkout data found in metadata or sessionStorage');
           }
           
           // Validate checkout data - check for items, regularItems, or preOrderItems
@@ -112,14 +102,13 @@ export default function PaymentCallbackPage() {
               checkoutDataKeys: checkoutData ? Object.keys(checkoutData) : [],
             });
             setStatus('error');
-            setMessage('Payment verified but checkout data is missing or invalid. Please contact support.');
+            setMessage(PAYMENT_COPY.confirmFailed(reference));
             return;
           }
           
-          // Get user ID from metadata or checkout data
-          const userId = (metadata.user_id && metadata.user_id !== 'guest') 
-            ? metadata.user_id 
-            : (checkoutData.user_id || null);
+          const userId = checkoutData.user_id && checkoutData.user_id !== 'guest'
+            ? checkoutData.user_id
+            : null;
           
           // Ensure payment reference is included
           if (!checkoutData.payment_reference) {
@@ -134,7 +123,7 @@ export default function PaymentCallbackPage() {
           // Ensure email is included in delivery address for guest customers
           if (checkoutData.delivery_address) {
             if (!checkoutData.delivery_address.email) {
-              checkoutData.delivery_address.email = metadata.customer_email || checkoutData.customer_email || null;
+              checkoutData.delivery_address.email = checkoutData.customer_bio?.email || checkoutData.customer_email || null;
             }
           }
           
@@ -197,18 +186,9 @@ export default function PaymentCallbackPage() {
 
                 const regularOrder = await orderService.createOrder(regularCheckoutData, userId);
                 orders.push({ type: 'regular', order: regularOrder });
-              } catch (error: any) {
+              } catch (error) {
                 console.error('❌ Regular order failed:', error);
-                let errorMessage = error?.message || error?.response?.data?.message || 'Failed to create regular order';
-                
-                // Provide user-friendly error messages
-                if (errorMessage.includes('Products not found') || errorMessage.includes('product_id')) {
-                  errorMessage = 'Some products in your order are no longer available. Please remove them from your cart and try again.';
-                } else if (errorMessage.includes('foreign key constraint')) {
-                  errorMessage = 'Some products in your order are no longer available. Please update your cart and try again.';
-                }
-                
-                errors.push(`Regular order: ${errorMessage}`);
+                errors.push(PAYMENT_COPY.confirmFailed(reference));
               }
             }
 
@@ -271,18 +251,9 @@ export default function PaymentCallbackPage() {
 
                 const preOrder = await orderService.createOrder(preOrderCheckoutData, userId);
                 orders.push({ type: 'pre-order', order: preOrder });
-              } catch (error: any) {
+              } catch (error) {
                 console.error('❌ Pre-order failed:', error);
-                let errorMessage = error?.message || error?.response?.data?.message || 'Failed to create pre-order';
-                
-                // Provide user-friendly error messages
-                if (errorMessage.includes('Products not found') || errorMessage.includes('product_id')) {
-                  errorMessage = 'Some products in your order are no longer available. Please remove them from your cart and try again.';
-                } else if (errorMessage.includes('foreign key constraint')) {
-                  errorMessage = 'Some products in your order are no longer available. Please update your cart and try again.';
-                }
-                
-                errors.push(`Pre-order: ${errorMessage}`);
+                errors.push(PAYMENT_COPY.confirmFailed(reference));
               }
             }
 
@@ -294,8 +265,7 @@ export default function PaymentCallbackPage() {
 
             // Handle results
             if (errors.length > 0 && orders.length === 0) {
-              // All orders failed
-              throw new Error(`Failed to create orders: ${errors.join('; ')}`);
+              throw new Error(PAYMENT_COPY.confirmFailed(reference));
             } else if (errors.length > 0) {
               // Some orders succeeded, some failed
               if (process.env.NODE_ENV === 'development') {
@@ -304,13 +274,13 @@ export default function PaymentCallbackPage() {
             }
 
             if (orders.length === 0) {
-              throw new Error('No orders were created');
+              throw new Error(PAYMENT_COPY.confirmFailed(reference));
             }
 
             const firstOrder = orders[0].order;
             
             if (!firstOrder || !firstOrder.id) {
-              throw new Error('Order creation returned invalid response');
+              throw new Error(PAYMENT_COPY.confirmFailed(reference));
             }
             
             // Order(s) created successfully
@@ -337,27 +307,16 @@ export default function PaymentCallbackPage() {
               const accessEmail = sessionStorage.getItem('order_access_email') || '';
               const emailQuery = accessEmail ? `?email=${encodeURIComponent(accessEmail)}` : '';
               router.push(`/orders/${firstOrder.id}${emailQuery}`);
-            } catch (orderError: any) {
-              console.error('Error creating order:', {
-                error: orderError,
-                message: orderError?.message,
-                response: orderError?.response,
-                data: orderError?.data,
-                stack: orderError?.stack,
-              });
+            } catch (orderError) {
+              console.error('Error creating order:', orderError);
               setStatus('error');
-              const errorMessage = orderError?.message || orderError?.response?.data?.message || 'Failed to create order';
-              setMessage(`Payment verified but failed to create order: ${errorMessage}. Please contact support.`);
-              toast.error(`Order creation failed: ${errorMessage}`);
+              setMessage(PAYMENT_COPY.confirmFailed(reference));
             }
-        } else {
-          setStatus('error');
-          setMessage(verifyResult.message || 'Payment verification failed');
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error('Payment callback error:', error);
         setStatus('error');
-        setMessage(error.message || 'An error occurred during payment verification');
+        setMessage(PAYMENT_COPY.confirmFailed(reference));
       }
     };
 
@@ -394,17 +353,22 @@ export default function PaymentCallbackPage() {
           </div>
         )}
 
-        {status === 'error' && (
+        {(status === 'error' || status === 'failed' || status === 'abandoned' || status === 'pending') && (
           <div className="text-center">
-            <div className="bg-red-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <XCircle className="w-10 h-10 text-red-600" />
+            <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${status === 'pending' ? 'bg-amber-100' : 'bg-red-100'}`}>
+              <XCircle className={`w-10 h-10 ${status === 'pending' ? 'text-amber-700' : 'text-red-600'}`} />
             </div>
-            <h1 className="text-2xl font-bold text-[#1A1A1A] mb-3">Payment Failed</h1>
+            <h1 className="text-2xl font-bold text-[#1A1A1A] mb-3">
+              {status === 'pending' ? 'Payment pending' : status === 'abandoned' ? 'Payment cancelled' : 'Payment did not go through'}
+            </h1>
             <p className="text-[#3A3A3A] mb-6">{message}</p>
+            {paymentReference ? (
+              <p className="mb-6 text-xs text-[#3A3A3A]">Reference: {paymentReference}</p>
+            ) : null}
             <div className="flex gap-4">
               <Link href="/checkout" className="flex-1">
                 <Button variant="outline" className="w-full">
-                  Try Again
+                  Back to checkout
                 </Button>
               </Link>
               <Link href="/" className="flex-1">

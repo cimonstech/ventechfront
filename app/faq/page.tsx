@@ -1,11 +1,10 @@
 import Link from 'next/link';
 import { Mail, Phone, MapPin, MessageCircle } from 'lucide-react';
-import { FaqBrowser } from '@/components/content/FaqBrowser';
-import { ContentUnavailable } from '@/components/content/ContentUnavailable';
-import { fetchPublicFaqs, getStoreContact } from '@/lib/publicContent';
+import { FaqList } from '@/components/content/FaqList';
+import { getStoreContact } from '@/lib/publicContent';
 
 export default async function FAQPage() {
-  const [categories, contact] = await Promise.all([fetchPublicFaqs(), getStoreContact()]);
+  const contact = await getStoreContact();
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-gray-50 py-8 sm:py-12">
@@ -22,16 +21,9 @@ export default async function FAQPage() {
           </p>
         </div>
 
-        {categories ? (
-          <FaqBrowser categories={categories} />
-        ) : (
-          <div className="mb-12">
-            <ContentUnavailable
-              message="We couldn't load the questions right now."
-              contact={contact}
-            />
-          </div>
-        )}
+        <div className="mb-12">
+          <FaqList />
+        </div>
 
         <div className="rounded-xl bg-gradient-to-r from-[#FF7A19] to-orange-600 p-5 text-center text-white sm:p-8 md:p-12">
           <MessageCircle className="mx-auto mb-4 h-12 w-12" />

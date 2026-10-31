@@ -10,6 +10,7 @@ import { postSignInPath } from '@/lib/landing';
 import { peekRememberedRedirect, clearRememberedRedirect, safeRedirectPath } from '@/lib/safeRedirect';
 import { linkPendingDevices } from '@/lib/devicesAdmin';
 import { isRecoveryLinkType, markRecoveryOnly } from '@/lib/recoverySession';
+import { mapAuthCallbackError, mapAuthLinkError } from '@/lib/authErrors';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -102,8 +103,9 @@ export default function AuthCallbackPage() {
         const refreshToken = hashParams.get('refresh_token');
 
         if (error) {
+          console.error('Auth callback URL error:', error, error_description);
           setStatus('error');
-          setMessage(error_description || 'Authentication failed');
+          setMessage(mapAuthCallbackError());
           return;
         }
 
@@ -117,7 +119,7 @@ export default function AuthCallbackPage() {
           if (sessionError) {
             console.error('Session error:', sessionError);
             setStatus('error');
-            setMessage(sessionError.message || 'Failed to authenticate');
+            setMessage(mapAuthCallbackError());
             return;
           }
 
@@ -153,7 +155,7 @@ export default function AuthCallbackPage() {
           if (exchangeError) {
             console.error('Exchange error:', exchangeError);
             setStatus('error');
-            setMessage(exchangeError.message || 'Failed to verify email');
+            setMessage(mapAuthCallbackError());
             return;
           }
 
@@ -185,13 +187,13 @@ export default function AuthCallbackPage() {
         // No code or tokens found
         if (!code && !accessToken) {
           setStatus('error');
-          setMessage('No verification code found');
+          setMessage(mapAuthLinkError());
           return;
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error('Callback error:', error);
         setStatus('error');
-        setMessage(error.message || 'An error occurred during verification');
+        setMessage(mapAuthCallbackError());
       }
     };
 

@@ -1,8 +1,11 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/Button';
+import { LoadGate, ProductGridSkeleton } from '@/components/ui-states';
+import { useListQuery } from '@/hooks/useListQuery';
+import { apiRequest, toApiError } from '@/lib/api';
 import {
   TrendingUp,
   Shield,
@@ -22,11 +25,9 @@ import {
 import toast from 'react-hot-toast';
 import { fetchPublicVlbDocs, submitVlbApplication, vlbGhs, type VlbPublicPlan } from '@/lib/vlb';
 
-export default function LaptopBankingPage({
-  plans,
-}: {
-  plans: VlbPublicPlan[];
-}) {
+export default function LaptopBankingPage() {
+  const [plans, setPlans] = useState<VlbPublicPlan[]>([]);
+  const plansQuery = useListQuery();
   const [selectedPlanId, setSelectedPlanId] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -36,6 +37,18 @@ export default function LaptopBankingPage({
     phone: '',
     message: '',
   });
+
+  const loadPlans = useCallback(() => {
+    return plansQuery.run(async () => {
+      const result = await apiRequest<VlbPublicPlan[]>('/api/vlb/plans');
+      if (!result.ok) throw toApiError(result);
+      setPlans(result.data || []);
+    });
+  }, [plansQuery.run]);
+
+  useEffect(() => {
+    void loadPlans();
+  }, [loadPlans]);
 
   const sample = plans[0];
   const vtsPlans = plans.filter((plan) => plan.plan_group === 'vts');
@@ -451,9 +464,19 @@ export default function LaptopBankingPage({
       <section className="py-12 md:py-16 bg-gray-50">
         <div className="container mx-auto px-4">
           <h2 className="text-2xl sm:text-3xl font-bold text-center text-[#1A1A1A] mb-8 md:mb-12">Choose Your Investment Path</h2>
-          {plans.length === 0 ? (
-            <p className="text-center text-sm text-[#3A3A3A]">Plans will appear here shortly.</p>
-          ) : (
+          <LoadGate
+            loaded={plansQuery.loaded}
+            loading={plansQuery.loading}
+            updating={plansQuery.updating}
+            error={plansQuery.error}
+            isEmpty={plans.length === 0}
+            onRetry={() => void loadPlans()}
+            skeleton={<ProductGridSkeleton count={3} />}
+            emptyTitle="No plans yet"
+            emptyDescription="Laptop Banking plans will show here when they are published."
+            emptyPrimary={{ label: 'Contact us', href: '/contact' }}
+          >
+          {plans.length === 0 ? null : (
             <>
               {vtsPlans.length > 0 && (
                 <div className="max-w-6xl mx-auto mb-12">
@@ -483,6 +506,7 @@ export default function LaptopBankingPage({
               )}
             </>
           )}
+          </LoadGate>
         </div>
       </section>
 

@@ -7,10 +7,17 @@ import { Button } from '@/components/ui/Button';
 import { InfoNote } from '@/components/ui/InfoNote';
 import { Sheet } from '@/components/ui/Sheet';
 import { VlbNav } from '@/components/admin/VlbNav';
-import { useSetAdminHeading } from '@/components/admin/AdminHeading';
+import {
+  AdminPageHeader,
+  AdminPagination,
+  AdminRowCard,
+  ResponsiveTable,
+} from '@/components/admin/list';
 import { useAccess } from '@/context/AccessContext';
 import { formatDeviceDate } from '@/lib/devicesAdmin';
 import { formatGhs, payoutStatusVariant } from '@/lib/vlb';
+import { AccessDenied, EmptyState, ErrorState, TableSkeleton } from '@/components/ui-states';
+import { noteQueryFail } from '@/lib/queryState';
 import { apiMessage, deviceRequest, payoutQueueMeta, type VlbPayoutQueueRow } from '@/lib/vlbAdmin';
 import { downloadAuthFile } from '@/lib/vlb';
 
@@ -22,7 +29,6 @@ const TABS = [
 ];
 
 export default function AdminVlbPayoutsPage() {
-  useSetAdminHeading('Payouts');
   const { canEdit, canView } = useAccess();
   const money = canEdit('vlb') && canEdit('finance');
   const financeView = canView('finance');
@@ -30,7 +36,11 @@ export default function AdminVlbPayoutsPage() {
   const [rows, setRows] = useState<VlbPayoutQueueRow[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
   const [markId, setMarkId] = useState<string | null>(null);
   const [method, setMethod] = useState('momo');
   const [reference, setReference] = useState('');
@@ -44,8 +54,16 @@ export default function AdminVlbPayoutsPage() {
       .then((result) => {
         setRows(result.data || []);
         setTotalPages(result.pagination?.totalPages || 1);
+        setTotal(result.pagination?.total || 0);
+        setLoaded(true);
+        setFailed(false);
+        setForbidden(false);
       })
-      .catch((error) => toast.error(apiMessage(error, 'Could not load payouts')))
+      .catch((error) => {
+        const kind = noteQueryFail(error);
+        if (kind === 'forbidden') setForbidden(true);
+        else if (kind !== 'unauthorized') setFailed(true);
+      })
       .finally(() => setLoading(false));
   };
 
@@ -77,8 +95,47 @@ export default function AdminVlbPayoutsPage() {
     }
   };
 
+  const detailsText = (row: VlbPayoutQueueRow) => {
+    const details = row.payout_details;
+    if (details?.payout_method === 'momo') {
+      return `${details.momo_network || 'MoMo'} · ${details.momo_number || '—'}`;
+    }
+    if (details?.payout_method === 'bank') {
+      return `${details.bank_name || 'Bank'} · ${details.bank_account_name || ''} · ${details.bank_account_number || '—'}`;
+    }
+    return 'Not set';
+  };
+
+  const rowActions = (row: VlbPayoutQueueRow) => (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      {money && (row.status === 'due' || row.status === 'processing') && (
+        <Button size="sm" variant="outline" onClick={() => { setMarkId(row.id); setPaidAt(new Date().toISOString().slice(0, 10)); }}>
+          Mark paid
+        </Button>
+      )}
+      {row.status === 'paid' && (
+        <button
+          type="button"
+          className="text-sm font-medium text-[#FF7A19]"
+          onClick={() => downloadAuthFile(
+            `/api/admin/vlb/payouts/${row.id}/receipt.pdf`,
+            `vlb-receipt-${row.id}.pdf`
+          ).catch((error) => toast.error(apiMessage(error, 'Could not download this receipt.')))}
+        >
+          Receipt
+        </button>
+      )}
+    </div>
+  );
+
+  const count = total || rows.length;
+
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
+      <AdminPageHeader
+        title="Payouts"
+        subtitle={`${count} payout${count === 1 ? '' : 's'}`}
+      />
       <VlbNav current="/admin/vlb/payouts" />
       {money ? (
         <InfoNote>
@@ -102,82 +159,75 @@ export default function AdminVlbPayoutsPage() {
           </button>
         ))}
       </div>
-      <div className="overflow-x-auto sticky-first rounded-xl bg-white shadow-sm">
-        <table className="min-w-full text-left text-sm">
-          <thead>
-            <tr className="border-b text-[#3A3A3A]">
-              <th className="px-4 py-3 font-medium">Investor</th>
-              <th className="px-4 py-3 font-medium">Period</th>
-              <th className="px-4 py-3 font-medium">Due</th>
-              <th className="px-4 py-3 font-medium">Net</th>
-              {financeView && <th className="px-4 py-3 font-medium">Payout details</th>}
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td className="px-4 py-6" colSpan={financeView ? 7 : 6}>Loading…</td></tr>
-            ) : rows.length === 0 ? (
-              <tr><td className="px-4 py-6 text-[#3A3A3A]" colSpan={financeView ? 7 : 6}>No payouts.</td></tr>
-            ) : rows.map((row) => {
-              const meta = payoutQueueMeta(row);
-              const details = row.payout_details;
-              return (
-              <tr key={row.id} className="border-t">
-                <td className="px-4 py-3">{meta.investor_no || '—'}<p className="text-xs text-[#3A3A3A]">{meta.plan_name}</p></td>
-                <td className="px-4 py-3">{row.type} {row.period_no}</td>
-                <td className="px-4 py-3">{formatDeviceDate(row.due_date)}</td>
-                <td className="px-4 py-3">{formatGhs(row.net_pesewas)}</td>
-                {financeView && (
-                  <td className="px-4 py-3 text-xs text-[#3A3A3A]">
-                    {details?.payout_method === 'momo'
-                      ? `${details.momo_network || 'MoMo'} · ${details.momo_number || '—'}`
-                      : details?.payout_method === 'bank'
-                        ? `${details.bank_name || 'Bank'} · ${details.bank_account_name || ''} · ${details.bank_account_number || '—'}`
-                        : 'Not set'}
-                  </td>
-                )}
-                <td className="px-4 py-3"><Badge variant={payoutStatusVariant(row.status)}>{row.status}</Badge></td>
-                <td className="px-4 py-3">
-                  {money && (row.status === 'due' || row.status === 'processing') && (
-                    <Button size="sm" variant="outline" onClick={() => { setMarkId(row.id); setPaidAt(new Date().toISOString().slice(0, 10)); }}>
-                      Mark paid
-                    </Button>
-                  )}
-                  {row.status === 'paid' && (
-                    <button
-                      type="button"
-                      className="ml-2 text-sm text-[#FF7A19]"
-                      onClick={() => downloadAuthFile(
-                        `/api/admin/vlb/payouts/${row.id}/receipt.pdf`,
-                        `vlb-receipt-${row.id}.pdf`
-                      ).catch((error) => toast.error(apiMessage(error, 'Could not download this receipt.')))}
-                    >
-                      Receipt
-                    </button>
-                  )}
-                </td>
+      {forbidden ? (
+        <AccessDenied title="You don't have access" description="You don't have access to this data." primary={{ label: 'Go back', href: '/admin' }} />
+      ) : failed && !loaded ? (
+        <ErrorState title="We couldn't load payouts" description="Try again in a moment." primary={{ label: 'Try again', onClick: () => void load() }} />
+      ) : loading && !loaded ? (
+        <TableSkeleton rows={6} />
+      ) : rows.length === 0 ? (
+        <EmptyState title="No payouts in this list yet" description="Payouts for this period will show up here." />
+      ) : (
+        <>
+          <ResponsiveTable
+            headers={
+              <tr>
+                <th className="px-4 py-3">Investor</th>
+                <th className="px-4 py-3">Period</th>
+                <th className="px-4 py-3">Due</th>
+                <th className="px-4 py-3">Net</th>
+                {financeView && <th className="px-4 py-3">Payout details</th>}
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3 text-right">Actions</th>
               </tr>
+            }
+            cards={rows.map((row) => {
+              const meta = payoutQueueMeta(row);
+              return (
+                <AdminRowCard
+                  key={row.id}
+                  name={meta.investor_no || '—'}
+                  status={<Badge variant={payoutStatusVariant(row.status)}>{row.status}</Badge>}
+                  facts={[
+                    { label: 'Plan', value: meta.plan_name },
+                    { label: 'Period', value: `${row.type} ${row.period_no}` },
+                    { label: 'Due', value: formatDeviceDate(row.due_date) },
+                    { label: 'Net', value: formatGhs(row.net_pesewas) },
+                    ...(financeView ? [{ label: 'Payout', value: detailsText(row) }] : []),
+                  ]}
+                  actions={rowActions(row)}
+                />
               );
             })}
-          </tbody>
-        </table>
-      </div>
-      {totalPages > 1 && (
-        <div className="flex gap-2">
-          <button type="button" className="rounded-lg border px-3 py-2 text-sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button>
-          <button type="button" className="rounded-lg border px-3 py-2 text-sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Next</button>
-        </div>
+          >
+            {rows.map((row) => {
+              const meta = payoutQueueMeta(row);
+              return (
+                <tr key={row.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">{meta.investor_no || '—'}<p className="text-xs text-[#3A3A3A]">{meta.plan_name}</p></td>
+                  <td className="px-4 py-3">{row.type} {row.period_no}</td>
+                  <td className="px-4 py-3">{formatDeviceDate(row.due_date)}</td>
+                  <td className="px-4 py-3">{formatGhs(row.net_pesewas)}</td>
+                  {financeView && (
+                    <td className="px-4 py-3 text-xs text-[#3A3A3A]">{detailsText(row)}</td>
+                  )}
+                  <td className="px-4 py-3"><Badge variant={payoutStatusVariant(row.status)}>{row.status}</Badge></td>
+                  <td className="px-4 py-3 text-right">{rowActions(row)}</td>
+                </tr>
+              );
+            })}
+          </ResponsiveTable>
+          <AdminPagination page={page} totalPages={totalPages} onPage={setPage} />
+        </>
       )}
       {markId && (
         <Sheet
           title="Mark paid"
           onClose={() => setMarkId(null)}
           footer={(
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => setMarkId(null)}>Cancel</Button>
-              <Button type="submit" form="vlb-mark-paid" className="w-full sm:w-auto" disabled={busy}>Confirm</Button>
+            <div className="flex flex-row justify-end gap-2">
+              <Button type="button" variant="outline" className="min-w-0 flex-1 sm:flex-none sm:w-auto" onClick={() => setMarkId(null)}>Cancel</Button>
+              <Button type="submit" form="vlb-mark-paid" className="min-w-0 flex-1 sm:flex-none sm:w-auto" disabled={busy}>Confirm</Button>
             </div>
           )}
         >

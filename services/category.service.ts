@@ -55,7 +55,7 @@ export const getCategories = async (): Promise<Category[]> => {
     return categoriesWithCounts;
   } catch (error) {
     console.error('Error fetching categories:', error);
-    return [];
+    throw error;
   }
 };
 
@@ -69,7 +69,7 @@ export const getFilterCategories = async (): Promise<Category[]> => {
     return categories.filter(cat => cat.product_count > 0);
   } catch (error) {
     console.error('Error fetching filter categories:', error);
-    return [];
+    throw error;
   }
 };
 
@@ -89,19 +89,10 @@ export const getCategoryBySlug = async (slug: string): Promise<Category | null> 
       .maybeSingle();
 
     if (error) {
-      // Only log non-404 errors (PGRST116 = not found, 42P01 = table doesn't exist)
       const errorCode = (error as any)?.code;
-      const errorMessage = (error as any)?.message || String(error);
-      
-      if (errorCode !== 'PGRST116' && errorCode !== '42P01') {
-        console.error('Error fetching category:', {
-          code: errorCode,
-          message: errorMessage,
-          details: error,
-          slug: slug,
-        });
-      }
-      return null;
+      if (errorCode === 'PGRST116') return null;
+      console.error('Error fetching category:', error);
+      throw error;
     }
 
     if (!data) {
@@ -114,13 +105,8 @@ export const getCategoryBySlug = async (slug: string): Promise<Category | null> 
       thumbnail: (data as any).image_url || (data as any).thumbnail_url || data.thumbnail || '',
     };
   } catch (error) {
-    // Better error logging for exceptions
-    const errorDetails = error instanceof Error 
-      ? { message: error.message, stack: error.stack, name: error.name }
-      : { error: String(error), type: typeof error };
-    
-    console.error('Error fetching category (exception):', errorDetails);
-    return null;
+    console.error('Error fetching category (exception):', error);
+    throw error;
   }
 };
 

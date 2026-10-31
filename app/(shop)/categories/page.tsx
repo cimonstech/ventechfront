@@ -1,36 +1,28 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
+import React, { useCallback, useEffect, useState } from 'react';
 import { CategoryCard, CategoryCardSimple } from '@/components/cards/CategoryCard';
 import { Button } from '@/components/ui/Button';
-import CheckmarkLoader from '@/components/loaders/CheckmarkLoader';
 import { Grid, List } from 'lucide-react';
+import { LoadGate, ProductGridSkeleton } from '@/components/ui-states';
+import { useListQuery } from '@/hooks/useListQuery';
 import { Category } from '@/types/product';
 import { getCategories } from '@/services/category.service';
-import toast from 'react-hot-toast';
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const query = useListQuery();
+
+  const fetchCategories = useCallback(() => {
+    return query.run(async () => {
+      setCategories(await getCategories());
+    });
+  }, [query.run]);
 
   useEffect(() => {
-    fetchCategories();
-  }, []);
-
-  const fetchCategories = async () => {
-    try {
-      setIsLoading(true);
-      const data = await getCategories();
-      setCategories(data);
-    } catch (error: any) {
-      console.error('Error fetching categories:', error);
-      toast.error('Failed to load categories');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    void fetchCategories();
+  }, [fetchCategories]);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -44,7 +36,9 @@ export default function CategoriesPage() {
         {/* View Toggle */}
         <div className="flex items-center justify-between mb-6">
           <p className="text-sm text-gray-600">
-            {categories.length} {categories.length === 1 ? 'category' : 'categories'} found
+            {query.loaded && !query.error
+              ? `${categories.length} ${categories.length === 1 ? 'category' : 'categories'}`
+              : ' '}
           </p>
 
           <div className="flex gap-2">
@@ -67,40 +61,32 @@ export default function CategoriesPage() {
           </div>
         </div>
 
-        {/* Loading State */}
-        {isLoading && (
-          <div className="flex items-center justify-center py-20">
-            <CheckmarkLoader size={72} color="#FF7A19" speedMs={600} />
-          </div>
-        )}
-
-        {/* Categories Grid */}
-        {!isLoading && viewMode === 'grid' && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {categories.map((category) => (
-              <CategoryCard key={category.id} category={category} />
-            ))}
-          </div>
-        )}
-
-        {/* Categories List */}
-        {!isLoading && viewMode === 'list' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {categories.map((category) => (
-              <CategoryCardSimple key={category.id} category={category} />
-            ))}
-          </div>
-        )}
-
-        {/* Empty State */}
-        {!isLoading && categories.length === 0 && (
-          <div className="text-center py-20">
-            <p className="text-gray-500 text-lg mb-4">No categories available</p>
-            <Link href="/">
-              <Button variant="primary">Back to Home</Button>
-            </Link>
-          </div>
-        )}
+        <LoadGate
+          loaded={query.loaded}
+          loading={query.loading}
+          updating={query.updating}
+          error={query.error}
+          isEmpty={categories.length === 0}
+          onRetry={() => void fetchCategories()}
+          skeleton={<ProductGridSkeleton count={8} />}
+          emptyTitle="No categories yet"
+          emptyDescription="Browse the shop while we add more product groups."
+          emptyPrimary={{ label: 'Browse the shop', href: '/shop' }}
+        >
+          {viewMode === 'grid' ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {categories.map((category) => (
+                <CategoryCard key={category.id} category={category} />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {categories.map((category) => (
+                <CategoryCardSimple key={category.id} category={category} />
+              ))}
+            </div>
+          )}
+        </LoadGate>
       </div>
     </div>
   );

@@ -5,8 +5,10 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import CheckmarkLoader from '@/components/loaders/CheckmarkLoader';
 import { ChevronLeft, Package, MapPin, CreditCard, FileText } from 'lucide-react';
+import { AccessDenied, EmptyState, ErrorState, LoadingMessage } from '@/components/ui-states';
+import { ApiError } from '@/lib/httpErrors';
+import { noteQueryFail } from '@/lib/queryState';
 import { Order } from '@/types/order';
 import { orderService } from '@/services/order.service';
 import { useAppSelector, useAppDispatch } from '@/store';
@@ -23,6 +25,9 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
+  const [missing, setMissing] = useState(false);
 
   useEffect(() => {
     // Check for payment success callback
@@ -79,9 +84,15 @@ export default function OrderDetailPage() {
       };
       
       setOrder(formattedOrder);
+      setFailed(false);
+      setForbidden(false);
+      setMissing(false);
     } catch (error: any) {
       console.error('Error fetching order:', error);
-      toast.error('Failed to load order details');
+      const kind = noteQueryFail(error);
+      if (kind === 'forbidden') setForbidden(true);
+      else if (error instanceof ApiError && (error.status === 404 || error.kind === 'not_found')) setMissing(true);
+      else if (kind !== 'unauthorized') setFailed(true);
     } finally {
       setIsLoading(false);
     }
@@ -121,30 +132,43 @@ export default function OrderDetailPage() {
       toast.success('Order cancelled successfully');
     } catch (error: any) {
       console.error('Error cancelling order:', error);
-      toast.error(error?.message || 'Failed to cancel order. Please contact support.');
+      toast.error('Could not cancel this order. Please contact support.');
     } finally {
       setIsCancelling(false);
     }
   };
 
   if (isLoading) {
+    return <LoadingMessage label="Loading your order" className="min-h-screen" />;
+  }
+
+  if (forbidden) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <CheckmarkLoader size={72} color="#FF7A19" speedMs={600} />
-      </div>
+      <AccessDenied
+        title="You don't have access"
+        description="You don't have access to this data."
+        primary={{ label: 'Back to orders', href: '/account/orders' }}
+      />
     );
   }
 
-  if (!order) {
+  if (failed && !order) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Order not found</h2>
-          <Link href="/account/orders">
-            <Button variant="primary">Back to Orders</Button>
-          </Link>
-        </div>
-      </div>
+      <ErrorState
+        title="We couldn't load this order"
+        description="Try again in a moment. If it keeps failing, contact support."
+        primary={{ label: 'Try again', onClick: () => void fetchOrder() }}
+      />
+    );
+  }
+
+  if (!order || missing) {
+    return (
+      <EmptyState
+        title="Order not found"
+        description="We couldn't find this order. Check the link, or go back to your orders."
+        primary={{ label: 'Back to orders', href: '/account/orders' }}
+      />
     );
   }
 

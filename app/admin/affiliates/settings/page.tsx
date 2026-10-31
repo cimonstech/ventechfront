@@ -16,6 +16,8 @@ import {
 } from '@/lib/affiliatesAdmin';
 import { getCategories } from '@/services/category.service';
 import type { Category } from '@/types/product';
+import { AccessDenied, ErrorState, TableSkeleton, UpdatingNotice } from '@/components/ui-states';
+import { useListQuery } from '@/hooks/useListQuery';
 
 const EMPTY: AffiliateSettings = {
   affiliate_fee_pesewas: 0,
@@ -45,55 +47,56 @@ export default function AdminAffiliateSettingsPage() {
   const [minWithdraw, setMinWithdraw] = useState('0.00');
   const [percent, setPercent] = useState('0');
   const [cap, setCap] = useState('');
+  const query = useListQuery();
   const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const load = () =>
+    query.run(async () => {
+      const [result, cats] = await Promise.all([
+        deviceRequest<AffiliateSettings>('/api/admin/affiliates/settings'),
+        getCategories(),
+      ]);
+      const data = result.data;
+      setForm({ ...EMPTY, ...data });
+      setFee(ghsInput(data.affiliate_fee_pesewas));
+      setCommission(ghsInput(data.affiliate_commission_pesewas));
+      setMinOrder(ghsInput(data.affiliate_min_order_pesewas));
+      setMinWithdraw(ghsInput(data.affiliate_withdrawal_min_pesewas));
+      setPercent(String((data.affiliate_commission_percent_bp || 0) / 100));
+      setCap(
+        data.affiliate_commission_cap_pesewas ? ghsInput(data.affiliate_commission_cap_pesewas) : ''
+      );
+      setCategories(cats);
+    });
+
   useEffect(() => {
-    if (!finance) {
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
-    Promise.all([
-      deviceRequest<AffiliateSettings>('/api/admin/affiliates/settings'),
-      getCategories().catch((error) => {
-        console.error('affiliate settings categories', error);
-        return [] as Category[];
-      }),
-    ])
-      .then(([result, cats]) => {
-        if (cancelled) return;
-        const data = result.data;
-        setForm({ ...EMPTY, ...data });
-        setFee(ghsInput(data.affiliate_fee_pesewas));
-        setCommission(ghsInput(data.affiliate_commission_pesewas));
-        setMinOrder(ghsInput(data.affiliate_min_order_pesewas));
-        setMinWithdraw(ghsInput(data.affiliate_withdrawal_min_pesewas));
-        setPercent(String((data.affiliate_commission_percent_bp || 0) / 100));
-        setCap(
-          data.affiliate_commission_cap_pesewas ? ghsInput(data.affiliate_commission_cap_pesewas) : ''
-        );
-        setCategories(cats);
-      })
-      .catch((error) => {
-        if (!cancelled) toast.error(apiMessage(error, 'Could not load settings'));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+    if (!finance) return;
+    void load();
   }, [finance]);
 
-  if (!finance) {
+  if (!finance || query.forbidden) {
     return (
-      <div className="space-y-4">
-        <AffiliatesNav current="/admin/affiliates/settings" />
-        <p className="text-sm text-[#3A3A3A]">Finance access is required to change affiliate settings.</p>
-      </div>
+      <AccessDenied
+        title="You don't have access"
+        description="You don't have access to this data."
+        primary={{ label: 'Go back', href: '/admin/affiliates' }}
+      />
     );
+  }
+
+  if (query.error && !query.loaded) {
+    return (
+      <ErrorState
+        title="We couldn't load affiliate settings"
+        description="Try again in a moment."
+        primary={{ label: 'Try again', onClick: () => void load() }}
+      />
+    );
+  }
+
+  if (query.loading && !query.loaded) {
+    return <TableSkeleton />;
   }
 
   const toggleSlug = (slug: string) => {
@@ -149,10 +152,8 @@ export default function AdminAffiliateSettingsPage() {
         Changes affect new commissions only. Existing pending and approved commissions stay as they are.
       </p>
 
-      {loading ? (
-        <p className="text-sm text-[#3A3A3A]">Loading settings…</p>
-      ) : (
-        <form
+      {query.updating ? <UpdatingNotice /> : null}
+      <form
           className="bg-white border border-gray-200 rounded-xl p-5 space-y-4"
           onSubmit={(event) => {
             event.preventDefault();
@@ -198,7 +199,7 @@ export default function AdminAffiliateSettingsPage() {
                   </label>
                 ))}
                 {categories.length === 0 ? (
-                  <p className="text-sm text-[#3A3A3A]">No categories loaded.</p>
+                  <p className="text-sm text-[#3A3A3A]">No categories yet. Add categories first, then choose them here.</p>
                 ) : null}
               </div>
             ) : null}
@@ -313,7 +314,6 @@ export default function AdminAffiliateSettingsPage() {
           </label>
           <Button type="submit" isLoading={saving} disabled={saving}>Save settings</Button>
         </form>
-      )}
     </div>
   );
 }

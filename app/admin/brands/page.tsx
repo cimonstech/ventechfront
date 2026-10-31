@@ -1,12 +1,22 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { Plus } from 'lucide-react';
 import { BrandModal } from '@/components/admin/BrandModal';
+import { AccessDenied, EmptyState, ErrorState, NoResults, StatCardSkeleton, UpdatingNotice } from '@/components/ui-states';
+import { useListQuery } from '@/hooks/useListQuery';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 import { useAccess } from '@/context/AccessContext';
+import {
+  AdminPageHeader,
+  AdminRowCard,
+  ConfirmDialog,
+  FilterBar,
+  ResponsiveTable,
+  RowActions,
+} from '@/components/admin/list';
+import { Badge } from '@/components/ui/Badge';
 
 interface Brand {
   id: string;
@@ -23,29 +33,23 @@ interface Brand {
 export default function BrandsPage() {
   const { canEdit } = useAccess();
   const canEditProducts = canEdit('products');
-  const [loading, setLoading] = useState(true);
+  const query = useListQuery();
   const [brands, setBrands] = useState<Brand[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Brand | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
-  // Fetch real data from Supabase
   const fetchBrands = async () => {
-    try {
-      setLoading(true);
+    await query.run(async () => {
       const { data, error } = await supabase
         .from('brands')
         .select('*')
         .order('created_at', { ascending: false });
-
       if (error) throw error;
       setBrands(data || []);
-    } catch (error: any) {
-      console.error('Error fetching brands:', error);
-      toast.error('Failed to load brands');
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   useEffect(() => {
@@ -76,194 +80,185 @@ export default function BrandsPage() {
     }
   };
 
-  const deleteBrand = async (brandId: string) => {
-    if (!confirm('Are you sure you want to delete this brand?')) return;
-
+  const deleteBrand = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
       const { error } = await supabase
         .from('brands')
         .delete()
-        .eq('id', brandId);
+        .eq('id', deleteTarget.id);
 
       if (error) throw error;
 
+      setDeleteTarget(null);
       await fetchBrands();
       toast.success('Brand deleted successfully');
     } catch (error: any) {
       console.error('Error deleting brand:', error);
       toast.error('Failed to delete brand');
+    } finally {
+      setDeleting(false);
     }
   };
 
-  if (loading) {
+  const brandActions = (brand: Brand) =>
+    canEditProducts
+      ? [
+          { label: 'Edit', onClick: () => setEditingBrand(brand) },
+          {
+            label: brand.is_featured ? 'Remove from featured' : 'Add to featured',
+            onClick: () => void toggleFeatured(brand.id),
+          },
+          { label: 'Delete', destructive: true, onClick: () => setDeleteTarget(brand) },
+        ]
+      : [];
+
+  if (query.forbidden) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF7A19] mx-auto mb-4"></div>
-          <p className="text-[#3A3A3A]">Loading brands...</p>
-        </div>
-      </div>
+      <AccessDenied
+        title="You don't have access"
+        description="You don't have access to this data."
+        primary={{ label: 'Go back', href: '/admin' }}
+      />
     );
   }
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-[#1A1A1A]">Brands</h1>
-          <p className="text-sm text-[#3A3A3A] mt-1">
-            Manage product brands and manufacturers
-          </p>
-        </div>
-        {canEditProducts && (
-        <Button
-          variant="primary"
-          icon={<Plus size={18} />}
-          onClick={() => setShowAddModal(true)}
-        >
-          Add Brand
-        </Button>
-        )}
-      </div>
+  if (query.error && !query.loaded) {
+    return (
+      <ErrorState
+        title="We couldn't load brands"
+        description="Try again in a moment."
+        primary={{ label: 'Try again', onClick: () => void fetchBrands() }}
+      />
+    );
+  }
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-          <p className="text-sm text-[#3A3A3A] mb-1">Total Brands</p>
+  if (query.loading && !query.loaded) {
+    return <StatCardSkeleton count={3} />;
+  }
+
+  return (
+    <div className="min-w-0">
+      {query.updating ? <UpdatingNotice /> : null}
+      <AdminPageHeader
+        title="Brands"
+        subtitle={`${brands.length} brand${brands.length === 1 ? '' : 's'}`}
+        primary={
+          canEditProducts
+            ? { label: 'Add brand', icon: <Plus size={16} />, onClick: () => setShowAddModal(true) }
+            : undefined
+        }
+      />
+
+      <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <p className="mb-1 text-sm text-[#3A3A3A]">Total Brands</p>
           <p className="text-3xl font-bold text-[#1A1A1A]">{brands.length}</p>
         </div>
-        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-          <p className="text-sm text-[#3A3A3A] mb-1">Featured Brands</p>
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <p className="mb-1 text-sm text-[#3A3A3A]">Featured Brands</p>
           <p className="text-3xl font-bold text-[#FF7A19]">
             {brands.filter((b) => b.is_featured).length}
           </p>
         </div>
-        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-          <p className="text-sm text-[#3A3A3A] mb-1">Total Products</p>
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <p className="mb-1 text-sm text-[#3A3A3A]">Total Products</p>
           <p className="text-3xl font-bold text-[#1A1A1A]">
             {brands.reduce((sum, b) => sum + b.product_count, 0)}
           </p>
         </div>
       </div>
 
-      {/* Search */}
-      <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-        <div className="relative">
-          <Search
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-            size={20}
-          />
-          <input
-            type="text"
-            placeholder="Search brands..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
-          />
-        </div>
-      </div>
+      <FilterBar
+        search={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Search brands"
+      />
 
-      {/* Brands Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredBrands.length === 0 ? (
-          <div className="col-span-full text-center py-12 text-[#3A3A3A]">
-            No brands found
-          </div>
+      {filteredBrands.length === 0 ? (
+        searchQuery ? (
+          <NoResults primary={{ label: 'Clear filters', onClick: () => setSearchQuery('') }} />
         ) : (
-          filteredBrands.map((brand) => (
-            <div
+          <EmptyState
+            title="No brands yet"
+            description="Add a brand to group products."
+            primary={canEditProducts ? { label: 'Add brand', onClick: () => setShowAddModal(true) } : undefined}
+          />
+        )
+      ) : (
+        <ResponsiveTable
+          headers={
+            <tr>
+              <th className="px-4 py-3">Brand</th>
+              <th className="px-4 py-3">Products</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3 text-right">Actions</th>
+            </tr>
+          }
+          cards={filteredBrands.map((brand) => (
+            <AdminRowCard
               key={brand.id}
-              className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
-            >
-              {/* Brand Logo */}
-              <div className="h-40 bg-gray-100 flex items-center justify-center">
-                {brand.logo_url ? (
-                  <img
-                    src={brand.logo_url}
-                    alt={brand.name}
-                    className="max-h-24 max-w-full object-contain px-6"
-                    onError={(e) => {
-                      // If image fails to load, show placeholder
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = 'none';
-                      const parent = target.parentElement;
-                      if (parent && !parent.querySelector('.placeholder')) {
-                        const placeholder = document.createElement('div');
-                        placeholder.className = 'placeholder text-4xl font-bold text-gray-400';
-                        placeholder.textContent = brand.name.charAt(0);
-                        parent.appendChild(placeholder);
-                      }
-                    }}
-                  />
-                ) : (
-                  <div className="text-4xl font-bold text-gray-400">
-                    {brand.name.charAt(0)}
+              name={brand.name}
+              thumbnail={brand.logo_url || undefined}
+              status={
+                brand.is_featured ? (
+                  <Badge variant="info" size="sm">Featured</Badge>
+                ) : undefined
+              }
+              facts={[
+                { label: 'Products', value: brand.product_count },
+                { label: 'Description', value: brand.description || 'No description' },
+              ]}
+              actions={<RowActions name={brand.name} actions={brandActions(brand)} />}
+            />
+          ))}
+        >
+          {filteredBrands.map((brand) => (
+            <tr key={brand.id} className="hover:bg-gray-50">
+              <td className="px-4 py-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  {brand.logo_url ? (
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gray-100">
+                      <img
+                        src={brand.logo_url}
+                        alt=""
+                        className="max-h-10 max-w-full object-contain"
+                      />
+                    </div>
+                  ) : null}
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-[#1A1A1A]">{brand.name}</p>
+                    <p className="truncate text-sm text-[#3A3A3A]">{brand.description || 'No description'}</p>
                   </div>
-                )}
-              </div>
-
-              {/* Brand Info */}
-              <div className="p-4">
-                <div className="flex items-start justify-between mb-2">
-                  <h3 className="font-bold text-[#1A1A1A] text-lg">{brand.name}</h3>
-                  {brand.is_featured && (
-                    <span className="px-2 py-1 bg-[#FF7A19] text-white text-xs rounded-full">
-                      Featured
-                    </span>
-                  )}
                 </div>
-                <p className="text-sm text-[#3A3A3A] mb-3">
-                  {brand.description || 'No description'}
-                </p>
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-sm text-[#3A3A3A]">
-                    <strong>{brand.product_count}</strong> products
-                  </span>
-                  {canEditProducts && (
-                  <button
-                    onClick={() => toggleFeatured(brand.id)}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                    title={brand.is_featured ? 'Remove from featured' : 'Add to featured'}
-                  >
-                    {brand.is_featured ? (
-                      <Eye size={18} className="text-[#FF7A19]" />
-                    ) : (
-                      <EyeOff size={18} className="text-gray-400" />
-                    )}
-                  </button>
-                  )}
-                </div>
+              </td>
+              <td className="px-4 py-3 text-[#1A1A1A]">{brand.product_count}</td>
+              <td className="px-4 py-3">
+                {brand.is_featured ? (
+                  <Badge variant="info" size="sm">Featured</Badge>
+                ) : null}
+              </td>
+              <td className="px-4 py-3 text-right">
+                <RowActions name={brand.name} actions={brandActions(brand)} />
+              </td>
+            </tr>
+          ))}
+        </ResponsiveTable>
+      )}
 
-                {canEditProducts && (
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    icon={<Edit size={16} />}
-                    onClick={() => setEditingBrand(brand)}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 text-red-600 hover:bg-red-50"
-                    icon={<Trash2 size={16} />}
-                    onClick={() => deleteBrand(brand.id)}
-                  >
-                    Delete
-                  </Button>
-                </div>
-                )}
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+      {deleteTarget ? (
+        <ConfirmDialog
+          title="Delete this brand?"
+          confirmLabel="Delete"
+          busy={deleting}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={() => void deleteBrand()}
+        >
+          {deleteTarget.name} will be removed.
+        </ConfirmDialog>
+      ) : null}
 
-      {/* Brand Modal */}
       <BrandModal
         isOpen={showAddModal || !!editingBrand}
         onClose={() => {
@@ -280,4 +275,3 @@ export default function BrandsPage() {
     </div>
   );
 }
-

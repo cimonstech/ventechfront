@@ -1,28 +1,37 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Upload, Trash2, Search, Grid, List, Image as ImageIcon, X, Loader2, Check, RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { Upload, Loader2, RefreshCw } from 'lucide-react';
 import { mediaService, MediaFile } from '@/services/media.service';
+import { AccessDenied, EmptyState, ErrorState, NoResults, StatCardSkeleton, UpdatingNotice } from '@/components/ui-states';
+import { useListQuery } from '@/hooks/useListQuery';
 import toast from 'react-hot-toast';
 import { useAccess } from '@/context/AccessContext';
+import {
+  AdminPageHeader,
+  AdminRowCard,
+  ConfirmDialog,
+  FilterBar,
+  filterSelectClassName,
+  ResponsiveTable,
+  RowActions,
+} from '@/components/admin/list';
 
-type ViewMode = 'grid' | 'list';
 type FolderFilter = 'all' | 'products' | 'categories' | 'banners' | 'brands' | 'uploads';
 
 export default function MediaLibraryPage() {
   const { canEdit } = useAccess();
   const canEditProducts = canEdit('products');
-  const [loading, setLoading] = useState(true);
+  const query = useListQuery();
   const [uploading, setUploading] = useState(false);
-  const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [files, setFiles] = useState<MediaFile[]>([]);
   const [filteredFiles, setFilteredFiles] = useState<MediaFile[]>([]);
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [folderFilter, setFolderFilter] = useState<FolderFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<MediaFile | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -44,30 +53,17 @@ export default function MediaLibraryPage() {
   }, [searchQuery, files]);
 
   const fetchFiles = async (isSync: boolean = false) => {
-    try {
-      if (isSync) {
-        setSyncing(true);
-      } else {
-        setLoading(true);
-      }
-      
-      // Fetch all files from R2 (no folder filter when syncing)
+    if (isSync) setSyncing(true);
+    await query.run(async () => {
       const folder = (isSync || folderFilter === 'all') ? undefined : folderFilter;
-      const mediaFiles = await mediaService.listFiles(folder, 10000); // Large limit to get all files
-      
+      const mediaFiles = await mediaService.listFiles(folder, 10000);
       setFiles(mediaFiles);
       setFilteredFiles(mediaFiles);
-      
       if (isSync) {
-        toast.success(`Synced ${mediaFiles.length} file(s) from R2`);
+        toast.success(`Synced ${mediaFiles.length} file(s)`);
       }
-    } catch (error: any) {
-      console.error('Error fetching files:', error);
-      toast.error(error.message || 'Failed to fetch media files');
-    } finally {
-      setLoading(false);
-      setSyncing(false);
-    }
+    });
+    setSyncing(false);
   };
 
   const handleSyncFromR2 = async () => {
@@ -82,16 +78,16 @@ export default function MediaLibraryPage() {
     try {
       const fileArray = Array.from(selectedFiles);
       const folder = folderFilter === 'all' ? 'uploads' : folderFilter;
-      
-      const uploadPromises = fileArray.map(file => 
+
+      const uploadPromises = fileArray.map(file =>
         mediaService.uploadFile(file, folder)
       );
 
       const urls = await Promise.all(uploadPromises);
-      
+
       toast.success(`${urls.length} file(s) uploaded successfully`);
       await fetchFiles(); // Refresh the list
-      
+
       // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -104,21 +100,20 @@ export default function MediaLibraryPage() {
     }
   };
 
-  const handleDelete = async (file: MediaFile) => {
-    if (!confirm(`Are you sure you want to delete this file?\n${file.key}`)) {
-      return;
-    }
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
 
-    setDeleting(file.url);
+    setDeleting(true);
     try {
-      await mediaService.deleteFile(file.url);
+      await mediaService.deleteFile(deleteTarget.url);
       toast.success('File deleted successfully');
+      setDeleteTarget(null);
       await fetchFiles(); // Refresh the list
     } catch (error: any) {
       console.error('Error deleting file:', error);
       toast.error(error.message || 'Failed to delete file');
     } finally {
-      setDeleting(null);
+      setDeleting(false);
     }
   };
 
@@ -143,296 +138,211 @@ export default function MediaLibraryPage() {
     return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
   };
 
-  if (loading) {
+  const fileName = (file: MediaFile) => file.key.split('/').pop() || file.key;
+
+  const fileActions = (file: MediaFile) => [
+    { label: selectedFile === file.url ? 'Copied' : 'Copy URL', onClick: () => handleSelect(file) },
+    ...(canEditProducts
+      ? [{ label: 'Delete', destructive: true, onClick: () => setDeleteTarget(file) }]
+      : []),
+  ];
+
+  if (query.forbidden) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <Loader2 className="animate-spin text-[#FF7A19] mx-auto mb-4" size={48} />
-          <p className="text-[#3A3A3A]">Loading media library...</p>
-        </div>
-      </div>
+      <AccessDenied
+        title="You don't have access"
+        description="You don't have access to this data."
+        primary={{ label: 'Go back', href: '/admin' }}
+      />
     );
   }
 
+  if (query.error && !query.loaded) {
+    return (
+      <ErrorState
+        title="We couldn't load media"
+        description="Try again in a moment."
+        primary={{ label: 'Try again', onClick: () => void fetchFiles() }}
+      />
+    );
+  }
+
+  if (query.loading && !query.loaded) {
+    return <StatCardSkeleton count={3} />;
+  }
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-[#1A1A1A]">Media Library</h1>
-          <p className="text-sm text-[#3A3A3A] mt-1">
-            Manage and organize all your uploaded images and media files
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {canEditProducts && (
-          <>
-          <Button
-            variant="outline"
-            icon={syncing ? <Loader2 className="animate-spin" size={18} /> : <RefreshCw size={18} />}
-            onClick={handleSyncFromR2}
-            disabled={loading || syncing}
-            title="Sync and refresh all files from R2 bucket"
-          >
-            {syncing ? 'Syncing...' : 'Sync from R2'}
-          </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={handleUpload}
-            className="hidden"
-            disabled={uploading}
-          />
-          <Button
-            type="button"
-            variant="primary"
-            icon={uploading ? <Loader2 className="animate-spin" size={18} /> : <Upload size={18} />}
-            disabled={uploading}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            {uploading ? 'Uploading...' : 'Upload Media'}
-          </Button>
-          </>
-          )}
-        </div>
-      </div>
+    <div className="min-w-0">
+      {query.updating ? <UpdatingNotice /> : null}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        onChange={handleUpload}
+        className="hidden"
+        disabled={uploading}
+      />
+      <AdminPageHeader
+        title="Media"
+        subtitle={`${files.length} file${files.length === 1 ? '' : 's'}`}
+        primary={
+          canEditProducts
+            ? {
+                label: uploading ? 'Uploading...' : 'Upload',
+                icon: uploading ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />,
+                disabled: uploading,
+                onClick: () => fileInputRef.current?.click(),
+              }
+            : undefined
+        }
+        secondary={
+          canEditProducts
+            ? [
+                {
+                  label: syncing ? 'Syncing...' : 'Sync from R2',
+                  icon: syncing ? <Loader2 className="animate-spin" size={16} /> : <RefreshCw size={16} />,
+                  disabled: query.loading || syncing,
+                  onClick: () => void handleSyncFromR2(),
+                },
+              ]
+            : []
+        }
+      />
 
-      {/* Filters and Search */}
-      <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-200">
-        <div className="flex flex-col md:flex-row gap-4">
-          {/* Folder Filter */}
-          <select
-            value={folderFilter}
-            onChange={(e) => setFolderFilter(e.target.value as FolderFilter)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
-          >
-            <option value="all">All Folders</option>
-            <option value="products">Products</option>
-            <option value="categories">Categories</option>
-            <option value="banners">Banners</option>
-            <option value="brands">Brands</option>
-            <option value="uploads">Uploads</option>
-          </select>
+      <FilterBar
+        search={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Search files"
+        activeCount={folderFilter === 'all' ? 0 : 1}
+        onClear={() => setFolderFilter('all')}
+      >
+        <select
+          value={folderFilter}
+          onChange={(e) => setFolderFilter(e.target.value as FolderFilter)}
+          className={filterSelectClassName()}
+        >
+          <option value="all">All folders</option>
+          <option value="products">Products</option>
+          <option value="categories">Categories</option>
+          <option value="banners">Banners</option>
+          <option value="brands">Brands</option>
+          <option value="uploads">Uploads</option>
+        </select>
+      </FilterBar>
 
-          {/* Search */}
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-            <input
-              type="text"
-              placeholder="Search files..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF7A19]"
-            />
-          </div>
-
-          {/* View Mode Toggle */}
-          <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-2 rounded transition-colors ${
-                viewMode === 'grid' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
-              }`}
-              title="Grid View"
-            >
-              <Grid size={20} />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-2 rounded transition-colors ${
-                viewMode === 'list' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
-              }`}
-              title="List View"
-            >
-              <List size={20} />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-          <p className="text-sm text-[#3A3A3A] mb-1">Total Files</p>
+      <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <p className="mb-1 text-sm text-[#3A3A3A]">Total Files</p>
           <p className="text-3xl font-bold text-[#1A1A1A]">{files.length}</p>
         </div>
-        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-          <p className="text-sm text-[#3A3A3A] mb-1">Filtered Results</p>
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <p className="mb-1 text-sm text-[#3A3A3A]">Filtered Results</p>
           <p className="text-3xl font-bold text-[#FF7A19]">{filteredFiles.length}</p>
         </div>
-        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-          <p className="text-sm text-[#3A3A3A] mb-1">Total Size</p>
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <p className="mb-1 text-sm text-[#3A3A3A]">Total Size</p>
           <p className="text-3xl font-bold text-[#1A1A1A]">
             {formatFileSize(filteredFiles.reduce((sum, f) => sum + (f.size || 0), 0))}
           </p>
         </div>
       </div>
 
-      {/* Media Grid/List */}
       {filteredFiles.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm p-12 border border-gray-200 text-center">
-          <ImageIcon className="text-gray-400 mx-auto mb-4" size={64} />
-          <h3 className="text-xl font-bold text-[#1A1A1A] mb-2">No media files found</h3>
-          <p className="text-[#3A3A3A] mb-6">
-            {searchQuery ? 'Try adjusting your search filters' : 'Upload your first media file to get started'}
-          </p>
-          {canEditProducts && !searchQuery && (
-            <Button
-              type="button"
-              variant="primary"
-              icon={<Upload size={18} />}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              Upload Media
-            </Button>
-          )}
-        </div>
-      ) : viewMode === 'grid' ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-          {filteredFiles.map((file) => (
-            <div
-              key={file.url}
-              className="group relative bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-all"
-            >
-              {/* Image */}
-              <div className="relative aspect-square bg-gray-100 overflow-hidden">
-                <img
-                  src={file.url}
-                  alt={file.key}
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.src = '/placeholders/placeholder-product.webp';
-                  }}
-                />
-                
-                {/* Overlay on hover */}
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                  <button
-                    onClick={() => handleSelect(file)}
-                    className="p-2 bg-white rounded-lg hover:bg-gray-100 transition-colors"
-                    title="Copy URL"
-                  >
-                    {selectedFile === file.url ? (
-                      <Check size={18} className="text-green-600" />
-                    ) : (
-                      <ImageIcon size={18} className="text-[#FF7A19]" />
-                    )}
-                  </button>
-                  {canEditProducts && (
-                  <button
-                    onClick={() => handleDelete(file)}
-                    disabled={deleting === file.url}
-                    className="p-2 bg-white rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
-                    title="Delete"
-                  >
-                    {deleting === file.url ? (
-                      <Loader2 size={18} className="animate-spin text-red-600" />
-                    ) : (
-                      <Trash2 size={18} className="text-red-600" />
-                    )}
-                  </button>
-                  )}
-                </div>
-              </div>
-
-              {/* File Info */}
-              <div className="p-2">
-                <p className="text-xs text-[#3A3A3A] truncate" title={file.key}>
-                  {file.key.split('/').pop()}
-                </p>
-                <p className="text-[10px] text-gray-400 mt-1">
-                  {formatFileSize(file.size)}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
+        searchQuery || folderFilter !== 'all' ? (
+          <NoResults
+            primary={{
+              label: 'Clear filters',
+              onClick: () => {
+                setSearchQuery('');
+                setFolderFilter('all');
+              },
+            }}
+          />
+        ) : (
+          <EmptyState
+            title="No media files yet"
+            description="Upload an image to use on products, banners, and pages."
+            primary={canEditProducts ? { label: 'Upload media', onClick: () => fileInputRef.current?.click() } : undefined}
+          />
+        )
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-[#1A1A1A]">Preview</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-[#1A1A1A]">Filename</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-[#1A1A1A]">Folder</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-[#1A1A1A]">Size</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-[#1A1A1A]">Date</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-[#1A1A1A]">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filteredFiles.map((file) => (
-                <tr key={file.url} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <div className="w-12 h-12 bg-gray-100 rounded overflow-hidden">
-                      <img
-                        src={file.url}
-                        alt={file.key}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.src = '/placeholders/placeholder-image.webp';
-                        }}
-                      />
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <p className="text-sm font-medium text-[#1A1A1A]" title={file.key}>
-                      {file.key.split('/').pop()}
-                    </p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="text-xs text-[#3A3A3A] bg-gray-100 px-2 py-1 rounded">
-                      {file.key.split('/')[0]}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-[#3A3A3A]">
-                    {formatFileSize(file.size)}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-[#3A3A3A]">
-                    {formatDate(file.lastModified)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleSelect(file)}
-                        className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-                        title="Copy URL"
-                      >
-                        {selectedFile === file.url ? (
-                          <Check size={16} className="text-green-600" />
-                        ) : (
-                          <ImageIcon size={16} className="text-[#FF7A19]" />
-                        )}
-                      </button>
-                      {canEditProducts && (
-                      <button
-                        onClick={() => handleDelete(file)}
-                        disabled={deleting === file.url}
-                        className="p-1.5 hover:bg-red-100 rounded transition-colors disabled:opacity-50"
-                        title="Delete"
-                      >
-                        {deleting === file.url ? (
-                          <Loader2 size={16} className="animate-spin text-red-600" />
-                        ) : (
-                          <Trash2 size={16} className="text-red-600" />
-                        )}
-                      </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ResponsiveTable
+          headers={
+            <tr>
+              <th className="px-4 py-3">Preview</th>
+              <th className="px-4 py-3">Filename</th>
+              <th className="px-4 py-3">Folder</th>
+              <th className="px-4 py-3">Size</th>
+              <th className="px-4 py-3">Date</th>
+              <th className="px-4 py-3 text-right">Actions</th>
+            </tr>
+          }
+          cards={filteredFiles.map((file) => (
+            <AdminRowCard
+              key={file.url}
+              name={fileName(file)}
+              thumbnail={file.url}
+              facts={[
+                { label: 'Folder', value: file.key.split('/')[0] },
+                { label: 'Size', value: formatFileSize(file.size) },
+                { label: 'Date', value: formatDate(file.lastModified) },
+              ]}
+              actions={<RowActions name={fileName(file)} actions={fileActions(file)} />}
+            />
+          ))}
+        >
+          {filteredFiles.map((file) => (
+            <tr key={file.url} className="hover:bg-gray-50">
+              <td className="px-4 py-3">
+                <div className="h-12 w-12 overflow-hidden rounded bg-gray-100">
+                  <img
+                    src={file.url}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = '/placeholders/placeholder-image.webp';
+                    }}
+                  />
+                </div>
+              </td>
+              <td className="px-4 py-3">
+                <p className="text-sm font-medium text-[#1A1A1A]" title={file.key}>
+                  {fileName(file)}
+                </p>
+              </td>
+              <td className="px-4 py-3">
+                <span className="rounded bg-gray-100 px-2 py-1 text-xs text-[#3A3A3A]">
+                  {file.key.split('/')[0]}
+                </span>
+              </td>
+              <td className="px-4 py-3 text-sm text-[#3A3A3A]">
+                {formatFileSize(file.size)}
+              </td>
+              <td className="px-4 py-3 text-sm text-[#3A3A3A]">
+                {formatDate(file.lastModified)}
+              </td>
+              <td className="px-4 py-3 text-right">
+                <RowActions name={fileName(file)} actions={fileActions(file)} />
+              </td>
+            </tr>
+          ))}
+        </ResponsiveTable>
       )}
+
+      {deleteTarget ? (
+        <ConfirmDialog
+          title="Delete this file?"
+          confirmLabel="Delete"
+          busy={deleting}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={() => void handleDelete()}
+        >
+          {deleteTarget.key} will be removed.
+        </ConfirmDialog>
+      ) : null}
     </div>
   );
 }
-

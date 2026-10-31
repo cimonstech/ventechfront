@@ -1,11 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { ChevronLeft, Mail, Shield, UserPlus } from 'lucide-react';
+import { UserPlus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { AdminPageHeader, AdminRowCard, ResponsiveTable, RowActions } from '@/components/admin/list';
+import { AccessDenied, EmptyState, ErrorState, TableSkeleton } from '@/components/ui-states';
+import { apiRequest, toApiError } from '@/lib/api';
+import { noteQueryFail } from '@/lib/queryState';
 import { Input } from '@/components/ui/Input';
 import { InfoNote } from '@/components/ui/InfoNote';
 import { Sheet } from '@/components/ui/Sheet';
@@ -79,6 +82,9 @@ export default function AdminStaffPage() {
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dialog, setDialog] = useState<'add' | 'edit' | null>(null);
   const [editing, setEditing] = useState<StaffMember | null>(null);
@@ -111,17 +117,16 @@ export default function AdminStaffPage() {
   const loadStaff = async () => {
     try {
       setIsLoading(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${apiUrl}/api/admin/staff`, {
-        headers: await authHeaders(),
-      });
-      const payload = await response.json();
-      if (!response.ok || payload.success === false) {
-        throw new Error(payload.message || 'Failed to load staff');
-      }
-      setStaff(payload.data || []);
+      setFailed(false);
+      setForbidden(false);
+      const result = await apiRequest<StaffMember[]>('/api/admin/staff');
+      if (!result.ok) throw toApiError(result);
+      setStaff(result.data || []);
+      setLoaded(true);
     } catch (error: any) {
-      toast.error(error.message || 'Failed to load staff');
+      const kind = noteQueryFail(error);
+      if (kind === 'forbidden') setForbidden(true);
+      else if (kind !== 'unauthorized') setFailed(true);
     } finally {
       setIsLoading(false);
     }
@@ -234,98 +239,102 @@ export default function AdminStaffPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link href="/admin">
-                <Button variant="ghost" size="sm">
-                  <ChevronLeft size={20} />
-                  Back
-                </Button>
-              </Link>
-              <div>
-                <h1 className="text-3xl font-bold text-[#1A1A1A]">Staff</h1>
-                <p className="text-sm text-[#3A3A3A] mt-1">Manage staff, admins, and their module access</p>
-              </div>
-            </div>
-            <Button size="sm" icon={<UserPlus size={16} />} onClick={openAdd}>
-              Add staff
-            </Button>
-          </div>
-        </div>
-      </div>
+    <div className="min-w-0 space-y-4">
+      <AdminPageHeader
+        title="Staff"
+        subtitle={`${staff.length} ${staff.length === 1 ? 'person' : 'people'}`}
+        primary={{ label: 'Add staff', icon: <UserPlus size={16} />, onClick: openAdd }}
+      />
 
-      <div className="container mx-auto px-4 py-8 space-y-4">
+      <div className="space-y-4">
         <InfoNote>
           View lets this person see the section. Edit lets them make changes. Finance is needed to record payments, refunds and investment amounts.
         </InfoNote>
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF7A19]" />
-            </div>
+          {forbidden ? (
+            <AccessDenied title="You don't have access" description="You don't have access to this data." primary={{ label: 'Go back', href: '/admin' }} />
+          ) : failed && !loaded ? (
+            <ErrorState title="We couldn't load staff" description="Try again in a moment." primary={{ label: 'Try again', onClick: () => void loadStaff() }} />
+          ) : isLoading && !loaded ? (
+            <TableSkeleton rows={6} />
           ) : staff.length === 0 ? (
-            <div className="text-center py-20">
-              <div className="bg-orange-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Shield className="w-10 h-10 text-[#FF7A19]" />
-              </div>
-              <h3 className="text-xl font-bold text-[#1A1A1A] mb-2">No staff yet</h3>
-              <p className="text-[#3A3A3A]">Add a staff member to give them module access.</p>
-            </div>
+            <EmptyState title="No staff yet" description="Add a person to give them access to admin sections." primary={{ label: 'Add staff', onClick: openAdd }} />
           ) : (
-            <div className="overflow-x-auto sticky-first">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-[#1A1A1A]">Name</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-[#1A1A1A]">Email</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-[#1A1A1A]">Role</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-[#1A1A1A]">Permissions</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-[#1A1A1A]">Actions</th>
+            <ResponsiveTable
+              headers={
+                <tr>
+                  <th className="px-4 py-3">Name</th>
+                  <th className="px-4 py-3">Email</th>
+                  <th className="px-4 py-3">Role</th>
+                  <th className="px-4 py-3">Permissions</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
+                </tr>
+              }
+              cards={staff.map((member) => {
+                const lastOwner = viewerIsOwner && member.role === 'superadmin' && ownerCount <= 1;
+                const manageable = canManage(member);
+                return (
+                  <AdminRowCard
+                    key={member.id}
+                    name={displayName(member)}
+                    status={
+                      <Badge variant={member.role === 'admin' ? 'warning' : member.role === 'staff' ? 'info' : 'error'}>
+                        {member.role}
+                      </Badge>
+                    }
+                    facts={[
+                      { label: 'Email', value: member.email },
+                      { label: 'Access', value: permissionSummary(member) },
+                    ]}
+                    actions={
+                      <RowActions
+                        name={displayName(member)}
+                        actions={[
+                          { label: 'Edit', onClick: () => openEdit(member), hidden: !manageable },
+                          {
+                            label: 'Delete',
+                            destructive: true,
+                            hidden: !manageable || member.id === user?.id || lastOwner,
+                            onClick: () => setRemoveTarget(member),
+                          },
+                        ]}
+                      />
+                    }
+                  />
+                );
+              })}
+            >
+              {staff.map((member) => {
+                const lastOwner = viewerIsOwner && member.role === 'superadmin' && ownerCount <= 1;
+                const manageable = canManage(member);
+                return (
+                  <tr key={member.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-sm font-medium text-[#1A1A1A]">{displayName(member)}</td>
+                    <td className="px-4 py-3 text-sm text-[#3A3A3A]">{member.email}</td>
+                    <td className="px-4 py-3">
+                      <Badge variant={member.role === 'admin' ? 'warning' : member.role === 'staff' ? 'info' : 'error'}>
+                        {member.role}
+                      </Badge>
+                    </td>
+                    <td className="max-w-md px-4 py-3 text-sm text-[#3A3A3A]">{permissionSummary(member)}</td>
+                    <td className="px-4 py-3 text-right">
+                      <RowActions
+                        name={displayName(member)}
+                        actions={[
+                          { label: 'Edit', onClick: () => openEdit(member), hidden: !manageable },
+                          {
+                            label: 'Delete',
+                            destructive: true,
+                            hidden: !manageable || member.id === user?.id || lastOwner,
+                            onClick: () => setRemoveTarget(member),
+                          },
+                        ]}
+                      />
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {staff.map((member) => {
-                    const lastOwner = viewerIsOwner && member.role === 'superadmin' && ownerCount <= 1;
-                    const manageable = canManage(member);
-                    return (
-                      <tr key={member.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 text-sm font-medium text-[#1A1A1A]">{displayName(member)}</td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2 text-sm text-[#3A3A3A]">
-                            <Mail size={14} />
-                            {member.email}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <Badge variant={member.role === 'admin' ? 'warning' : member.role === 'staff' ? 'info' : 'error'}>
-                            {member.role}
-                          </Badge>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-[#3A3A3A] max-w-md">{permissionSummary(member)}</td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" disabled={!manageable} onClick={() => openEdit(member)}>
-                              Edit
-                            </Button>
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              disabled={!manageable || member.id === user?.id || lastOwner}
-                              onClick={() => setRemoveTarget(member)}
-                            >
-                              Remove
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                );
+              })}
+            </ResponsiveTable>
           )}
         </div>
       </div>
@@ -336,9 +345,9 @@ export default function AdminStaffPage() {
           onClose={() => setDialog(null)}
           wide
           footer={(
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setDialog(null)}>Cancel</Button>
-              <Button className="w-full sm:w-auto" onClick={save} isLoading={saving}>Save</Button>
+            <div className="flex flex-row justify-end gap-2">
+              <Button variant="ghost" className="min-w-0 flex-1 sm:flex-none sm:w-auto" onClick={() => setDialog(null)}>Cancel</Button>
+              <Button className="min-w-0 flex-1 sm:flex-none sm:w-auto" onClick={save} isLoading={saving}>Save</Button>
             </div>
           )}
         >
@@ -410,9 +419,9 @@ export default function AdminStaffPage() {
           title="Remove staff member"
           onClose={() => setRemoveTarget(null)}
           footer={(
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setRemoveTarget(null)}>Cancel</Button>
-              <Button variant="danger" className="w-full sm:w-auto" onClick={remove} isLoading={saving}>Remove</Button>
+            <div className="flex flex-row justify-end gap-2">
+              <Button variant="ghost" className="min-w-0 flex-1 sm:flex-none sm:w-auto" onClick={() => setRemoveTarget(null)}>Cancel</Button>
+              <Button variant="danger" className="min-w-0 flex-1 sm:flex-none sm:w-auto" onClick={remove} isLoading={saving}>Remove</Button>
             </div>
           )}
         >

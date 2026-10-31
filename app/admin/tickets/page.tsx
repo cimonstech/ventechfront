@@ -5,6 +5,17 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Badge } from '@/components/ui/Badge';
+import {
+  AdminPageHeader,
+  AdminPagination,
+  AdminRowCard,
+  FilterBar,
+  filterSelectClassName,
+  ResponsiveTable,
+  RowActions,
+} from '@/components/admin/list';
+import { LoadGate, TableSkeleton } from '@/components/ui-states';
+import { noteQueryFail } from '@/lib/queryState';
 import { useSetAdminHeading } from '@/components/admin/AdminHeading';
 import { useAppSelector } from '@/store';
 import {
@@ -50,6 +61,9 @@ function ServiceRequestsList() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [query, setQuery] = useState(searchParams.get('search') || '');
   const [issueTypeId, setIssueTypeId] = useState('');
@@ -106,8 +120,15 @@ function ServiceRequestsList() {
         if (cancelled) return;
         setRows(result.data || []);
         setTotalPages(result.pagination?.totalPages || 1);
+        setLoaded(true);
+        setFailed(false);
+        setForbidden(false);
       } catch (error) {
-        if (!cancelled) toast.error(apiMessage(error, 'Could not load service requests'));
+        if (!cancelled) {
+          const kind = noteQueryFail(error);
+          if (kind === 'forbidden') setForbidden(true);
+          else if (kind !== 'unauthorized') setFailed(true);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -130,13 +151,12 @@ function ServiceRequestsList() {
   }));
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-bold text-[#1A1A1A]">Service requests</h2>
-        <Link href="/admin/tickets/issue-types" className="text-sm font-semibold text-[#FF7A19]">
-          Issue types
-        </Link>
-      </div>
+    <div className="min-w-0 space-y-6">
+      <AdminPageHeader
+        title="Service requests"
+        subtitle={`${rows.length} on this page`}
+        secondary={[{ label: 'Issue types', href: '/admin/tickets/issue-types' }]}
+      />
 
       <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
         {openCounts.map((item) => (
@@ -167,7 +187,7 @@ function ServiceRequestsList() {
               setStatus('');
               setPage(1);
             }}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium ${
+            className={`min-h-11 rounded-full px-3 py-1.5 text-sm font-medium ${
               tab === item.id ? 'bg-[#FF7A19] text-white' : 'bg-white border border-gray-200 text-[#1A1A1A]'
             }`}
           >
@@ -176,73 +196,150 @@ function ServiceRequestsList() {
         ))}
       </div>
 
-      <form
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3"
-        onSubmit={(event) => {
-          event.preventDefault();
+      <FilterBar
+        search={search}
+        onSearchChange={(value) => {
+          setSearch(value);
+          setQuery(value.trim());
           setPage(1);
-          setQuery(search.trim());
+        }}
+        searchPlaceholder="Ticket, serial, phone, email"
+        activeCount={[issueTypeId, warranty, from, to, status, assigneeFilter].filter(Boolean).length}
+        onClear={() => {
+          setIssueTypeId('');
+          setWarranty('');
+          setFrom('');
+          setTo('');
+          setStatus('');
+          setAssigneeFilter('');
+          setPage(1);
         }}
       >
-        <input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Ticket, serial, phone, email"
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
-        />
-        <select value={issueTypeId} onChange={(event) => { setIssueTypeId(event.target.value); setPage(1); }} className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+        <select
+          value={issueTypeId}
+          onChange={(event) => { setIssueTypeId(event.target.value); setPage(1); }}
+          className={filterSelectClassName()}
+        >
           <option value="">All issues</option>
           {issues.map((issue) => (
             <option key={issue.id} value={issue.id}>{issue.name}</option>
           ))}
         </select>
-        <select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }} className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+        <select
+          value={status}
+          onChange={(event) => { setStatus(event.target.value); setPage(1); }}
+          className={filterSelectClassName()}
+        >
           <option value="">Status from tab</option>
           {Object.entries(STATUS_LABEL).map(([value, label]) => (
             <option key={value} value={value}>{label}</option>
           ))}
         </select>
-        {(tab === 'open' || tab === 'done') && (
-          <select value={assigneeFilter} onChange={(event) => { setAssigneeFilter(event.target.value); setPage(1); }} className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+        {(tab === 'open' || tab === 'done') ? (
+          <select
+            value={assigneeFilter}
+            onChange={(event) => { setAssigneeFilter(event.target.value); setPage(1); }}
+            className={filterSelectClassName()}
+          >
             <option value="">Any assignee</option>
             <option value="unassigned">Unassigned</option>
             {assignees.map((person) => (
               <option key={person.id} value={person.id}>{person.name || person.email}</option>
             ))}
           </select>
-        )}
-        <select value={warranty} onChange={(event) => { setWarranty(event.target.value); setPage(1); }} className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+        ) : null}
+        <select
+          value={warranty}
+          onChange={(event) => { setWarranty(event.target.value); setPage(1); }}
+          className={filterSelectClassName()}
+        >
           <option value="">Any warranty</option>
           <option value="active">Active</option>
           <option value="expired">Expired</option>
           <option value="none">None</option>
           <option value="unknown">Unknown</option>
         </select>
-        <button type="submit" className="px-3 py-2 rounded-lg bg-[#1A1A1A] text-white text-sm font-medium">Search</button>
-        <input type="date" value={from} onChange={(event) => { setFrom(event.target.value); setPage(1); }} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" aria-label="From date" />
-        <input type="date" value={to} onChange={(event) => { setTo(event.target.value); setPage(1); }} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" aria-label="To date" />
-      </form>
+        <input
+          type="date"
+          value={from}
+          onChange={(event) => { setFrom(event.target.value); setPage(1); }}
+          className={filterSelectClassName()}
+          aria-label="From date"
+        />
+        <input
+          type="date"
+          value={to}
+          onChange={(event) => { setTo(event.target.value); setPage(1); }}
+          className={filterSelectClassName()}
+          aria-label="To date"
+        />
+      </FilterBar>
 
-      <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto sticky-first">
-        <table className="min-w-[760px] w-full text-sm">
-          <thead className="bg-gray-50 text-left text-[#3A3A3A]">
-            <tr>
-              <th className="px-4 py-3">Ticket</th>
-              <th className="px-4 py-3">Customer</th>
-              <th className="px-4 py-3">Model</th>
-              <th className="px-4 py-3">Issue</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Assigned to</th>
-              <th className="px-4 py-3">Warranty</th>
-              <th className="px-4 py-3">Updated</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {loading ? (
-              <tr><td colSpan={8} className="px-4 py-10 text-center text-[#3A3A3A]">Loading requests…</td></tr>
-            ) : rows.length === 0 ? (
-              <tr><td colSpan={8} className="px-4 py-10 text-center text-[#3A3A3A]">No service requests match.</td></tr>
-            ) : rows.map((row) => (
+      <LoadGate
+        loaded={loaded}
+        loading={loading}
+        updating={loading && loaded}
+        error={failed}
+        forbidden={forbidden}
+        isEmpty={rows.length === 0}
+        filtered={Boolean(query || issueTypeId || warranty || from || to || status || assigneeFilter)}
+        onRetry={() => setPage(1)}
+        onClearFilters={() => {
+          setQuery('');
+          setSearch('');
+          setIssueTypeId('');
+          setWarranty('');
+          setFrom('');
+          setTo('');
+          setStatus('');
+          setAssigneeFilter('');
+        }}
+        skeleton={<TableSkeleton rows={6} />}
+        emptyTitle="No service requests yet"
+        emptyDescription="Customer requests will show up here."
+        denyHome="/admin"
+      >
+        <>
+          <ResponsiveTable
+            headers={
+              <tr>
+                <th className="px-4 py-3">Ticket</th>
+                <th className="px-4 py-3">Customer</th>
+                <th className="px-4 py-3">Model</th>
+                <th className="px-4 py-3">Issue</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Assigned to</th>
+                <th className="px-4 py-3">Warranty</th>
+                <th className="px-4 py-3">Updated</th>
+                <th className="px-4 py-3 text-right">Actions</th>
+              </tr>
+            }
+            cards={rows.map((row) => (
+              <AdminRowCard
+                key={row.id}
+                name={row.ticket_no}
+                href={`/admin/tickets/${row.id}`}
+                status={
+                  <Badge size="sm" variant={statusVariant(row.status)}>
+                    {STATUS_LABEL[row.status] || row.status}
+                  </Badge>
+                }
+                facts={[
+                  { label: 'Customer', value: row.customer?.name || '—' },
+                  { label: 'Model', value: row.laptop_model },
+                  { label: 'Assignee', value: assigneeName(row) },
+                  { label: 'Date', value: formatTicketWhen(row.updated_at) },
+                ]}
+                actions={
+                  <RowActions
+                    name={row.ticket_no}
+                    actions={[{ label: 'View', href: `/admin/tickets/${row.id}` }]}
+                  />
+                }
+              />
+            ))}
+          >
+            {rows.map((row) => (
               <tr key={row.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3">
                   <Link href={`/admin/tickets/${row.id}`} className="font-semibold text-[#FF7A19]">{row.ticket_no}</Link>
@@ -253,21 +350,25 @@ function ServiceRequestsList() {
                 </td>
                 <td className="px-4 py-3 text-[#1A1A1A]">{row.laptop_model}</td>
                 <td className="px-4 py-3">{row.issue?.name || '—'}</td>
-                <td className="px-4 py-3"><Badge size="sm" variant={statusVariant(row.status)}>{STATUS_LABEL[row.status] || row.status}</Badge></td>
+                <td className="px-4 py-3">
+                  <Badge size="sm" variant={statusVariant(row.status)}>{STATUS_LABEL[row.status] || row.status}</Badge>
+                </td>
                 <td className="px-4 py-3">{assigneeName(row)}</td>
                 <td className="px-4 py-3 capitalize">{row.warranty_status_at_submit || '—'}</td>
                 <td className="px-4 py-3 whitespace-nowrap">{formatTicketWhen(row.updated_at)}</td>
+                <td className="px-4 py-3 text-right">
+                  <RowActions
+                    name={row.ticket_no}
+                    actions={[{ label: 'View', href: `/admin/tickets/${row.id}` }]}
+                  />
+                </td>
               </tr>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </ResponsiveTable>
 
-      <div className="flex items-center justify-between text-sm">
-        <button type="button" className="text-[#FF7A19] font-semibold disabled:text-gray-400" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</button>
-        <span className="text-[#3A3A3A]">Page {page} of {totalPages}</span>
-        <button type="button" className="text-[#FF7A19] font-semibold disabled:text-gray-400" disabled={page >= totalPages} onClick={() => setPage((value) => value + 1)}>Next</button>
-      </div>
+          <AdminPagination page={page} totalPages={totalPages} onPage={setPage} />
+        </>
+      </LoadGate>
     </div>
   );
 }

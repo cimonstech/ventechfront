@@ -1,4 +1,5 @@
 import { authHeaders } from '@/lib/authHeaders';
+import { apiRequest, toApiError } from '@/lib/api';
 import { Coupon, CreateCouponData, CouponValidation } from '@/types/coupon';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
@@ -91,25 +92,9 @@ export const couponService = {
 
   // Get all coupons (admin)
   async getAllCoupons(): Promise<Coupon[]> {
-    try {
-      const response = await fetch(`${API_URL}/api/coupons`, {
-        method: 'GET',
-        headers: {
-          ...(await authHeaders()),
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch coupons');
-      }
-
-      const result = await response.json();
-      return result.success ? (result.data || []) : [];
-    } catch (error) {
-      console.error('Error fetching coupons:', error);
-      return [];
-    }
+    const result = await apiRequest<Coupon[]>('/api/coupons');
+    if (!result.ok) throw toApiError(result);
+    return result.data || [];
   },
 
   // Get coupon by ID (admin)
