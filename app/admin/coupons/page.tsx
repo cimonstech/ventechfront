@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 import { LoadGate, TableSkeleton } from '@/components/ui-states';
 import {
   AdminPageHeader,
+  readyCount,
   AdminRowCard,
   ConfirmDialog,
   ResponsiveTable,
@@ -223,7 +224,7 @@ export default function AdminCouponsPage() {
     <div className="min-w-0 space-y-6">
       <AdminPageHeader
         title="Coupons"
-        subtitle={`${coupons.length} coupon${coupons.length === 1 ? '' : 's'}`}
+        subtitle={readyCount(query.loaded && !query.error, `${coupons.length} coupon${coupons.length === 1 ? '' : 's'}`)}
         primary={{
           label: 'Add coupon',
           icon: <Plus size={16} />,

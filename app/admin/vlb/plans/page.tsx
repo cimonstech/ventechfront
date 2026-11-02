@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { VlbNav } from '@/components/admin/VlbNav';
 import {
   AdminPageHeader,
+  readyCount,
   AdminRowCard,
   ResponsiveTable,
   RowActions,
@@ -169,7 +170,7 @@ export default function AdminVlbPlansPage() {
     <div className="min-w-0 max-w-full space-y-6 overflow-x-clip">
       <AdminPageHeader
         title="Plans"
-        subtitle={`${rows.length} plan${rows.length === 1 ? '' : 's'}`}
+        subtitle={readyCount(loaded && !failed, `${rows.length} plan${rows.length === 1 ? '' : 's'}`)}
         primary={
           editable
             ? { label: 'Add plan', icon: <Plus size={16} />, onClick: () => { setOpen('new'); setForm(EMPTY); } }

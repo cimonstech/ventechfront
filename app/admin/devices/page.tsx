@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import {
   AdminPageHeader,
+  readyCount,
   AdminPagination,
   AdminRowCard,
   FilterBar,
@@ -208,7 +209,7 @@ export default function AdminDevicesPage() {
     <div className="min-w-0 space-y-6">
       <AdminPageHeader
         title="Devices"
-        subtitle={`${total} device${total === 1 ? '' : 's'}`}
+        subtitle={readyCount(loaded && !failed, `${total} device${total === 1 ? '' : 's'}`)}
         primary={editable ? { label: 'Add from orders', href: '/admin/devices/new' } : undefined}
         secondary={[{ label: 'Print labels', onClick: printLabels }]}
       />

@@ -10,6 +10,7 @@ import { AffiliatePrompt } from '@/components/admin/AffiliatePrompt';
 import { AffiliatesNav } from '@/components/admin/AffiliatesNav';
 import {
   AdminPageHeader,
+  readyCount,
   AdminPagination,
   AdminRowCard,
   ResponsiveTable,
@@ -49,6 +50,8 @@ export default function AdminAffiliateCommissionsPage() {
   const [total, setTotal] = useState(0);
   const [rows, setRows] = useState<AffiliateCommissionRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [reverseId, setReverseId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -65,7 +68,10 @@ export default function AdminAffiliateCommissionsPage() {
       setRows(tab === 'pending' ? list.filter(commissionNotYetEligible) : list);
       setTotalPages(result.pagination?.totalPages || 1);
       setTotal(result.pagination?.total || 0);
+      setLoaded(true);
+      setFailed(false);
     } catch (error) {
+      setFailed(true);
       toast.error(apiMessage(error, 'Could not load commissions'));
     } finally {
       setLoading(false);
@@ -124,7 +130,7 @@ export default function AdminAffiliateCommissionsPage() {
     <div className="min-w-0 space-y-6">
       <AdminPageHeader
         title="Commissions"
-        subtitle={`${count} commission${count === 1 ? '' : 's'}`}
+        subtitle={readyCount(loaded && !failed, `${count} commission${count === 1 ? '' : 's'}`)}
         secondary={[
           {
             label: exporting ? 'Exporting' : 'Export all',

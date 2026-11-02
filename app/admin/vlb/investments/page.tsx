@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/Badge';
 import { VlbNav } from '@/components/admin/VlbNav';
 import {
   AdminPageHeader,
+  readyCount,
   AdminPagination,
   AdminRowCard,
   filterSelectClassName,
@@ -96,7 +97,7 @@ export default function AdminVlbInvestmentsPage() {
     <div className="min-w-0 space-y-6">
       <AdminPageHeader
         title="Investments"
-        subtitle={`${count} investment${count === 1 ? '' : 's'}`}
+        subtitle={readyCount(loaded && !failed, `${count} investment${count === 1 ? '' : 's'}`)}
       />
       <VlbNav current="/admin/vlb/investments" />
       <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">

@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import { Badge } from '@/components/ui/Badge';
 import {
   AdminPageHeader,
+  readyCount,
   AdminPagination,
   AdminRowCard,
   FilterBar,
@@ -147,14 +148,14 @@ function ServiceRequestsList() {
 
   const openCounts = TICKET_STAGES.filter((item) => item !== 'completed').map((item) => ({
     label: STATUS_LABEL[item],
-    count: summary?.counts[item] || 0,
+    count: summary ? summary.counts[item] : null,
   }));
 
   return (
     <div className="min-w-0 space-y-6">
       <AdminPageHeader
         title="Service requests"
-        subtitle={`${rows.length} on this page`}
+        subtitle={readyCount(loaded && !failed, `${rows.length} on this page`)}
         secondary={[{ label: 'Issue types', href: '/admin/tickets/issue-types' }]}
       />
 
@@ -162,7 +163,7 @@ function ServiceRequestsList() {
         {openCounts.map((item) => (
           <div key={item.label} className="bg-white border border-gray-200 rounded-xl p-3">
             <p className="text-xs text-[#3A3A3A]">{item.label}</p>
-            <p className="text-2xl font-bold text-[#1A1A1A]">{item.count}</p>
+            <p className="text-2xl font-bold text-[#1A1A1A]">{item.count == null ? '—' : item.count}</p>
           </div>
         ))}
         <div className="bg-white border border-gray-200 rounded-xl p-3">

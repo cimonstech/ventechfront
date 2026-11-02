@@ -9,6 +9,7 @@ import { applyQueryFail } from '@/lib/queryState';
 import { VlbNav } from '@/components/admin/VlbNav';
 import {
   AdminPageHeader,
+  readyCount,
   AdminPagination,
   AdminRowCard,
   ResponsiveTable,
@@ -76,7 +77,7 @@ export default function AdminVlbApplicationsPage() {
     <div className="min-w-0 space-y-6">
       <AdminPageHeader
         title="Laptop Banking"
-        subtitle={`${count} application${count === 1 ? '' : 's'}`}
+        subtitle={readyCount(loaded && !failed, `${count} application${count === 1 ? '' : 's'}`)}
       />
       <VlbNav current="/admin/vlb" />
       <div className="flex flex-wrap gap-2">

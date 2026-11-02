@@ -42,6 +42,10 @@ function ActionButton({
   return button;
 }
 
+export function readyCount(ready: boolean, text: string): string | undefined {
+  return ready ? text : undefined;
+}
+
 export function AdminPageHeader({
   title,
   subtitle,

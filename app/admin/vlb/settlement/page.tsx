@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { VlbNav } from '@/components/admin/VlbNav';
 import {
   AdminPageHeader,
+  readyCount,
   AdminRowCard,
   ResponsiveTable,
   RowActions,
@@ -86,7 +87,7 @@ export default function AdminVlbSettlementPage() {
     <div className="min-w-0 space-y-6">
       <AdminPageHeader
         title="Settlement"
-        subtitle={`${rows.length} investment${rows.length === 1 ? '' : 's'}`}
+        subtitle={readyCount(loaded && !failed, `${rows.length} investment${rows.length === 1 ? '' : 's'}`)}
       />
       <VlbNav current="/admin/vlb/settlement" />
       {featureOff || forbidden || (failed && !loaded) ? (

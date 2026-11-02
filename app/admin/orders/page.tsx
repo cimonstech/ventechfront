@@ -17,6 +17,7 @@ import {
 import { Badge } from '@/components/ui/Badge';
 import {
   AdminPageHeader,
+  readyCount,
   AdminRowCard,
   FilterBar,
   filterSelectClassName,
@@ -472,7 +473,7 @@ export default function AdminOrdersPage() {
     <div className="min-w-0">
       <AdminPageHeader
         title="Orders"
-        subtitle={`${orders.length} order${orders.length === 1 ? '' : 's'}`}
+        subtitle={readyCount(loaded && !failed, `${orders.length} order${orders.length === 1 ? '' : 's'}`)}
         secondary={[
           ...(canEditOrders
             ? [{

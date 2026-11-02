@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import {
   AdminPageHeader,
+  readyCount,
   AdminRowCard,
   ConfirmDialog,
   ResponsiveTable,
@@ -305,7 +306,7 @@ export default function AdminTaxesPage() {
     <div className="min-w-0">
       <AdminPageHeader
         title="Taxes"
-        subtitle={`${taxes.length} tax${taxes.length === 1 ? '' : 'es'}`}
+        subtitle={readyCount(loaded && !failed, `${taxes.length} tax${taxes.length === 1 ? '' : 'es'}`)}
         primary={{ label: 'Add tax', icon: <Plus size={16} />, onClick: () => setShowCreateModal(true) }}
       />
 

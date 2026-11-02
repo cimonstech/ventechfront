@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import {
   AdminPageHeader,
+  readyCount,
   AdminRowCard,
   ConfirmDialog,
   FilterBar,
@@ -339,7 +340,7 @@ export default function TransactionsPage() {
     <div className="min-w-0">
       <AdminPageHeader
         title="Transactions"
-        subtitle={`${filteredTransactions.length} transaction${filteredTransactions.length === 1 ? '' : 's'}`}
+        subtitle={readyCount(loaded && !failed, `${filteredTransactions.length} transaction${filteredTransactions.length === 1 ? '' : 's'}`)}
         secondary={[
           {
             label: 'Export csv',

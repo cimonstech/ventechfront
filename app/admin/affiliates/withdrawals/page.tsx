@@ -10,6 +10,7 @@ import { AffiliatePrompt } from '@/components/admin/AffiliatePrompt';
 import { AffiliatesNav } from '@/components/admin/AffiliatesNav';
 import {
   AdminPageHeader,
+  readyCount,
   AdminPagination,
   AdminRowCard,
   ResponsiveTable,
@@ -129,7 +130,7 @@ export default function AdminAffiliateWithdrawalsPage() {
     <div className="min-w-0 space-y-6">
       <AdminPageHeader
         title="Withdrawals"
-        subtitle={`${count} withdrawal${count === 1 ? '' : 's'}`}
+        subtitle={readyCount(loaded && !failed, `${count} withdrawal${count === 1 ? '' : 's'}`)}
         secondary={[
           {
             label: exporting ? 'Exporting' : 'Export all',

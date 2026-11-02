@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { VlbNav } from '@/components/admin/VlbNav';
 import {
   AdminPageHeader,
+  readyCount,
   AdminRowCard,
   ResponsiveTable,
 } from '@/components/admin/list';
@@ -96,7 +97,7 @@ export default function AdminVlbUpgradesPage() {
     <div className="min-w-0 space-y-6">
       <AdminPageHeader
         title="Upgrade requests"
-        subtitle={`${rows.length} request${rows.length === 1 ? '' : 's'}`}
+        subtitle={readyCount(loaded && !failed, `${rows.length} request${rows.length === 1 ? '' : 's'}`)}
       />
       <VlbNav current="/admin/vlb/upgrades" />
       <div className="flex flex-wrap gap-2">

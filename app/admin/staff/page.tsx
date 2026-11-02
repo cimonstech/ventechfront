@@ -5,7 +5,7 @@ import { UserPlus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { AdminPageHeader, AdminRowCard, ResponsiveTable, RowActions } from '@/components/admin/list';
+import { AdminPageHeader, readyCount, AdminRowCard, ResponsiveTable, RowActions } from '@/components/admin/list';
 import { AccessDenied, EmptyState, ErrorState, TableSkeleton } from '@/components/ui-states';
 import { apiRequest, toApiError } from '@/lib/api';
 import { noteQueryFail } from '@/lib/queryState';
@@ -243,7 +243,7 @@ export default function AdminStaffPage() {
     <div className="min-w-0 space-y-4">
       <AdminPageHeader
         title="Staff"
-        subtitle={`${staff.length} ${staff.length === 1 ? 'person' : 'people'}`}
+        subtitle={readyCount(loaded && !failed, `${staff.length} ${staff.length === 1 ? 'person' : 'people'}`)}
         primary={{ label: 'Add staff', icon: <UserPlus size={16} />, onClick: openAdd }}
       />
 

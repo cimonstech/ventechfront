@@ -13,6 +13,7 @@ import { accessDeniedMessage } from '@/lib/access';
 import { useAccess } from '@/context/AccessContext';
 import {
   AdminPageHeader,
+  readyCount,
   AdminRowCard,
   ConfirmDialog,
   ResponsiveTable,
@@ -327,7 +328,7 @@ export default function BannersPage() {
     <div className="min-w-0">
       <AdminPageHeader
         title="Banners"
-        subtitle={`${banners.length} banner${banners.length === 1 ? '' : 's'}`}
+        subtitle={readyCount(loaded && !failed, `${banners.length} banner${banners.length === 1 ? '' : 's'}`)}
         primary={
           canEditContent
             ? {

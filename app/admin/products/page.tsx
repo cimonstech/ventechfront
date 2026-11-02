@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/Badge';
 import { ProductModal } from '@/components/admin/ProductModal';
 import {
   AdminPageHeader,
+  readyCount,
   AdminPagination,
   AdminRowCard,
   AttentionCard,
@@ -297,7 +298,7 @@ export default function AdminProductsPage() {
     <div className="min-w-0">
       <AdminPageHeader
         title="Products"
-        subtitle={`${pagination.total} product${pagination.total === 1 ? '' : 's'}`}
+        subtitle={readyCount(loaded && !failed, `${pagination.total} product${pagination.total === 1 ? '' : 's'}`)}
         primary={
           canEditProducts
             ? { label: 'Add product', icon: <Plus size={16} />, onClick: () => setShowAddModal(true) }

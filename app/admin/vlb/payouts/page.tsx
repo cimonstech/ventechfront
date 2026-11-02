@@ -9,6 +9,7 @@ import { Sheet } from '@/components/ui/Sheet';
 import { VlbNav } from '@/components/admin/VlbNav';
 import {
   AdminPageHeader,
+  readyCount,
   AdminPagination,
   AdminRowCard,
   ResponsiveTable,
@@ -137,7 +138,7 @@ export default function AdminVlbPayoutsPage() {
     <div className="min-w-0 space-y-6">
       <AdminPageHeader
         title="Payouts"
-        subtitle={`${count} payout${count === 1 ? '' : 's'}`}
+        subtitle={readyCount(loaded && !failed, `${count} payout${count === 1 ? '' : 's'}`)}
       />
       <VlbNav current="/admin/vlb/payouts" />
       {money ? (

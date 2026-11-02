@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { VlbNav } from '@/components/admin/VlbNav';
 import {
   AdminPageHeader,
+  readyCount,
   AdminPagination,
   AdminRowCard,
   FilterBar,
@@ -72,7 +73,7 @@ export default function AdminVlbInvestorsPage() {
     <div className="min-w-0 space-y-6">
       <AdminPageHeader
         title="Investors"
-        subtitle={`${count} investor${count === 1 ? '' : 's'}`}
+        subtitle={readyCount(loaded && !failed, `${count} investor${count === 1 ? '' : 's'}`)}
       />
       <VlbNav current="/admin/vlb/investors" />
       <FilterBar

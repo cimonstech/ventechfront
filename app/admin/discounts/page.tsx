@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import {
   AdminPageHeader,
+  readyCount,
   AdminRowCard,
   ConfirmDialog,
   ResponsiveTable,
@@ -351,7 +352,7 @@ export default function AdminDiscountsPage() {
     <div className="min-w-0">
       <AdminPageHeader
         title="Discounts"
-        subtitle={`${discounts.length} discount${discounts.length === 1 ? '' : 's'}`}
+        subtitle={readyCount(loaded && !failed, `${discounts.length} discount${discounts.length === 1 ? '' : 's'}`)}
         primary={{ label: 'Add discount', icon: <Plus size={16} />, onClick: () => setShowCreateModal(true) }}
       />
 

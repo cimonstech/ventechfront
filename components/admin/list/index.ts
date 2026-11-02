@@ -1,4 +1,4 @@
-export { AdminPageHeader } from './AdminPageHeader';
+export { AdminPageHeader, readyCount } from './AdminPageHeader';
 export { AdminPagination } from './AdminPagination';
 export { AttentionCard } from './AttentionCard';
 export { ConfirmDialog } from './ConfirmDialog';

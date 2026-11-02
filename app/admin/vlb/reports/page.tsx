@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { VlbNav } from '@/components/admin/VlbNav';
 import {
   AdminPageHeader,
+  readyCount,
   AdminRowCard,
   ResponsiveTable,
 } from '@/components/admin/list';
@@ -98,7 +99,7 @@ export default function AdminVlbReportsPage() {
     <div className="min-w-0 space-y-6">
       <AdminPageHeader
         title="Reports"
-        subtitle={`${payoutCount} payout${payoutCount === 1 ? '' : 's'}`}
+        subtitle={readyCount(Boolean(payouts) && !failed, `${payoutCount} payout${payoutCount === 1 ? '' : 's'}`)}
         secondary={[
           { label: 'Export scholar fund', onClick: () => void csv('scholar-fund') },
           { label: 'Export payouts', onClick: () => void csv('payouts') },

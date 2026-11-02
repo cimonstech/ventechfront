@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import { Badge } from '@/components/ui/Badge';
 import {
   AdminPageHeader,
+  readyCount,
   AdminPagination,
   AdminRowCard,
   FilterBar,
@@ -96,7 +97,7 @@ function CustomersList() {
 
   const [query, setQuery] = useState(search);
   const [rows, setRows] = useState<CustomerListRow[]>([]);
-  const [counts, setCounts] = useState<CustomerCounts>({ all: 0, regular: 0, affiliate: null, investor: null });
+  const [counts, setCounts] = useState<CustomerCounts | null>(null);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState(false);
@@ -152,11 +153,11 @@ function CustomersList() {
 
   const tabs = useMemo(() => {
     const items: Array<{ id: CustomerType; label: string; count: number | null }> = [
-      { id: 'all', label: 'All', count: counts.all },
-      { id: 'regular', label: 'Customers', count: counts.regular },
+      { id: 'all', label: 'All', count: counts?.all ?? null },
+      { id: 'regular', label: 'Customers', count: counts?.regular ?? null },
     ];
-    if (canAffiliates) items.push({ id: 'affiliate', label: 'Affiliates', count: counts.affiliate });
-    if (canVlb) items.push({ id: 'investor', label: 'Laptop Banking', count: counts.investor });
+    if (canAffiliates) items.push({ id: 'affiliate', label: 'Affiliates', count: counts?.affiliate ?? null });
+    if (canVlb) items.push({ id: 'investor', label: 'Laptop Banking', count: counts?.investor ?? null });
     return items;
   }, [canAffiliates, canVlb, counts]);
 
@@ -193,7 +194,7 @@ function CustomersList() {
     <div className="min-w-0 space-y-6">
       <AdminPageHeader
         title="Customers"
-        subtitle={`${counts.all} on file`}
+        subtitle={readyCount(loaded && !failed && counts != null, `${counts?.all ?? 0} on file`)}
         secondary={[
           {
             label: exporting ? 'Exporting' : 'Export all',
@@ -223,7 +224,7 @@ function CustomersList() {
               type === item.id ? 'bg-[#FF7A19] text-white' : 'bg-white border border-gray-200 text-[#1A1A1A]'
             }`}
           >
-            {item.label} ({item.count ?? 0})
+            {item.count == null ? item.label : `${item.label} (${item.count})`}
           </button>
         ))}
       </div>
