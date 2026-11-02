@@ -45,8 +45,9 @@ export const PROGRAM_AREAS: Array<{
   { role: 'investor', label: 'Investor', href: '/account/investments' },
 ];
 
+const STAFF_OPEN_PREFIXES = ['/admin/users'];
+
 const FULL_ADMIN_PREFIXES = [
-  '/admin/users',
   '/admin/coupons',
   '/admin/discounts',
   '/admin/taxes',
@@ -133,6 +134,7 @@ export function canOpenAdminPath(pathname: string, access: AccessProfile | null)
   if (access.role === 'superadmin') return true;
   if (access.role === 'admin') return true;
   if (pathname === '/admin') return true;
+  if (STAFF_OPEN_PREFIXES.some((prefix) => matchesPrefix(pathname, prefix))) return true;
   if (FULL_ADMIN_PREFIXES.some((prefix) => matchesPrefix(pathname, prefix))) return false;
   const match = MODULE_PREFIXES.find((entry) => matchesPrefix(pathname, entry.prefix));
   if (!match) return false;

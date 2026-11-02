@@ -99,7 +99,18 @@ export function devicePublicUrl(token: string): string {
 export async function deviceRequest<T>(
   path: string,
   init: RequestInit = {}
-): Promise<{ data: T; message: string; pagination?: DevicePage; pending_count?: number }> {
+): Promise<{
+  data: T;
+  message: string;
+  pagination?: DevicePage;
+  pending_count?: number;
+  counts?: {
+    all: number;
+    regular: number;
+    affiliate: number | null;
+    investor: number | null;
+  };
+}> {
   const result = await apiRequest<T>(path, init);
   if (!result.ok) {
     throw toApiError(result);
@@ -110,6 +121,7 @@ export async function deviceRequest<T>(
     message: result.message,
     pagination: result.pagination,
     pending_count: result.pending_count,
+    counts: result.counts,
   };
 }
 

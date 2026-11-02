@@ -24,6 +24,12 @@ export type ApiOk<T> = {
     totalPages: number;
   };
   pending_count?: number;
+  counts?: {
+    all: number;
+    regular: number;
+    affiliate: number | null;
+    investor: number | null;
+  };
 };
 
 export type ApiFail = {
@@ -219,6 +225,7 @@ export async function apiRequest<T>(path: string, init: ApiRequestInit = {}): Pr
       message: typeof body?.message === 'string' ? body.message : 'Saved',
       pagination: body.pagination,
       pending_count: typeof body.pending_count === 'number' ? body.pending_count : undefined,
+      counts: body.counts,
     };
   }
 

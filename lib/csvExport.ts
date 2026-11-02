@@ -145,6 +145,11 @@ export const CustomerColumns: CSVColumn[] = [
   { key: 'phone', label: 'Phone' },
   { key: 'newsletter_subscribed', label: 'Newsletter', format: CSVExporter.formatBoolean },
   { key: 'created_at', label: 'Registered', format: CSVExporter.formatDate },
+  { key: 'type', label: 'Type' },
+  { key: 'affiliate_no', label: 'Affiliate no' },
+  { key: 'affiliate_status', label: 'Affiliate status' },
+  { key: 'investor_no', label: 'Investor no' },
+  { key: 'active_investments_count', label: 'Active investments' },
 ];
 
 export const OrderColumns: CSVColumn[] = [
