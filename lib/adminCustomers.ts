@@ -53,6 +53,20 @@ export function customerName(row: { first_name?: string | null; last_name?: stri
   return joined || row.full_name || row.email;
 }
 
+export function affiliateTypeHint(row: Pick<CustomerListRow, 'affiliate_no' | 'affiliate_status'>): string {
+  const status = AFFILIATE_STATUS_LABEL[row.affiliate_status || ''] || row.affiliate_status || 'Active';
+  const no = row.affiliate_no?.trim();
+  return no ? `Affiliate ${no}, ${status}` : `Affiliate, ${status}`;
+}
+
+export function investorTypeHint(row: Pick<CustomerListRow, 'investor_no' | 'active_investments_count'>): string {
+  const live = row.active_investments_count || 0;
+  if (live <= 0) return 'Past investor';
+  const investments = live === 1 ? '1 active investment' : `${live} active investments`;
+  const no = row.investor_no?.trim();
+  return no ? `Laptop Banking investor ${no}, ${investments}` : `Laptop Banking investor, ${investments}`;
+}
+
 export async function downloadCustomersCsv(params: URLSearchParams): Promise<void> {
   const headers = await authHeaders();
   const response = await fetch(`${API_URL}/api/admin/customers/export?${params.toString()}`, { headers });

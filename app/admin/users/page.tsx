@@ -15,6 +15,7 @@ import {
   ResponsiveTable,
   RowActions,
 } from '@/components/admin/list';
+import { CustomerTypeBadges } from '@/components/admin/CustomerTypeBadges';
 import { LoadGate, TableSkeleton } from '@/components/ui-states';
 import { applyQueryFail } from '@/lib/queryState';
 import { useSetAdminHeading } from '@/components/admin/AdminHeading';
@@ -31,35 +32,7 @@ import {
 } from '@/lib/adminCustomers';
 
 const AFFILIATE_FILTERS = ['awaiting_payment', 'pending', 'active', 'suspended', 'rejected'] as const;
-
-function TypeBadges({ row }: { row: CustomerListRow }) {
-  const badges = [];
-  if (row.is_affiliate) {
-    const status = row.affiliate_status && row.affiliate_status !== 'active'
-      ? ` · ${AFFILIATE_STATUS_LABEL[row.affiliate_status] || row.affiliate_status}`
-      : '';
-    badges.push(
-      <Badge key="aff" size="sm" className="bg-orange-100 text-[#E66600]">
-        Affiliate {row.affiliate_no || ''}{status}
-      </Badge>
-    );
-  }
-  if (row.is_investor) {
-    badges.push(
-      <Badge key="inv" size="sm" variant="info">
-        Investor {row.investor_no || ''}
-      </Badge>
-    );
-  }
-  if (!row.is_affiliate && !row.is_investor) {
-    badges.push(
-      <Badge key="cust" size="sm" variant="default">
-        Customer
-      </Badge>
-    );
-  }
-  return <div className="flex max-w-full flex-wrap gap-1">{badges}</div>;
-}
+const REGULAR_TAB_HINT = 'Customers who are not affiliates or Laptop Banking investors';
 
 export default function AdminUsersPage() {
   return (
@@ -154,7 +127,7 @@ function CustomersList() {
   const tabs = useMemo(() => {
     const items: Array<{ id: CustomerType; label: string; count: number | null }> = [
       { id: 'all', label: 'All', count: counts?.all ?? null },
-      { id: 'regular', label: 'Customers', count: counts?.regular ?? null },
+      { id: 'regular', label: 'Customers only', count: counts?.regular ?? null },
     ];
     if (canAffiliates) items.push({ id: 'affiliate', label: 'Affiliates', count: counts?.affiliate ?? null });
     if (canVlb) items.push({ id: 'investor', label: 'Laptop Banking', count: counts?.investor ?? null });
@@ -219,6 +192,12 @@ function CustomersList() {
           <button
             key={item.id}
             type="button"
+            title={item.id === 'regular' ? REGULAR_TAB_HINT : undefined}
+            aria-label={
+              item.id === 'regular'
+                ? `${item.count == null ? 'Customers only' : `Customers only (${item.count})`}. ${REGULAR_TAB_HINT}`
+                : undefined
+            }
             onClick={() => replaceParams({ type: item.id === 'all' ? null : item.id, affiliate_status: null, investor_status: null })}
             className={`min-h-11 rounded-full px-3 py-1.5 text-sm font-medium ${
               type === item.id ? 'bg-[#FF7A19] text-white' : 'bg-white border border-gray-200 text-[#1A1A1A]'
@@ -288,6 +267,7 @@ function CustomersList() {
           <option value="oldest">Oldest first</option>
         </select>
       </FilterBar>
+      <p className="-mt-4 mb-4 text-xs text-[#3A3A3A]">CUST customer · AFF affiliate · VLB Laptop Banking</p>
 
       <LoadGate
         loaded={loaded}
@@ -322,7 +302,7 @@ function CustomersList() {
                 key={row.id}
                 name={customerName(row)}
                 href={`/admin/users/${row.id}`}
-                status={<TypeBadges row={row} />}
+                status={<CustomerTypeBadges row={row} />}
                 facts={[
                   { label: 'Email', value: row.email },
                   { label: 'Phone', value: row.phone || '—' },
@@ -346,7 +326,7 @@ function CustomersList() {
                 </td>
                 <td className="px-4 py-3 text-sm text-[#3A3A3A]">{row.email}</td>
                 <td className="px-4 py-3 text-sm text-[#3A3A3A]">{row.phone || '—'}</td>
-                <td className="px-4 py-3"><TypeBadges row={row} /></td>
+                <td className="px-4 py-3"><CustomerTypeBadges row={row} /></td>
                 <td className="px-4 py-3 text-sm text-[#3A3A3A]">
                   {new Date(row.created_at).toLocaleDateString()}
                 </td>
