@@ -13,11 +13,11 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
 
   if (isAdminRoute) {
     return (
-      <>
+      <div className="flex min-h-0 flex-1 flex-col">
         <OfflineBanner />
         <SessionExpiredHost />
         {children}
-      </>
+      </div>
     );
   }
 

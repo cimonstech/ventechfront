@@ -430,7 +430,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <AdminHeadingProvider>
-    <div className="flex h-screen bg-gray-50 print:block print:h-auto print:bg-white">
+    <div className="flex h-dvh min-h-0 flex-1 bg-gray-50 print:block print:h-auto print:bg-white">
       {mobileNav ? (
         <button
           type="button"
@@ -573,7 +573,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Main Content */}
       <main
-        className={`flex-1 min-w-0 overflow-y-auto overflow-x-clip scroll-pt-20 ml-0 ${sidebarOpen ? 'lg:ml-64' : 'lg:ml-20'} transition-all duration-300 print:ml-0 print:overflow-visible`}
+        className={`min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-clip scroll-pt-20 bg-gray-50 ml-0 ${sidebarOpen ? 'lg:ml-64' : 'lg:ml-20'} transition-all duration-300 print:ml-0 print:overflow-visible`}
       >
         {/* Top Bar */}
         <div className="bg-white border-b border-gray-200 px-4 py-3 lg:px-8 lg:py-4 sticky top-0 z-40 print:hidden">

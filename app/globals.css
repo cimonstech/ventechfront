@@ -43,6 +43,11 @@ input, select, textarea {
 
 input[type='file'] {
   max-width: 100%;
+  max-height: 2.75rem;
+}
+
+input[type='file'].hidden {
+  display: none;
 }
 
 .overflow-x-auto {

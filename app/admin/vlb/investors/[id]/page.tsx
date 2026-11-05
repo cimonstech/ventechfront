@@ -72,7 +72,7 @@ function findOnFile(
   });
 }
 
-const CARD = 'min-w-0 overflow-hidden rounded-xl bg-white p-4 shadow-sm sm:p-6';
+const CARD = 'h-fit min-w-0 overflow-hidden rounded-xl bg-white p-4 shadow-sm sm:p-6';
 
 export default function AdminVlbInvestorDetailPage() {
   const params = useParams();
@@ -151,7 +151,7 @@ export default function AdminVlbInvestorDetailPage() {
     openAdminVlbDocument(docId).catch((error) => toast.error(apiMessage(error, 'Could not download this file.')));
 
   return (
-    <div className="min-w-0 max-w-full space-y-6 overflow-x-clip">
+    <div className="h-fit min-w-0 max-w-full space-y-6 overflow-x-clip">
       <VlbNav current="/admin/vlb/investors" />
       <Link href="/admin/vlb/investors" className="text-sm font-medium text-[#FF7A19]">Back to investors</Link>
       <div className={CARD}>
@@ -239,7 +239,7 @@ export default function AdminVlbInvestorDetailPage() {
           </ul>
         )}
         {editable && (
-          <form className="mt-4 grid min-w-0 grid-cols-1 gap-3" onSubmit={upload}>
+          <form className="mt-4 grid min-w-0 grid-cols-1 content-start gap-3" onSubmit={upload}>
             <select
               className="min-h-11 w-full min-w-0 max-w-full rounded-lg border px-3 py-2 text-sm"
               value={kind}

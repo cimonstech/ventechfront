@@ -32,7 +32,7 @@ export function FilePick({
         type="file"
         accept={accept}
         disabled={disabled}
-        className="sr-only"
+        className="hidden"
         onChange={(event) => onFile(event.target.files?.[0] || null)}
       />
       <div className="flex min-w-0 items-center gap-2">

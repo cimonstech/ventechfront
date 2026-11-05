@@ -82,7 +82,7 @@ export default function RootLayout({
           <Suspense fallback={null}>
             <ReferralCapture />
           </Suspense>
-          <div className="min-h-screen flex flex-col">
+          <div className="flex min-h-dvh flex-col">
             <LayoutWrapper>{children}</LayoutWrapper>
           </div>
           <ToastDedupe />
