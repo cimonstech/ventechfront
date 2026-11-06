@@ -3,6 +3,7 @@
 import { ADMIN_DATA_DENIED, isAccessDeniedStatus } from '@/lib/access';
 import { authHeaders } from '@/lib/authHeaders';
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import {
   Download,
   CheckCircle,
@@ -21,6 +22,9 @@ import {
   RowActions,
 } from '@/components/admin/list';
 import { LoadGate, TableSkeleton } from '@/components/ui-states';
+import { CopyValue } from '@/components/ui/CopyValue';
+import { Sheet } from '@/components/ui/Sheet';
+import { Button } from '@/components/ui/Button';
 import { noteQueryFail } from '@/lib/queryState';
 import { useAccess } from '@/context/AccessContext';
 import { supabase } from '@/lib/supabase';
@@ -31,6 +35,7 @@ interface Transaction {
   id: string;
   order_number: string;
   order_id?: string;
+  paystack_reference: string;
   customer_name: string;
   customer_email: string;
   amount: number;
@@ -38,6 +43,29 @@ interface Transaction {
   payment_method: string;
   date: string;
   created_at: string;
+}
+
+function paystackReferenceOf(tx: any): string {
+  const value = tx?.paystack_reference;
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function formatTransaction(tx: any): Transaction {
+  return {
+    id: tx.id,
+    order_number: tx.order?.order_number || tx.metadata?.order_number || 'N/A',
+    order_id: tx.order_id || tx.order?.id,
+    paystack_reference: paystackReferenceOf(tx),
+    customer_name: tx.customer_name || tx.metadata?.customer_name || tx.user
+      ? `${tx.user?.first_name || ''} ${tx.user?.last_name || ''}`.trim() || tx.customer_email || 'Unknown'
+      : tx.customer_email || 'Guest',
+    customer_email: tx.customer_email || tx.user?.email || 'No email',
+    amount: typeof tx.amount === 'string' ? parseFloat(tx.amount) || 0 : (tx.amount || 0),
+    status: tx.payment_status === 'paid' ? 'completed' : tx.payment_status === 'pending' ? 'pending' : tx.payment_status === 'failed' ? 'failed' : 'refunded',
+    payment_method: tx.payment_method || 'paystack',
+    date: new Date(tx.paid_at || tx.created_at).toLocaleDateString(),
+    created_at: tx.created_at,
+  };
 }
 
 export default function TransactionsPage() {
@@ -53,6 +81,7 @@ export default function TransactionsPage() {
   const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set());
   const [isRefunding, setIsRefunding] = useState(false);
   const [refundTarget, setRefundTarget] = useState<Transaction | 'bulk' | null>(null);
+  const [viewing, setViewing] = useState<Transaction | null>(null);
 
   // Fetch real data from Supabase
   useEffect(() => {
@@ -91,20 +120,7 @@ export default function TransactionsPage() {
         if (response.ok) {
           const result = await response.json();
           if (result.success && result.data) {
-            const formattedTransactions: Transaction[] = (result.data || []).map((tx: any) => ({
-              id: tx.id,
-              order_number: tx.order?.order_number || tx.metadata?.order_number || 'N/A',
-              order_id: tx.order_id || tx.order?.id,
-              customer_name: tx.customer_name || tx.user 
-                ? `${tx.user?.first_name || ''} ${tx.user?.last_name || ''}`.trim() || tx.customer_email || 'Unknown'
-                : tx.customer_email || 'Guest',
-              customer_email: tx.customer_email || tx.user?.email || 'No email',
-              amount: typeof tx.amount === 'string' ? parseFloat(tx.amount) || 0 : (tx.amount || 0),
-              status: tx.payment_status === 'paid' ? 'completed' : tx.payment_status === 'pending' ? 'pending' : tx.payment_status === 'failed' ? 'failed' : 'refunded',
-              payment_method: tx.payment_method || 'paystack',
-              date: new Date(tx.paid_at || tx.created_at).toLocaleDateString(),
-              created_at: tx.created_at,
-            }));
+            const formattedTransactions: Transaction[] = (result.data || []).map(formatTransaction);
             setTransactions(formattedTransactions);
             return;
           }
@@ -147,20 +163,7 @@ export default function TransactionsPage() {
       }
 
       // Format transactions for display
-      const formattedTransactions: Transaction[] = (data || []).map((tx: any) => ({
-        id: tx.id,
-        order_number: tx.order?.order_number || tx.metadata?.order_number || 'N/A',
-        order_id: tx.order_id || tx.order?.id,
-        customer_name: tx.metadata?.customer_name || tx.user 
-          ? `${tx.user.first_name || ''} ${tx.user.last_name || ''}`.trim() || tx.customer_email || 'Unknown'
-          : tx.customer_email || 'Guest',
-        customer_email: tx.customer_email || tx.user?.email || 'No email',
-        amount: typeof tx.amount === 'string' ? parseFloat(tx.amount) || 0 : (tx.amount || 0),
-        status: tx.payment_status === 'paid' ? 'completed' : tx.payment_status === 'pending' ? 'pending' : tx.payment_status === 'failed' ? 'failed' : 'refunded',
-        payment_method: tx.payment_method || 'paystack',
-        date: new Date(tx.paid_at || tx.created_at).toLocaleDateString(),
-        created_at: tx.created_at,
-      }));
+      const formattedTransactions: Transaction[] = (data || []).map(formatTransaction);
 
       setTransactions(formattedTransactions);
       setLoaded(true);
@@ -231,10 +234,12 @@ export default function TransactionsPage() {
   );
 
   const filteredTransactions = transactions.filter((transaction) => {
+    const q = searchQuery.toLowerCase();
     const matchesSearch =
-      transaction.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      transaction.customer_email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      transaction.order_number.toLowerCase().includes(searchQuery.toLowerCase());
+      transaction.customer_name.toLowerCase().includes(q) ||
+      transaction.customer_email.toLowerCase().includes(q) ||
+      transaction.order_number.toLowerCase().includes(q) ||
+      transaction.paystack_reference.toLowerCase().includes(q);
 
     const matchesStatus =
       statusFilter === 'all' || transaction.status === statusFilter;
@@ -331,10 +336,12 @@ export default function TransactionsPage() {
     0
   );
 
-  const refundActions = (transaction: Transaction) =>
-    canEditFinance && transaction.status === 'completed'
+  const rowActions = (transaction: Transaction) => [
+    { label: 'View', onClick: () => setViewing(transaction) },
+    ...(canEditFinance && transaction.status === 'completed'
       ? [{ label: 'Refund', destructive: true, onClick: () => requestSingleRefund(transaction) }]
-      : [];
+      : []),
+  ];
 
   return (
     <div className="min-w-0">
@@ -392,7 +399,7 @@ export default function TransactionsPage() {
       <FilterBar
         search={searchQuery}
         onSearchChange={setSearchQuery}
-        searchPlaceholder="Search by customer, email, or order"
+        searchPlaceholder="Search by customer, email, order, or reference"
         activeCount={statusFilter !== 'all' ? 1 : 0}
         onClear={() => setStatusFilter('all')}
       >
@@ -442,6 +449,7 @@ export default function TransactionsPage() {
                 </th>
               ) : null}
               <th className="px-4 py-3">Order</th>
+              <th className="px-4 py-3">Reference</th>
               <th className="px-4 py-3">Customer</th>
               <th className="px-4 py-3">Amount</th>
               <th className="px-4 py-3">Payment method</th>
@@ -458,13 +466,21 @@ export default function TransactionsPage() {
               facts={[
                 { label: 'Customer', value: transaction.customer_name },
                 { label: 'Amount', value: formatCurrency(transaction.amount) },
+                {
+                  label: 'Reference',
+                  value: (
+                    <span className="inline-flex justify-end font-mono text-xs font-normal">
+                      <CopyValue value={transaction.paystack_reference} />
+                    </span>
+                  ),
+                },
                 { label: 'Method', value: transaction.payment_method },
                 { label: 'Date', value: new Date(transaction.created_at).toLocaleDateString() },
               ]}
               actions={
                 <RowActions
                   name={transaction.order_number}
-                  actions={refundActions(transaction)}
+                  actions={rowActions(transaction)}
                 />
               }
             />
@@ -486,6 +502,11 @@ export default function TransactionsPage() {
               <td className="px-4 py-3">
                 <span className="font-mono text-sm font-semibold text-[#1A1A1A]">
                   {transaction.order_number}
+                </span>
+              </td>
+              <td className="px-4 py-3">
+                <span className="font-mono text-xs">
+                  <CopyValue value={transaction.paystack_reference} />
                 </span>
               </td>
               <td className="px-4 py-3">
@@ -511,13 +532,60 @@ export default function TransactionsPage() {
               <td className="px-4 py-3 text-right">
                 <RowActions
                   name={transaction.order_number}
-                  actions={refundActions(transaction)}
+                  actions={rowActions(transaction)}
                 />
               </td>
             </tr>
           ))}
         </ResponsiveTable>
       </LoadGate>
+
+      {viewing ? (
+        <Sheet
+          title="Transaction"
+          onClose={() => setViewing(null)}
+          footer={
+            <div className="flex justify-end">
+              <Button variant="ghost" onClick={() => setViewing(null)}>
+                Close
+              </Button>
+            </div>
+          }
+        >
+          <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3 text-sm">
+            <dt className="text-[#3A3A3A]">Paystack reference</dt>
+            <dd className="min-w-0 font-mono text-[#1A1A1A]">
+              <CopyValue value={viewing.paystack_reference} />
+            </dd>
+            <dt className="text-[#3A3A3A]">Order</dt>
+            <dd className="min-w-0 font-mono font-semibold">
+              {viewing.order_id ? (
+                <Link
+                  href={`/admin/orders?open=${encodeURIComponent(viewing.order_id)}`}
+                  className="text-[#FF7A19] hover:underline"
+                >
+                  {viewing.order_number}
+                </Link>
+              ) : (
+                <span className="text-[#1A1A1A]">{viewing.order_number}</span>
+              )}
+            </dd>
+            <dt className="text-[#3A3A3A]">Customer</dt>
+            <dd className="min-w-0 text-[#1A1A1A]">
+              {viewing.customer_name}
+              <span className="mt-0.5 block font-normal text-[#3A3A3A]">{viewing.customer_email}</span>
+            </dd>
+            <dt className="text-[#3A3A3A]">Amount</dt>
+            <dd className="font-semibold text-[#1A1A1A]">{formatCurrency(viewing.amount)}</dd>
+            <dt className="text-[#3A3A3A]">Method</dt>
+            <dd className="text-[#1A1A1A]">{viewing.payment_method}</dd>
+            <dt className="text-[#3A3A3A]">Status</dt>
+            <dd>{statusBadge(viewing.status)}</dd>
+            <dt className="text-[#3A3A3A]">Date</dt>
+            <dd className="text-[#1A1A1A]">{new Date(viewing.created_at).toLocaleDateString()}</dd>
+          </dl>
+        </Sheet>
+      ) : null}
 
       {refundTarget ? (
         <ConfirmDialog
