@@ -12,7 +12,8 @@ import { ChevronLeft } from 'lucide-react';
 import { formatCurrency } from '@/lib/helpers';
 import { orderService } from '@/services/order.service';
 import { deliveryOptionsService } from '@/services/deliveryOptions.service';
-import { paymentService } from '@/services/payment.service';
+import { clearPaymentRedirectWatch, paymentService } from '@/services/payment.service';
+import { PAYMENT_START_TIMEOUT_MS, shouldResetPaymentUiOnPageShow } from '@/lib/paymentUi';
 import { referralForCheckout } from '@/lib/referralCookie';
 import { couponService } from '@/services/coupon.service';
 import { DeliveryOption } from '@/types/order';
@@ -41,7 +42,26 @@ export default function CheckoutPage() {
   // Get applied coupon from sessionStorage (set by cart page)
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
   const [couponBusy, setCouponBusy] = useState(false);
-  
+
+  const resetPaymentUi = (message?: string) => {
+    clearPaymentRedirectWatch();
+    setIsProcessing(false);
+    if (message) setCheckoutError(message);
+  };
+
+  useEffect(() => {
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (!shouldResetPaymentUiOnPageShow(event.persisted)) return;
+      // Back/forward cache: Pay now must not stay stuck on "Starting your payment…"
+      resetPaymentUi();
+    };
+    window.addEventListener('pageshow', onPageShow);
+    return () => {
+      window.removeEventListener('pageshow', onPageShow);
+      clearPaymentRedirectWatch();
+    };
+  }, []);
+
   useEffect(() => {
     // Load coupon from sessionStorage on mount
     if (typeof window !== 'undefined') {
@@ -202,6 +222,32 @@ export default function CheckoutPage() {
   const [selectedDelivery, setSelectedDelivery] = useState<DeliveryOption | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'cash_on_delivery' | 'paystack'>('paystack'); // Paystack as default
   const [notes, setNotes] = useState('');
+
+  useEffect(() => {
+    if (!isProcessing || paymentMethod !== 'paystack') return;
+    const timer = window.setTimeout(() => {
+      resetPaymentUi("We couldn't open the payment page. Please try again.");
+    }, PAYMENT_START_TIMEOUT_MS);
+    return () => window.clearTimeout(timer);
+  }, [isProcessing, paymentMethod]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const resumePaidCheckout = async () => {
+      const reference = sessionStorage.getItem('pending_payment_reference')?.trim();
+      if (!reference) return;
+      // One verify only — never poll.
+      const result = await paymentService.verifyPayment(reference);
+      if (cancelled) return;
+      if (result.success && result.status === 'success') {
+        router.replace(`/payment/callback?reference=${encodeURIComponent(reference)}`);
+      }
+    };
+    void resumePaidCheckout();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   const saveCheckoutDraft = () => {
     if (typeof window === 'undefined') return;
@@ -503,17 +549,23 @@ export default function CheckoutPage() {
           checkout_data: checkoutData,
           payment_reference: paymentReference,
         },
+        onClose: () => {
+          resetPaymentUi();
+        },
       });
 
       if (!paymentResult.success) {
-        setCheckoutError(paymentResult.message || PAYMENT_COPY.startFailed);
-        setIsProcessing(false);
+        resetPaymentUi(paymentResult.message || PAYMENT_COPY.startFailed);
+        return;
+      }
+      // Redirect / popup path: leave isProcessing true until pageshow, onClose, success, or 30s safety net.
+      if (paymentResult.authorization_url) {
+        // Full-page redirect away from checkout; BFCache pageshow will reset if they come back.
         return;
       }
     } catch (error) {
       console.error('Paystack payment error:', error);
-      setCheckoutError(PAYMENT_COPY.startFailed);
-      setIsProcessing(false);
+      resetPaymentUi(PAYMENT_COPY.startFailed);
     }
   };
 

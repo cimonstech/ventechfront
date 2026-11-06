@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/Badge';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 import { useAccess } from '@/context/AccessContext';
+import { formatCedis } from '@/lib/money';
+import { formatOrderItemOptions } from '@/lib/orderItemOptions';
 
 interface OrderItem {
   id: string;
@@ -617,21 +619,20 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
                                       </span>
                                     )}
                                   </div>
-                                  {item.selected_variants && (
+                                  {formatOrderItemOptions(item.selected_variants) ? (
                                     <p className="text-xs text-[#3A3A3A]">
-                                      {Object.entries(item.selected_variants).map(([key, value]) => `${key}: ${value}`).join(', ')}
+                                      {formatOrderItemOptions(item.selected_variants)}
                                     </p>
-                                  )}
+                                  ) : null}
                                 </div>
                               </div>
                             </td>
                             <td className="px-4 py-3 text-sm text-[#3A3A3A]">{item.quantity}</td>
                             <td className="px-4 py-3 text-sm text-right text-[#3A3A3A]">
-                              GHS {(item.unit_price || 0).toFixed(2)}
+                              {formatCedis(item.unit_price || 0)}
                             </td>
                             <td className="px-4 py-3 text-sm text-right font-semibold text-[#1A1A1A]">
-                              {/* ✅ Use backend's total_price directly - already in GHS, NO calculation */}
-                              GHS {(item.total_price ?? item.subtotal ?? 0).toFixed(2)}
+                              {formatCedis(item.total_price ?? item.subtotal ?? 0)}
                             </td>
                           </tr>
                         ))
@@ -653,12 +654,12 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-[#3A3A3A]">Subtotal:</span>
-                    <span className="font-medium text-[#1A1A1A]">GHS {order.subtotal.toFixed(2)}</span>
+                    <span className="font-medium text-[#1A1A1A]">{formatCedis(order.subtotal)}</span>
                   </div>
                   {order.discount > 0 && (
                     <div className="flex justify-between">
                       <span className="text-[#3A3A3A]">Discount:</span>
-                      <span className="font-medium text-[#1A1A1A]">-GHS {order.discount.toFixed(2)}</span>
+                      <span className="font-medium text-[#1A1A1A]">-{formatCedis(order.discount)}</span>
                     </div>
                   )}
                   {order.shipping_fee > 0 && (
@@ -666,18 +667,18 @@ export function OrderDetailModal({ isOpen, onClose, orderId, onStatusUpdate }: O
                       <span className="text-[#3A3A3A]">
                         {order.is_pre_order ? 'Pre-Order Shipping:' : 'Shipping:'}
                       </span>
-                      <span className="font-medium text-[#1A1A1A]">GHS {order.shipping_fee.toFixed(2)}</span>
+                      <span className="font-medium text-[#1A1A1A]">{formatCedis(order.shipping_fee)}</span>
                     </div>
                   )}
                   {order.tax > 0 && (
                     <div className="flex justify-between">
                       <span className="text-[#3A3A3A]">Tax:</span>
-                      <span className="font-medium text-[#1A1A1A]">GHS {order.tax.toFixed(2)}</span>
+                      <span className="font-medium text-[#1A1A1A]">{formatCedis(order.tax)}</span>
                     </div>
                   )}
                   <div className="flex justify-between pt-2 border-t border-gray-300">
                     <span className="font-semibold text-[#1A1A1A]">Total:</span>
-                    <span className="font-bold text-lg text-[#FF7A19]">GHS {order.total.toFixed(2)}</span>
+                    <span className="font-bold text-lg text-[#FF7A19]">{formatCedis(order.total)}</span>
                   </div>
                 </div>
               </div>

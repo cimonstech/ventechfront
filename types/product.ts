@@ -62,6 +62,7 @@ export interface ProductVariant {
   type: 'ram' | 'storage' | 'color' | 'warranty' | 'size';
   name: string;
   value: string;
+  attribute_name?: string;
   price_adjustment: number; // Additional cost or discount
   stock_quantity: number;
   sku: string;

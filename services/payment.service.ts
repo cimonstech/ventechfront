@@ -12,6 +12,8 @@ interface PaymentData {
     user_id?: string;
     [key: string]: any;
   };
+  /** Called when the Paystack popup is closed without completing payment. */
+  onClose?: () => void;
 }
 
 interface PaymentResponse {
@@ -33,7 +35,45 @@ type InitializePayload = {
   authorization_url?: string;
 };
 
+let redirectWatch: ReturnType<typeof setInterval> | null = null;
+let redirectWatchTimeout: ReturnType<typeof setTimeout> | null = null;
+
+/** Clear the 500 ms location-check interval (and its fallback timeout). Safe to call anytime. */
+export function clearPaymentRedirectWatch(): void {
+  if (redirectWatch != null) {
+    clearInterval(redirectWatch);
+    redirectWatch = null;
+  }
+  if (redirectWatchTimeout != null) {
+    clearTimeout(redirectWatchTimeout);
+    redirectWatchTimeout = null;
+  }
+}
+
+function startRedirectWatch(callbackUrl: string, reference: string): void {
+  clearPaymentRedirectWatch();
+  redirectWatch = setInterval(() => {
+    if (
+      window.location.pathname.includes('/payment/callback') ||
+      window.location.pathname.includes('/orders/')
+    ) {
+      clearPaymentRedirectWatch();
+    }
+  }, 500);
+  redirectWatchTimeout = setTimeout(() => {
+    clearPaymentRedirectWatch();
+    if (
+      !window.location.pathname.includes('/payment/callback') &&
+      !window.location.pathname.includes('/orders/')
+    ) {
+      window.location.href = `${callbackUrl}?reference=${encodeURIComponent(reference)}`;
+    }
+  }, 3000);
+}
+
 export const paymentService = {
+  clearRedirectWatch: clearPaymentRedirectWatch,
+
   async initializePayment(data: PaymentData): Promise<PaymentResponse> {
     const result = await apiRequest<InitializePayload>('/api/payments/initialize', {
       method: 'POST',
@@ -69,25 +109,13 @@ export const paymentService = {
 
       try {
         const PaystackPop = await loadPaystack();
+        const callbackUrl = data.callback_url || `${window.location.origin}/payment/callback`;
 
         if (authorization_url) {
           window.location.href = authorization_url;
         } else if (PaystackPop && typeof PaystackPop.resumeTransaction === 'function' && access_code) {
           PaystackPop.resumeTransaction(access_code);
-          const callbackUrl = data.callback_url || `${window.location.origin}/payment/callback`;
-          const redirectCheck = setInterval(() => {
-            if (window.location.pathname.includes('/payment/callback') ||
-                window.location.pathname.includes('/orders/')) {
-              clearInterval(redirectCheck);
-            }
-          }, 500);
-          setTimeout(() => {
-            clearInterval(redirectCheck);
-            if (!window.location.pathname.includes('/payment/callback') &&
-                !window.location.pathname.includes('/orders/')) {
-              window.location.href = `${callbackUrl}?reference=${data.reference}`;
-            }
-          }, 3000);
+          startRedirectWatch(callbackUrl, data.reference);
         } else if (PaystackPop && typeof PaystackPop.setup === 'function') {
           const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
           if (!publicKey) {
@@ -97,7 +125,6 @@ export const paymentService = {
               return { success: false, message: PAYMENT_COPY.startFailed, reference: data.reference };
             }
           } else {
-            const callbackUrl = data.callback_url || `${window.location.origin}/payment/callback`;
             const handler = PaystackPop.setup({
               key: publicKey,
               email: data.email,
@@ -106,16 +133,13 @@ export const paymentService = {
               currency: 'GHS',
               callback_url: callbackUrl,
               callback: (response: any) => {
+                clearPaymentRedirectWatch();
                 const ref = response.reference || data.reference;
-                window.location.href = `${callbackUrl}?reference=${ref}`;
+                window.location.href = `${callbackUrl}?reference=${encodeURIComponent(ref)}`;
               },
               onClose: () => {
-                setTimeout(() => {
-                  if (!window.location.pathname.includes('/payment/callback') &&
-                      !window.location.pathname.includes('/orders/')) {
-                    window.location.href = `${callbackUrl}?reference=${data.reference}`;
-                  }
-                }, 1000);
+                clearPaymentRedirectWatch();
+                data.onClose?.();
               },
             });
             handler.openIframe();
@@ -127,6 +151,7 @@ export const paymentService = {
         }
       } catch (paystackError) {
         console.error('Paystack initialization error:', paystackError);
+        clearPaymentRedirectWatch();
         if (authorization_url) {
           window.location.href = authorization_url;
         } else {

@@ -4,8 +4,9 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { FieldError } from '@/components/ui-states';
 import { signIn, signOut, getUserProfile } from '@/services/auth.service';
 import { useAppDispatch } from '@/store';
@@ -24,7 +25,6 @@ export default function LoginPage() {
     email: '',
     password: '',
   });
-  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<any>({});
   const [redirectTo, setRedirectTo] = useState<string | null>(null);
@@ -175,39 +175,18 @@ export default function LoginPage() {
               </div>
               <FieldError id="login-email-error" message={errors.email} />
             </div>
-            <div>
-              <label htmlFor="password" className="sr-only">
-                Password
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock size={18} className="text-[#3A3A3A]" />
-                </div>
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
-                  required
-                  value={formData.password}
-                  onChange={handleChange}
-                  aria-invalid={errors.password ? true : undefined}
-                  aria-describedby={errors.password ? 'login-password-error' : undefined}
-                  suppressHydrationWarning
-                  className={`appearance-none rounded-b-lg relative block w-full px-3 py-3 pl-10 pr-10 border placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-[#FF7A19] focus:border-[#FF7A19] focus:z-10 sm:text-sm ${errors.password ? 'border-red-500' : 'border-gray-300'}`}
-                  placeholder="Password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#3A3A3A] hover:text-[#FF7A19]"
-                  suppressHydrationWarning
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-              <FieldError id="login-password-error" message={errors.password} />
-            </div>
+            <PasswordInput
+              id="password"
+              name="password"
+              autoComplete="current-password"
+              required
+              value={formData.password}
+              onChange={handleChange}
+              error={errors.password}
+              icon={<Lock size={18} />}
+              placeholder="Password"
+              className="rounded-b-lg appearance-none"
+            />
           </div>
 
           <div className="flex items-center justify-between">

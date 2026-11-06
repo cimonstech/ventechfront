@@ -8,6 +8,7 @@ import { useAppSelector, useAppDispatch } from '@/store';
 import { removeFromCart, updateQuantity } from '@/store/cartSlice';
 import { Trash2, Minus, Plus, ShoppingBag, ArrowRight } from 'lucide-react';
 import { formatCurrency } from '@/lib/helpers';
+import { formatOrderItemOptions } from '@/lib/orderItemOptions';
 import { taxService } from '@/services/tax.service';
 import { discountService } from '@/services/discount.service';
 import { CouponCode } from '@/components/cart/CouponCode';
@@ -236,18 +237,11 @@ export default function CartPage() {
                       <p className="text-[10px] sm:text-xs text-gray-500 mb-2">{item.brand}</p>
 
                       {/* Variants */}
-                      {Object.keys(item.selected_variants || {}).length > 0 && (
-                        <div className="flex flex-wrap gap-1 mb-2">
-                          {Object.values(item.selected_variants || {}).map((variant: any) => (
-                            <span
-                              key={variant.id}
-                              className="text-[9px] sm:text-xs bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded"
-                            >
-                              {variant.name}: {variant.value}
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                      {formatOrderItemOptions(item.selected_variants) ? (
+                        <p className="text-[9px] sm:text-xs text-gray-600 mb-2">
+                          {formatOrderItemOptions(item.selected_variants)}
+                        </p>
+                      ) : null}
 
                       {/* Quantity Controls */}
                       <div className="flex items-center gap-2 mb-2">

@@ -14,6 +14,7 @@ import { orderService } from '@/services/order.service';
 import { useAppSelector, useAppDispatch } from '@/store';
 import { clearCart } from '@/store/cartSlice';
 import { formatCurrency, formatDate, getOrderStatusColor } from '@/lib/helpers';
+import { formatOrderItemOptions } from '@/lib/orderItemOptions';
 import toast from 'react-hot-toast';
 
 export default function OrderDetailPage() {
@@ -224,15 +225,9 @@ export default function OrderDetailPage() {
                     <div className="flex-1">
                       <p className="font-semibold text-gray-900 mb-1">{item.product_name}</p>
                       <p className="text-sm text-gray-600 mb-2">Quantity: {item.quantity}</p>
-                      {item.selected_variants && Object.keys(item.selected_variants).length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                          {Object.values(item.selected_variants).map((variant: any, idx) => (
-                            <span key={idx} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
-                              {variant.name}: {variant.value}
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                      {formatOrderItemOptions(item.selected_variants) ? (
+                        <p className="text-xs text-gray-600">{formatOrderItemOptions(item.selected_variants)}</p>
+                      ) : null}
                     </div>
                     <div className="text-right">
                       <p className="font-bold text-gray-900">

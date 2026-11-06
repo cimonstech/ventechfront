@@ -137,6 +137,7 @@ export function ProductContent({ product }: ProductContentProps) {
           type: 'ram' as any, // Will be determined by attribute type
           name: selectedVariant.option.label,
           value: selectedVariant.option.value,
+          attribute_name: selectedVariant.attributeName || undefined,
           price_adjustment: selectedVariant.option.price_modifier,
           stock_quantity: selectedVariant.option.stock_quantity,
           sku: `${product.id}-${selectedVariant.option.sku_suffix || selectedVariant.option.value}`,
@@ -174,6 +175,7 @@ export function ProductContent({ product }: ProductContentProps) {
           type: 'ram' as any,
           name: selectedVariant.option.label,
           value: selectedVariant.option.value,
+          attribute_name: selectedVariant.attributeName || undefined,
           price_adjustment: selectedVariant.option.price_modifier,
           stock_quantity: selectedVariant.option.stock_quantity,
           sku: `${product.id}-${selectedVariant.option.sku_suffix || selectedVariant.option.value}`,

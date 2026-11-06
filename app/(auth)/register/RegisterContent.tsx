@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { signUp } from '@/services/auth.service';
 import toast from 'react-hot-toast';
 import { Mail, Lock, User, Phone, ArrowRight, CheckCircle } from 'lucide-react';
@@ -213,11 +214,10 @@ export function RegisterContent() {
               placeholder="+233 XX XXX XXXX"
             />
 
-            {/* Password */}
-            <Input
+            <PasswordInput
               label="Password"
               name="password"
-              type="password"
+              autoComplete="new-password"
               value={formData.password}
               onChange={handleChange}
               error={errors.password}
@@ -225,11 +225,10 @@ export function RegisterContent() {
               icon={<Lock size={18} />}
             />
 
-            {/* Confirm Password */}
-            <Input
+            <PasswordInput
               label="Confirm Password"
               name="confirmPassword"
-              type="password"
+              autoComplete="new-password"
               value={formData.confirmPassword}
               onChange={handleChange}
               error={errors.confirmPassword}

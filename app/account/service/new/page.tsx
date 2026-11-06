@@ -7,10 +7,12 @@ import toast from 'react-hot-toast';
 import { ArrowLeft, Check, FileText, Film, ImagePlus, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { DeviceWarrantyBadge } from '@/components/admin/DeviceWarrantyBadge';
+import { SuccessPanel } from '@/components/ui-states';
 import { useAppSelector } from '@/store';
 import { safeRedirectPath } from '@/lib/safeRedirect';
 import { apiMessage, deviceRequest, type DeviceWarranty } from '@/lib/devicesAdmin';
 import { uploadTicketFile } from '@/lib/ticketUploads';
+import { formatDate } from '@/lib/helpers';
 
 interface IssueType {
   id: string;
@@ -89,7 +91,13 @@ function NewServiceRequest() {
   const [files, setFiles] = useState<LocalFile[]>([]);
   const [receipt, setReceipt] = useState<LocalFile | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [created, setCreated] = useState<string | null>(null);
+  const [created, setCreated] = useState<{
+    ticketNo: string;
+    emailSent: boolean;
+    device: string;
+    issue: string;
+    dateStarted: string;
+  } | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -302,7 +310,13 @@ function NewServiceRequest() {
     }
     setSubmitting(true);
     try {
-      const result = await deviceRequest<{ ticket_no: string }>('/api/tickets', {
+      const result = await deviceRequest<{
+        ticket_no: string;
+        email_sent?: boolean;
+        laptop_model?: string;
+        issue_name?: string;
+        date_started?: string;
+      }>('/api/tickets', {
         method: 'POST',
         body: JSON.stringify({
           device_token: token || undefined,
@@ -318,7 +332,20 @@ function NewServiceRequest() {
         }),
       });
       toast.success(result.message);
-      setCreated(result.data.ticket_no);
+      const issueName = issues.find((row) => row.id === issueId)?.name || result.data.issue_name || 'Service';
+      const deviceName =
+        result.data.laptop_model ||
+        (source === 'device' ? linked?.model_name : undefined) ||
+        (source === 'listed' ? devices.find((row) => row.qr_token === selectedToken)?.model_name : undefined) ||
+        model.trim() ||
+        'Laptop';
+      setCreated({
+        ticketNo: result.data.ticket_no,
+        emailSent: result.data.email_sent === true,
+        device: deviceName,
+        issue: issueName,
+        dateStarted: result.data.date_started || started,
+      });
     } catch (error) {
       toast.error(apiMessage(error, 'Could not submit this request'));
     } finally {
@@ -337,26 +364,26 @@ function NewServiceRequest() {
   if (created) {
     return (
       <div className="min-h-screen bg-[#F4F1EC] overflow-x-clip">
-        <div className="max-w-3xl mx-auto min-w-0 px-4 py-6 sm:py-10 space-y-6">
-          <div className="rounded-2xl bg-[#1A1A1A] text-white px-5 py-8 sm:px-8 text-center">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#FF7A19]">Service request</p>
-            <p className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight break-words">{created}</p>
-            <p className="mt-3 text-sm text-white/80">We&apos;ve emailed you a copy</p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Link
-              href={`/account/service/${encodeURIComponent(created)}`}
-              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-[#FF7A19] px-4 py-2 font-medium text-white hover:bg-[#E66600] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A19]"
-            >
-              View request
-            </Link>
-            <Link
-              href="/account/devices"
-              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-white px-4 py-2 font-medium text-[#1A1A1A] hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7A19]"
-            >
-              Back to my devices
-            </Link>
-          </div>
+        <div className="max-w-3xl mx-auto min-w-0 px-4 py-6 sm:py-10">
+          <SuccessPanel
+            title={`Request ${created.ticketNo} received`}
+            description="We'll review it and update you by email and here."
+            details={[
+              { label: 'Device', value: created.device },
+              { label: 'Issue type', value: created.issue },
+              { label: 'Date', value: formatDate(created.dateStarted) },
+            ]}
+            footnote={
+              created.emailSent
+                ? "We've emailed you a copy."
+                : 'A copy will be emailed to you shortly.'
+            }
+            primary={{
+              label: 'View request',
+              href: `/account/service/${encodeURIComponent(created.ticketNo)}`,
+            }}
+            secondary={{ label: 'Back to my devices', href: '/account/devices' }}
+          />
         </div>
       </div>
     );
